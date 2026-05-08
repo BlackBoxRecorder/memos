@@ -169,7 +169,7 @@ function closeForm(): void {
 function formatDate(d: string): string {
   try {
     const date = new Date(d + "Z");
-    return date.toLocaleDateString("en-US", {
+    return date.toLocaleDateString("zh-CN", {
       year: "numeric",
       month: "short",
       day: "numeric",
