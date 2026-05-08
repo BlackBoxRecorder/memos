@@ -1,4 +1,4 @@
-import { initDb, seedFromJson } from "./db";
+import { initDb } from "./db";
 import { handleAuthRequest } from "./api/auth";
 import { handleMemosRequest } from "./api/memos";
 
@@ -43,23 +43,6 @@ async function buildClientJs(srcPath: string): Promise<string | null> {
   } catch (e) {
     console.error(`Build failed for ${srcPath}:`, e);
     return null;
-  }
-}
-
-// 尝试导入 shower-thoughts.json 作为 seed 数据
-async function trySeed(): Promise<void> {
-  try {
-    const jsonPath = `${STATIC_BASE}/masonry/shower-thoughts.json`;
-    const file = Bun.file(jsonPath);
-    if (await file.exists()) {
-      const thoughts: string[] = await file.json();
-      seedFromJson(thoughts);
-      console.log(
-        `Seeded ${thoughts.length} initial memos from shower-thoughts.json`,
-      );
-    }
-  } catch {
-    // JSON 文件不存在或格式不对，跳过
   }
 }
 
@@ -143,9 +126,6 @@ async function handleRequest(request: Request): Promise<Response> {
 
 // 初始化数据库
 initDb();
-
-// 尝试 seed（首次运行）
-await trySeed();
 
 // 启动服务器
 Bun.serve({

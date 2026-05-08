@@ -26,18 +26,12 @@ export function initDb(): void {
     CREATE TABLE IF NOT EXISTS memos (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
       content     TEXT    NOT NULL,
+      tag         TEXT    NOT NULL DEFAULT '',
       is_public   INTEGER NOT NULL DEFAULT 1,
       created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
       updated_at  TEXT    NOT NULL DEFAULT (datetime('now'))
     )
   `);
-
-  // Migration: add tag column if not present
-  const cols = d.query("PRAGMA table_info(memos)").all() as any[];
-  const hasTag = cols.some((c: any) => c.name === "tag");
-  if (!hasTag) {
-    d.run("ALTER TABLE memos ADD COLUMN tag TEXT NOT NULL DEFAULT ''");
-  }
 }
 
 function rowToMemo(row: any): Memo {
@@ -130,16 +124,4 @@ export function deleteMemo(id: number): boolean {
   const d = getDb();
   const result = d.run("DELETE FROM memos WHERE id = ?", [id]);
   return result.changes > 0;
-}
-
-export function seedFromJson(thoughts: string[]): void {
-  const d = getDb();
-  const count = d.query("SELECT COUNT(*) as c FROM memos").get() as any;
-  if (count.c > 0) return; // 已有数据，不重复导入
-  const stmt = d.prepare(
-    "INSERT INTO memos (content, is_public) VALUES (?, 1)",
-  );
-  for (const text of thoughts) {
-    stmt.run(text);
-  }
 }

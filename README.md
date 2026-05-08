@@ -9,7 +9,7 @@
 - **🔍 全文搜索** — 实时搜索备忘录内容，支持按需过滤
 - **🌊 瀑布流展示** — 首页采用 Masonry 瀑布流布局，自适应多列排列
 - **🔐 管理后台** — 独立的管理员 SPA 界面，通过密钥认证登录
-- **🪶 轻量无依赖** — 基于 Bun 内置 API（SQLite + HTTP Server），仅依赖两个第三方库
+- **🪶 轻量无依赖** — 基于 Bun 内置 API（SQLite + HTTP Server）
 
 ## 技术栈
 
@@ -17,7 +17,7 @@
 |------|------|
 | 运行时 | [Bun](https://bun.com) |
 | 数据库 | SQLite（`bun:sqlite`，WAL 模式） |
-| 前端（首页） | Vanilla TS + [@chenglou/pretext](https://github.com/chenglou/pretext) 文字排版 |
+| 前端（首页） | [@chenglou/pretext](https://github.com/chenglou/pretext) 文字排版 |
 | 前端（管理后台） | [VanJS](https://vanjs.org/) 响应式 UI |
 | 认证 | Cookie + 内存 Session |
 | 构建 | `Bun.build`（服务端按需编译 TS → JS） |
@@ -69,7 +69,6 @@ bun install
 
 - 自动创建 `memos.db` 文件（SQLite，WAL 模式）
 - 自动创建 `memos` 表（id、content、tag、is_public、created_at、updated_at）
-- 若在 `src/masonry/shower-thoughts.json` 放置了种子数据，首次启动时会自动导入
 
 ### 运行
 
