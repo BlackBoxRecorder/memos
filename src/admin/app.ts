@@ -147,6 +147,7 @@ function openCreateForm(): void {
   formIsPublic.val = true;
   formTag.val = "";
   formError.val = null;
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 function openEditForm(memo: Memo): void {
@@ -155,6 +156,7 @@ function openEditForm(memo: Memo): void {
   formIsPublic.val = memo.is_public;
   formTag.val = memo.tag;
   formError.val = null;
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 function closeForm(): void {
