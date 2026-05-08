@@ -28,9 +28,11 @@ type LayoutState = {
 
 type State = {
   cards: Card[];
+  currentSearch: string;
+  currentTag: string;
 };
 
-let st: State = { cards: [] };
+let st: State = { cards: [], currentSearch: "", currentTag: "" };
 
 type DomCache = {
   container: HTMLDivElement;
@@ -47,6 +49,18 @@ const domCache: DomCache = {
 domCache.container.style.position = "relative";
 document.body.appendChild(domCache.container);
 
+// --- prepared text cache ---
+const preparedCache = new Map<string, PreparedText>();
+
+function getOrPrepare(text: string, f: string): PreparedText {
+  const cached = preparedCache.get(text);
+  if (cached) return cached;
+  const p = prepare(text, f);
+  preparedCache.set(text, p);
+  return p;
+}
+
+// --- status messages ---
 function showStatus(message: string, isError = false): void {
   if (!domCache.statusEl) {
     domCache.statusEl = document.createElement("div");
@@ -65,8 +79,8 @@ function hideStatus(): void {
   }
 }
 
+// --- masonry layout ---
 function computeLayout(windowWidth: number): LayoutState {
-  // --- column math ---
   let colCount: number;
   let colWidth: number;
   if (windowWidth <= singleColumnMaxViewportWidth) {
@@ -87,13 +101,11 @@ function computeLayout(windowWidth: number): LayoutState {
   const contentWidth = colCount * colWidth + (colCount - 1) * gap;
   const offsetLeft = (windowWidth - contentWidth) / 2;
 
-  // --- masonry placement: shortest-column-first ---
   const colHeights = new Float64Array(colCount);
   for (let c = 0; c < colCount; c++) colHeights[c] = gap;
 
   const positionedCards: PositionedCard[] = [];
   for (let i = 0; i < st.cards.length; i++) {
-    // Find the shortest column
     let shortest = 0;
     for (let c = 1; c < colCount; c++) {
       if (colHeights[c]! < colHeights[shortest]!) shortest = c;
@@ -132,6 +144,13 @@ function getOrCreateCardNode(cardIndex: number): HTMLDivElement {
   return node;
 }
 
+function clearAllCards(): void {
+  for (const node of domCache.cards) {
+    if (node) node.remove();
+  }
+  domCache.cards = [];
+}
+
 // --- events ---
 window.addEventListener("resize", () => scheduleRender());
 window.addEventListener("scroll", () => scheduleRender(), true);
@@ -150,7 +169,6 @@ function scheduleRender() {
 function render() {
   if (st.cards.length === 0) return;
 
-  // --- DOM reads ---
   const windowWidth = document.documentElement.clientWidth;
   const windowHeight = document.documentElement.clientHeight;
   const scrollTop = window.scrollY;
@@ -158,7 +176,6 @@ function render() {
   const layoutState = computeLayout(windowWidth);
   domCache.container.style.height = `${layoutState.contentHeight}px`;
 
-  // --- visibility culling + DOM writes (single pass) ---
   const viewTop = scrollTop - 200;
   const viewBottom = scrollTop + windowHeight + 200;
   const visibleFlags = new Uint8Array(st.cards.length);
@@ -179,7 +196,6 @@ function render() {
     node.style.height = `${positionedCard.h}px`;
   }
 
-  // Remove cards that scrolled out of view
   for (let cardIndex = 0; cardIndex < domCache.cards.length; cardIndex++) {
     const node = domCache.cards[cardIndex];
     if (node && visibleFlags[cardIndex] === 0) {
@@ -189,37 +205,108 @@ function render() {
   }
 }
 
-// --- async initialization: fetch memos from API ---
-async function init(): Promise<void> {
-  showStatus("Loading...");
-
+// --- tag loading ---
+async function loadTags(): Promise<void> {
   try {
-    const resp = await fetch("/api/memos");
-    if (!resp.ok) {
-      throw new Error(`Server returned ${resp.status}`);
+    const resp = await fetch("/api/memos/tags");
+    const data: { tags: string[] } = await resp.json();
+    const select = document.getElementById("tag-select") as HTMLSelectElement;
+    if (!select) return;
+    for (const tag of data.tags) {
+      const opt = document.createElement("option");
+      opt.value = tag;
+      opt.textContent = tag;
+      select.appendChild(opt);
     }
-    const data: { memos: { content: string }[] } = await resp.json();
+  } catch (err) {
+    console.error("Failed to load tags:", err);
+  }
+}
 
-    if (data.memos.length === 0) {
-      showStatus("No memos yet.");
-      return;
-    }
+// --- fetch and render with filters ---
+async function fetchAndRender(search: string, tag: string): Promise<void> {
+  showStatus("Loading...");
+  try {
+    const params = new URLSearchParams();
+    if (search) params.set("search", search);
+    if (tag) params.set("tag", tag);
+    const url = `/api/memos${params.toString() ? "?" + params.toString() : ""}`;
+
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
+    const data: { memos: { content: string }[] } = await resp.json();
 
     hideStatus();
 
-    // Prepare all texts upfront (one-time cost)
+    if (data.memos.length === 0) {
+      st = { cards: [], currentSearch: search, currentTag: tag };
+      clearAllCards();
+      domCache.container.style.height = "0px";
+      showStatus("No memos found.");
+      return;
+    }
+
     st = {
       cards: data.memos.map((m) => ({
         text: m.content,
-        prepared: prepare(m.content, font),
+        prepared: getOrPrepare(m.content, font),
       })),
+      currentSearch: search,
+      currentTag: tag,
     };
 
+    clearAllCards();
     scheduleRender();
+
+    // Update URL for bookmarkability
+    const newUrl = params.toString()
+      ? `${window.location.pathname}?${params.toString()}`
+      : window.location.pathname;
+    history.replaceState(null, "", newUrl);
   } catch (err) {
     console.error("Failed to load memos:", err);
     showStatus("Failed to load memos. Please try again later.", true);
   }
+}
+
+// --- debounced search + tag change ---
+let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+document.addEventListener("DOMContentLoaded", () => {
+  const searchInput = document.getElementById(
+    "search-input",
+  ) as HTMLInputElement;
+  const tagSelect = document.getElementById("tag-select") as HTMLSelectElement;
+
+  searchInput?.addEventListener("input", () => {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      fetchAndRender(searchInput.value.trim(), tagSelect?.value || "");
+    }, 250);
+  });
+
+  tagSelect?.addEventListener("change", () => {
+    fetchAndRender(searchInput?.value.trim() || "", tagSelect.value);
+  });
+});
+
+// --- init: load tags and initial state from URL ---
+async function init(): Promise<void> {
+  const urlParams = new URLSearchParams(window.location.search);
+  const initialSearch = urlParams.get("search") || "";
+  const initialTag = urlParams.get("tag") || "";
+
+  const searchInput = document.getElementById(
+    "search-input",
+  ) as HTMLInputElement;
+  if (searchInput) searchInput.value = initialSearch;
+
+  await loadTags();
+
+  const tagSelect = document.getElementById("tag-select") as HTMLSelectElement;
+  if (tagSelect && initialTag) tagSelect.value = initialTag;
+
+  await fetchAndRender(initialSearch, initialTag);
 }
 
 init();

@@ -1,5 +1,12 @@
 import { requireAuth } from "../auth";
-import { getMemos, getMemo, createMemo, updateMemo, deleteMemo } from "../db";
+import {
+  getMemos,
+  getMemo,
+  createMemo,
+  updateMemo,
+  deleteMemo,
+  getAllTags,
+} from "../db";
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -18,14 +25,20 @@ export async function handleMemosRequest(
   if (method === "GET" && path === "/api/memos") {
     const url = new URL(request.url);
     const allParam = url.searchParams.get("all");
-    // 仅当已认证且明确请求 all=true 时返回所有 memos
-    // 否则根据认证状态返回
     const includePrivate =
       allParam === "true"
         ? requireAuth(request) === null
         : requireAuth(request) === null;
-    const memos = getMemos(includePrivate);
+    const search = url.searchParams.get("search") || undefined;
+    const tag = url.searchParams.get("tag") || undefined;
+    const memos = getMemos({ includePrivate, search, tag });
     return json({ memos });
+  }
+
+  // GET /api/memos/tags
+  if (method === "GET" && path === "/api/memos/tags") {
+    const tags = getAllTags();
+    return json({ tags });
   }
 
   // POST /api/memos — 创建
@@ -33,7 +46,7 @@ export async function handleMemosRequest(
     const authErr = requireAuth(request);
     if (authErr) return authErr;
 
-    let body: { content?: string; is_public?: boolean };
+    let body: { content?: string; is_public?: boolean; tag?: string };
     try {
       body = await request.json();
     } catch {
@@ -48,7 +61,11 @@ export async function handleMemosRequest(
       return json({ error: "Content is required" }, 400);
     }
 
-    const memo = createMemo(body.content.trim(), body.is_public !== false);
+    const memo = createMemo(
+      body.content.trim(),
+      body.is_public !== false,
+      body.tag,
+    );
     return json({ memo }, 201);
   }
 
@@ -59,7 +76,7 @@ export async function handleMemosRequest(
     if (authErr) return authErr;
 
     const id = Number(putMatch[1]);
-    let body: { content?: string; is_public?: boolean };
+    let body: { content?: string; is_public?: boolean; tag?: string };
     try {
       body = await request.json();
     } catch {
@@ -73,9 +90,10 @@ export async function handleMemosRequest(
       return json({ error: "Content cannot be empty" }, 400);
     }
 
-    const fields: { content?: string; is_public?: boolean } = {};
+    const fields: { content?: string; is_public?: boolean; tag?: string } = {};
     if (body.content !== undefined) fields.content = body.content.trim();
     if (body.is_public !== undefined) fields.is_public = body.is_public;
+    if (body.tag !== undefined) fields.tag = body.tag;
 
     const memo = updateMemo(id, fields);
     if (!memo) return json({ error: "Memo not found" }, 404);

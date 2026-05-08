@@ -3,6 +3,7 @@ import { Database } from "bun:sqlite";
 export interface Memo {
   id: number;
   content: string;
+  tag: string;
   is_public: boolean;
   created_at: string;
   updated_at: string;
@@ -30,28 +31,60 @@ export function initDb(): void {
       updated_at  TEXT    NOT NULL DEFAULT (datetime('now'))
     )
   `);
+
+  // Migration: add tag column if not present
+  const cols = d.query("PRAGMA table_info(memos)").all() as any[];
+  const hasTag = cols.some((c: any) => c.name === "tag");
+  if (!hasTag) {
+    d.run("ALTER TABLE memos ADD COLUMN tag TEXT NOT NULL DEFAULT ''");
+  }
 }
 
 function rowToMemo(row: any): Memo {
   return {
     id: row.id,
     content: row.content,
+    tag: row.tag || "",
     is_public: row.is_public === 1,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
 }
 
-export function getMemos(includePrivate: boolean): Memo[] {
+export function getMemos(opts: {
+  includePrivate: boolean;
+  search?: string;
+  tag?: string;
+}): Memo[] {
   const d = getDb();
-  if (includePrivate) {
-    const rows = d.query("SELECT * FROM memos ORDER BY created_at DESC").all();
-    return rows.map(rowToMemo);
+  const conditions: string[] = [];
+  const params: any[] = [];
+
+  if (!opts.includePrivate) {
+    conditions.push("is_public = 1");
   }
-  const rows = d
-    .query("SELECT * FROM memos WHERE is_public = 1 ORDER BY created_at DESC")
-    .all();
+  if (opts.search) {
+    conditions.push("content LIKE ?");
+    params.push(`%${opts.search}%`);
+  }
+  if (opts.tag) {
+    conditions.push("tag = ?");
+    params.push(opts.tag);
+  }
+
+  const where =
+    conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+  const sql = `SELECT * FROM memos ${where} ORDER BY created_at DESC`;
+  const rows = d.query(sql).all(...params);
   return rows.map(rowToMemo);
+}
+
+export function getAllTags(): string[] {
+  const d = getDb();
+  const rows = d
+    .query("SELECT DISTINCT tag FROM memos WHERE tag != '' ORDER BY tag")
+    .all() as any[];
+  return rows.map((r: any) => r.tag);
 }
 
 export function getMemo(id: number): Memo | null {
@@ -60,18 +93,22 @@ export function getMemo(id: number): Memo | null {
   return row ? rowToMemo(row) : null;
 }
 
-export function createMemo(content: string, isPublic: boolean): Memo {
+export function createMemo(
+  content: string,
+  isPublic: boolean,
+  tag?: string,
+): Memo {
   const d = getDb();
-  const result = d.run("INSERT INTO memos (content, is_public) VALUES (?, ?)", [
-    content,
-    isPublic ? 1 : 0,
-  ]);
+  const result = d.run(
+    "INSERT INTO memos (content, is_public, tag) VALUES (?, ?, ?)",
+    [content, isPublic ? 1 : 0, tag || ""],
+  );
   return getMemo(Number(result.lastInsertRowid))!;
 }
 
 export function updateMemo(
   id: number,
-  fields: { content?: string; is_public?: boolean },
+  fields: { content?: string; is_public?: boolean; tag?: string },
 ): Memo | null {
   const d = getDb();
   const existing = getMemo(id);
@@ -80,10 +117,11 @@ export function updateMemo(
   const content = fields.content ?? existing.content;
   const isPublic =
     fields.is_public !== undefined ? fields.is_public : existing.is_public;
+  const tag = fields.tag !== undefined ? fields.tag : existing.tag;
 
   d.run(
-    "UPDATE memos SET content = ?, is_public = ?, updated_at = datetime('now') WHERE id = ?",
-    [content, isPublic ? 1 : 0, id],
+    "UPDATE memos SET content = ?, is_public = ?, tag = ?, updated_at = datetime('now') WHERE id = ?",
+    [content, isPublic ? 1 : 0, tag, id],
   );
   return getMemo(id);
 }

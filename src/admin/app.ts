@@ -1,6 +1,7 @@
 interface Memo {
   id: number;
   content: string;
+  tag: string;
   is_public: boolean;
   created_at: string;
   updated_at: string;
@@ -9,7 +10,13 @@ interface Memo {
 type FormMode =
   | { type: "closed" }
   | { type: "create" }
-  | { type: "edit"; id: number; content: string; isPublic: boolean };
+  | {
+      type: "edit";
+      id: number;
+      content: string;
+      isPublic: boolean;
+      tag: string;
+    };
 
 interface State {
   authenticated: boolean | null; // null = checking
@@ -17,6 +24,7 @@ interface State {
   formMode: FormMode;
   formContent: string;
   formIsPublic: boolean;
+  formTag: string;
   formError: string | null;
   formSaving: boolean;
   deleteConfirmId: number | null;
@@ -31,6 +39,7 @@ let state: State = {
   formMode: { type: "closed" },
   formContent: "",
   formIsPublic: true,
+  formTag: "",
   formError: null,
   formSaving: false,
   deleteConfirmId: null,
@@ -117,12 +126,14 @@ async function createMemo(): Promise<void> {
       body: JSON.stringify({
         content: state.formContent.trim(),
         is_public: state.formIsPublic,
+        tag: state.formTag.trim(),
       }),
     });
     setState({
       formMode: { type: "closed" },
       formContent: "",
       formIsPublic: true,
+      formTag: "",
       formSaving: false,
     });
     await loadMemos();
@@ -143,12 +154,14 @@ async function updateMemo(id: number): Promise<void> {
       body: JSON.stringify({
         content: state.formContent.trim(),
         is_public: state.formIsPublic,
+        tag: state.formTag.trim(),
       }),
     });
     setState({
       formMode: { type: "closed" },
       formContent: "",
       formIsPublic: true,
+      formTag: "",
       formSaving: false,
     });
     await loadMemos();
@@ -185,6 +198,7 @@ function openCreateForm(): void {
     formMode: { type: "create" },
     formContent: "",
     formIsPublic: true,
+    formTag: "",
     formError: null,
   });
 }
@@ -196,9 +210,11 @@ function openEditForm(memo: Memo): void {
       id: memo.id,
       content: memo.content,
       isPublic: memo.is_public,
+      tag: memo.tag,
     },
     formContent: memo.content,
     formIsPublic: memo.is_public,
+    formTag: memo.tag,
     formError: null,
   });
 }
@@ -208,6 +224,7 @@ function closeForm(): void {
     formMode: { type: "closed" },
     formContent: "",
     formIsPublic: true,
+    formTag: "",
     formError: null,
   });
 }
@@ -283,6 +300,8 @@ function renderForm(): string {
       <h2>${title}</h2>
       <textarea id="form-content" placeholder="What's on your mind?"
         ${disabled}>${escape(state.formContent)}</textarea>
+      <input type="text" id="form-tag" placeholder="Tag (optional)"
+        value="${escape(state.formTag)}" ${disabled} />
       <div class="form-row">
         <label class="form-check">
           <input type="checkbox" id="form-is-public"
@@ -321,6 +340,7 @@ function renderMemoCard(memo: Memo): string {
       <div class="memo-content">${escape(memo.content)}</div>
       <div class="memo-meta">
         <span class="badge ${badgeClass}">${badgeText}</span>
+        ${memo.tag ? `<span class="badge badge-tag">${escape(memo.tag)}</span>` : ""}
         <span>Created: ${formatDate(memo.created_at)}</span>
         ${memo.updated_at !== memo.created_at ? `<span>Updated: ${formatDate(memo.updated_at)}</span>` : ""}
       </div>
@@ -407,8 +427,10 @@ Object.assign(window, {
     const checkbox = document.getElementById(
       "form-is-public",
     ) as HTMLInputElement;
+    const tagInput = document.getElementById("form-tag") as HTMLInputElement;
     state.formContent = textarea.value;
     state.formIsPublic = checkbox.checked;
+    state.formTag = tagInput.value;
 
     if (state.formMode.type === "create") {
       createMemo();
