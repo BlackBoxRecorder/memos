@@ -79,6 +79,69 @@ function hideStatus(): void {
   }
 }
 
+// --- custom select helpers ---
+function getCustomSelectValue(): string {
+  const selected = document.querySelector(
+    "#tag-select .select-option.selected",
+  ) as HTMLElement | null;
+  return selected?.dataset.value || "";
+}
+
+function setCustomSelectValue(value: string): void {
+  const select = document.getElementById("tag-select");
+  if (!select) return;
+
+  const options = select.querySelectorAll(".select-option");
+  let selectedText = "";
+  for (let i = 0; i < options.length; i++) {
+    const el = options[i] as HTMLElement;
+    const isMatch = el.dataset.value === value;
+    el.classList.toggle("selected", isMatch);
+    if (isMatch) selectedText = el.textContent || "";
+  }
+
+  const triggerLabel = select.querySelector(
+    ".select-label",
+  ) as HTMLElement | null;
+  if (triggerLabel) {
+    triggerLabel.textContent = selectedText || value || "All tags";
+  }
+}
+
+function initCustomSelect(): void {
+  const select = document.getElementById("tag-select");
+  if (!select) return;
+
+  const trigger = select.querySelector(".select-trigger") as HTMLElement;
+
+  trigger.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const isOpen = select.classList.contains("open");
+    document.querySelectorAll(".custom-select.open").forEach((el) => {
+      if (el !== select) el.classList.remove("open");
+    });
+    select.classList.toggle("open", !isOpen);
+  });
+
+  select.addEventListener("click", (e) => {
+    const target = e.target as HTMLElement;
+    if (!target.classList.contains("select-option")) return;
+
+    const value = target.dataset.value || "";
+    setCustomSelectValue(value);
+    select.classList.remove("open");
+
+    const searchInput = document.getElementById(
+      "search-input",
+    ) as HTMLInputElement | null;
+    fetchAndRender(searchInput?.value.trim() || "", value);
+  });
+
+  document.addEventListener("click", () => {
+    select.classList.remove("open");
+  });
+}
+
 // --- masonry layout ---
 function computeLayout(windowWidth: number): LayoutState {
   let colCount: number;
@@ -210,13 +273,15 @@ async function loadTags(): Promise<void> {
   try {
     const resp = await fetch("/api/memos/tags");
     const data: { tags: string[] } = await resp.json();
-    const select = document.getElementById("tag-select") as HTMLSelectElement;
-    if (!select) return;
-    for (const tag of data.tags) {
-      const opt = document.createElement("option");
-      opt.value = tag;
+    const dropdown = document.querySelector("#tag-select .select-dropdown");
+    if (!dropdown) return;
+    for (let i = 0; i < data.tags.length; i++) {
+      const tag = data.tags[i]!;
+      const opt = document.createElement("div");
+      opt.className = "select-option";
+      opt.dataset.value = tag;
       opt.textContent = tag;
-      select.appendChild(opt);
+      dropdown.appendChild(opt);
     }
   } catch (err) {
     console.error("Failed to load tags:", err);
@@ -276,18 +341,15 @@ document.addEventListener("DOMContentLoaded", () => {
   const searchInput = document.getElementById(
     "search-input",
   ) as HTMLInputElement;
-  const tagSelect = document.getElementById("tag-select") as HTMLSelectElement;
 
   searchInput?.addEventListener("input", () => {
     if (debounceTimer) clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
-      fetchAndRender(searchInput.value.trim(), tagSelect?.value || "");
+      fetchAndRender(searchInput.value.trim(), getCustomSelectValue());
     }, 250);
   });
 
-  tagSelect?.addEventListener("change", () => {
-    fetchAndRender(searchInput?.value.trim() || "", tagSelect.value);
-  });
+  initCustomSelect();
 });
 
 // --- init: load tags and initial state from URL ---
@@ -303,8 +365,7 @@ async function init(): Promise<void> {
 
   await loadTags();
 
-  const tagSelect = document.getElementById("tag-select") as HTMLSelectElement;
-  if (tagSelect && initialTag) tagSelect.value = initialTag;
+  if (initialTag) setCustomSelectValue(initialTag);
 
   await fetchAndRender(initialSearch, initialTag);
 }

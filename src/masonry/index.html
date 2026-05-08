@@ -16,11 +16,18 @@
         <input id="search-input" type="search" placeholder="Search memos..." style="padding:8px 12px;border:1px solid #ddd;border-radius:6px;
             font-size:14px;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;outline:none;width:240px;
             max-width:100%;transition:border-color .15s" />
-        <select id="tag-select" style="padding:8px 12px;border:1px solid #ddd;border-radius:6px;
-            font-size:14px;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;outline:none;background:#fff;
-            max-width:100%">
-            <option value="">All tags</option>
-        </select>
+        <div class="custom-select" id="tag-select" tabindex="0">
+            <div class="select-trigger">
+                <span class="select-label">All tags</span>
+                <svg class="select-arrow" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor"
+                    stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 4.5l3 3 3-3" />
+                </svg>
+            </div>
+            <div class="select-dropdown">
+                <div class="select-option selected" data-value="">All tags</div>
+            </div>
+        </div>
     </div>
     <style>
         * {
@@ -47,9 +54,103 @@
             overflow: hidden;
         }
 
-        #search-input:focus,
-        #tag-select:focus {
+        #search-input:focus {
             border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+        }
+
+        /* --- custom select --- */
+        .custom-select {
+            position: relative;
+            width: 170px;
+            max-width: 100%;
+            cursor: pointer;
+            user-select: none;
+            outline: none;
+        }
+
+        .select-trigger {
+            padding: 8px 10px 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            background-color: #fff;
+            color: #333;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            transition: border-color .15s, box-shadow .15s;
+        }
+
+        .select-trigger:hover {
+            border-color: #bbb;
+        }
+
+        .custom-select:focus .select-trigger,
+        .custom-select.open .select-trigger {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+        }
+
+        .select-label {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .select-arrow {
+            width: 12px;
+            height: 12px;
+            color: #999;
+            flex-shrink: 0;
+            transition: transform .2s;
+        }
+
+        .custom-select.open .select-arrow {
+            transform: rotate(180deg);
+        }
+
+        .select-dropdown {
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 0;
+            right: 0;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 200;
+            display: none;
+        }
+
+        .custom-select.open .select-dropdown {
+            display: block;
+        }
+
+        .select-option {
+            padding: 8px 12px;
+            font-size: 14px;
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            color: #333;
+            transition: background-color .1s;
+            cursor: pointer;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .select-option:hover {
+            background-color: #f5f5f5;
+        }
+
+        .select-option.selected {
+            background-color: #eff6ff;
+            color: #2563eb;
+            font-weight: 500;
         }
     </style>
     <script type="module" src="./index.ts"></script>
