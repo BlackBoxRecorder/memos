@@ -7,7 +7,7 @@ import {
   clearAuthCookie,
 } from "../auth";
 
-const SECRET_KEY = process.env.MEMOS_SECRET_KEY || "memos-dev-secret";
+const SECRET_KEY = process.env.MEMOS_SECRET_KEY || "memos-dev-test";
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
