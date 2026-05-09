@@ -6,6 +6,7 @@ import {
   updateMemo,
   deleteMemo,
   getAllTags,
+  countMemos,
 } from "../db";
 
 function json(data: unknown, status = 200): Response {
@@ -33,6 +34,13 @@ export async function handleMemosRequest(
     const tag = url.searchParams.get("tag") || undefined;
     const memos = getMemos({ includePrivate, search, tag });
     return json({ memos });
+  }
+
+  // GET /api/memos/count
+  if (method === "GET" && path === "/api/memos/count") {
+    const includePrivate = requireAuth(request) === null;
+    const count = countMemos({ includePrivate });
+    return json({ count });
   }
 
   // GET /api/memos/tags

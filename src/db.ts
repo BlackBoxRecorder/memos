@@ -81,6 +81,15 @@ export function getAllTags(): string[] {
   return rows.map((r: any) => r.tag);
 }
 
+export function countMemos(opts: { includePrivate: boolean }): number {
+  const d = getDb();
+  const where = opts.includePrivate ? "" : "WHERE is_public = 1";
+  const row = d
+    .query(`SELECT COUNT(*) as count FROM memos ${where}`)
+    .get() as any;
+  return row.count;
+}
+
 export function getMemo(id: number): Memo | null {
   const d = getDb();
   const row = d.query("SELECT * FROM memos WHERE id = ?").get(id);

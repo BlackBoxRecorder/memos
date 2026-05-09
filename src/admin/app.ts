@@ -335,15 +335,21 @@ function AdminPage() {
   return div(
     div(
       { class: "admin-topbar" },
-      span({ class: "title" }, "Memos Admin"),
       div(
-        { class: "actions" },
-        button(
-          { class: "btn btn-primary btn-sm", onclick: openCreateForm },
-          "+ New Memo",
+        { class: "admin-topbar-inner" },
+        span({ class: "title" }, "Memos Admin"),
+        div(
+          { class: "actions" },
+          button(
+            { class: "btn btn-primary btn-sm", onclick: openCreateForm },
+            "+ New Memo",
+          ),
+          a({ href: "/", class: "btn btn-outline btn-sm" }, "View Site"),
+          button(
+            { class: "btn btn-outline btn-sm", onclick: logout },
+            "Logout",
+          ),
         ),
-        a({ href: "/", class: "btn btn-outline btn-sm" }, "View Site"),
-        button({ class: "btn btn-outline btn-sm", onclick: logout }, "Logout"),
       ),
     ),
     div(

@@ -4,7 +4,10 @@
 
 <body>
     <div id="filter-bar">
-        <div class="filter-spacer"></div>
+        <div id="site-header">
+            <h1 class="site-title">Memos</h1>
+            <span class="memo-count" id="memo-count"></span>
+        </div>
         <div class="filter-center">
             <input id="search-input" type="search" placeholder="Search memos..." />
             <div class="custom-select" id="tag-select" tabindex="0">
@@ -107,19 +110,52 @@
             border-color: #bbb;
         }
 
+        #site-header {
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+            justify-self: start;
+        }
+
+        .site-title {
+            font-size: 28px;
+            font-weight: 600;
+            color: #1a1a1a;
+            letter-spacing: -0.5px;
+            line-height: 1.2;
+            margin: 0;
+        }
+
+        .memo-count {
+            font-size: 14px;
+            color: #888;
+            font-weight: 400;
+            white-space: nowrap;
+        }
+
         @media (max-width: 520px) {
             #filter-bar {
                 display: flex;
                 flex-wrap: wrap;
-                justify-content: center;
+                justify-content: space-between;
                 gap: 8px;
             }
 
-            .filter-spacer {
-                display: none;
+            #site-header {
+                order: 1;
+            }
+
+            .site-title {
+                font-size: 22px;
+            }
+
+            #admin-btn {
+                order: 2;
+                justify-self: auto;
             }
 
             .filter-center {
+                order: 3;
                 flex: 1 1 100%;
                 justify-content: center;
             }
@@ -133,10 +169,6 @@
             .custom-select {
                 width: 140px;
                 flex-shrink: 0;
-            }
-
-            #admin-btn {
-                justify-self: center;
             }
         }
 

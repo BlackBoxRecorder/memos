@@ -288,6 +288,20 @@ async function loadTags(): Promise<void> {
   }
 }
 
+// --- memo count ---
+async function loadCount(): Promise<void> {
+  try {
+    const resp = await fetch("/api/memos/count");
+    const data: { count: number } = await resp.json();
+    const countEl = document.getElementById("memo-count");
+    if (countEl) {
+      countEl.textContent = `${data.count} items`;
+    }
+  } catch (err) {
+    console.error("Failed to load count:", err);
+  }
+}
+
 // --- fetch and render with filters ---
 async function fetchAndRender(search: string, tag: string): Promise<void> {
   showStatus("Loading...");
@@ -364,6 +378,7 @@ async function init(): Promise<void> {
   if (searchInput) searchInput.value = initialSearch;
 
   await loadTags();
+  await loadCount();
 
   if (initialTag) setCustomSelectValue(initialTag);
 
