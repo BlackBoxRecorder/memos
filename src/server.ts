@@ -1,6 +1,8 @@
 import { initDb } from "./db";
 import { handleAuthRequest } from "./api/auth";
 import { handleMemosRequest } from "./api/memos";
+import { handleAiRequest } from "./api/ai";
+import { initEmbeddingCache } from "./ai/embeddings";
 
 const PORT = parseInt(process.env.PORT || "3020");
 const STATIC_BASE = import.meta.dir;
@@ -77,6 +79,11 @@ async function handleRequest(request: Request): Promise<Response> {
     if (res) return res;
   }
 
+  if (path.startsWith("/api/ai")) {
+    const res = await handleAiRequest(request, path);
+    if (res) return res;
+  }
+
   if (path.startsWith("/api/memos")) {
     const res = await handleMemosRequest(request, path);
     if (res) return res;
@@ -126,6 +133,9 @@ async function handleRequest(request: Request): Promise<Response> {
 
 // 初始化数据库
 initDb();
+
+// 初始化向量缓存
+initEmbeddingCache();
 
 // 启动服务器
 Bun.serve({

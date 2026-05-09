@@ -8,6 +8,11 @@ import {
   getAllTags,
   countMemos,
 } from "../db";
+import {
+  generateAndStoreEmbedding,
+  deleteEmbeddingCache,
+  getSemanticResults,
+} from "../ai/embeddings";
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -32,8 +37,27 @@ export async function handleMemosRequest(
         : requireAuth(request) === null;
     const search = url.searchParams.get("search") || undefined;
     const tag = url.searchParams.get("tag") || undefined;
-    const memos = getMemos({ includePrivate, search, tag });
-    return json({ memos });
+
+    const result = getMemos({ includePrivate, search, tag });
+
+    // Also run semantic search and merge results (non-blocking to LIKE results)
+    if (search) {
+      try {
+        const semanticIds = await getSemanticResults(search);
+        if (semanticIds.length > 0) {
+          const existingIds = new Set(result.map((m) => m.id));
+          const extraIds = semanticIds.filter((id) => !existingIds.has(id));
+          if (extraIds.length > 0) {
+            const extraMemos = getMemos({ includePrivate, ids: extraIds });
+            result.push(...extraMemos);
+          }
+        }
+      } catch {
+        // semantic search failed, just keep LIKE results
+      }
+    }
+
+    return json({ memos: result });
   }
 
   // GET /api/memos/count
@@ -74,6 +98,12 @@ export async function handleMemosRequest(
       body.is_public !== false,
       body.tag,
     );
+
+    // Fire-and-forget embedding generation
+    generateAndStoreEmbedding(memo.id, memo.content).catch((err) =>
+      console.error("Embedding generation failed:", err),
+    );
+
     return json({ memo }, 201);
   }
 
@@ -106,6 +136,13 @@ export async function handleMemosRequest(
     const memo = updateMemo(id, fields);
     if (!memo) return json({ error: "Memo not found" }, 404);
 
+    // Regenerate embedding if content changed
+    if (fields.content) {
+      generateAndStoreEmbedding(memo.id, memo.content).catch((err) =>
+        console.error("Embedding generation failed:", err),
+      );
+    }
+
     return json({ memo });
   }
 
@@ -118,6 +155,9 @@ export async function handleMemosRequest(
     const id = Number(deleteMatch[1]);
     const deleted = deleteMemo(id);
     if (!deleted) return json({ error: "Memo not found" }, 404);
+
+    // Clean up embedding cache
+    deleteEmbeddingCache(id);
 
     return json({ ok: true });
   }

@@ -32,6 +32,14 @@ export function initDb(): void {
       updated_at  TEXT    NOT NULL DEFAULT (datetime('now'))
     )
   `);
+  d.run(`
+    CREATE TABLE IF NOT EXISTS memo_embeddings (
+      memo_id    INTEGER PRIMARY KEY,
+      embedding  BLOB NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (memo_id) REFERENCES memos(id) ON DELETE CASCADE
+    )
+  `);
 }
 
 function rowToMemo(row: any): Memo {
@@ -49,6 +57,7 @@ export function getMemos(opts: {
   includePrivate: boolean;
   search?: string;
   tag?: string;
+  ids?: number[];
 }): Memo[] {
   const d = getDb();
   const conditions: string[] = [];
@@ -56,6 +65,11 @@ export function getMemos(opts: {
 
   if (!opts.includePrivate) {
     conditions.push("is_public = 1");
+  }
+  if (opts.ids && opts.ids.length > 0) {
+    const placeholders = opts.ids.map(() => "?").join(", ");
+    conditions.push(`id IN (${placeholders})`);
+    params.push(...opts.ids);
   }
   if (opts.search) {
     conditions.push("content LIKE ?");
@@ -133,4 +147,30 @@ export function deleteMemo(id: number): boolean {
   const d = getDb();
   const result = d.run("DELETE FROM memos WHERE id = ?", [id]);
   return result.changes > 0;
+}
+
+// --- Embedding helpers ---
+
+export function getAllEmbeddings(): Array<{
+  memo_id: number;
+  embedding: Buffer;
+}> {
+  const d = getDb();
+  const rows = d
+    .query("SELECT memo_id, embedding FROM memo_embeddings")
+    .all() as Array<{ memo_id: number; embedding: Buffer }>;
+  return rows;
+}
+
+export function saveEmbedding(memoId: number, embedding: Buffer): void {
+  const d = getDb();
+  d.run(
+    "INSERT OR REPLACE INTO memo_embeddings (memo_id, embedding, updated_at) VALUES (?, ?, datetime('now'))",
+    [memoId, embedding],
+  );
+}
+
+export function deleteEmbedding(memoId: number): void {
+  const d = getDb();
+  d.run("DELETE FROM memo_embeddings WHERE memo_id = ?", [memoId]);
 }

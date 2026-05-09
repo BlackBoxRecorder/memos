@@ -30,6 +30,13 @@ const deleteDeleting = van.state(false);
 const globalError = van.state<string | null>(null);
 const loading = van.state(false);
 
+// AI states
+const aiAvailable = van.state(false);
+const aiOptimizing = van.state(false);
+const aiSuggestedTags = van.state<string[]>([]);
+const aiSuggestingTags = van.state(false);
+let suggestTimer: ReturnType<typeof setTimeout> | null = null;
+
 // ====== API ======
 async function api<T>(path: string, options?: RequestInit): Promise<T> {
   const resp = await fetch(path, {
@@ -48,7 +55,10 @@ async function checkAuth(): Promise<void> {
   try {
     const data = await api<{ authenticated: boolean }>("/api/auth/check");
     authenticated.val = data.authenticated;
-    if (data.authenticated) await loadMemos();
+    if (data.authenticated) {
+      await loadMemos();
+      checkAiStatus();
+    }
   } catch {
     authenticated.val = false;
   }
@@ -63,6 +73,7 @@ async function login(key: string): Promise<void> {
     authenticated.val = true;
     globalError.val = null;
     await loadMemos();
+    checkAiStatus();
   } catch (err) {
     globalError.val = (err as Error).message;
   }
@@ -141,6 +152,64 @@ async function deleteMemo(id: number): Promise<void> {
   }
 }
 
+// ====== AI Actions ======
+
+async function checkAiStatus(): Promise<void> {
+  try {
+    const data = await api<{ optimize: boolean }>("/api/ai/status");
+    aiAvailable.val = data.optimize || false;
+  } catch {
+    aiAvailable.val = false;
+  }
+}
+
+async function handleOptimize(): Promise<void> {
+  const content = formContent.val.trim();
+  if (!content || aiOptimizing.val) return;
+
+  aiOptimizing.val = true;
+  formError.val = null;
+  try {
+    const data = await api<{ content: string }>("/api/ai/optimize", {
+      method: "POST",
+      body: JSON.stringify({ content }),
+    });
+    formContent.val = data.content;
+  } catch (err) {
+    formError.val = (err as Error).message;
+  } finally {
+    aiOptimizing.val = false;
+  }
+}
+
+async function suggestTagsForContent(): Promise<void> {
+  const content = formContent.val.trim();
+  if (content.length < 20) {
+    aiSuggestedTags.val = [];
+    return;
+  }
+
+  aiSuggestingTags.val = true;
+  try {
+    const data = await api<{ tags: string[] }>("/api/ai/suggest-tags", {
+      method: "POST",
+      body: JSON.stringify({ content }),
+    });
+    aiSuggestedTags.val = data.tags || [];
+  } catch {
+    aiSuggestedTags.val = [];
+  } finally {
+    aiSuggestingTags.val = false;
+  }
+}
+
+function debouncedSuggestTags(): void {
+  if (suggestTimer) clearTimeout(suggestTimer);
+  suggestTimer = setTimeout(() => {
+    suggestTagsForContent();
+  }, 1000);
+}
+
 function openCreateForm(): void {
   formMode.val = { type: "create" };
   formContent.val = "";
@@ -156,6 +225,9 @@ function openEditForm(memo: Memo): void {
   formIsPublic.val = memo.is_public;
   formTag.val = memo.tag;
   formError.val = null;
+  aiSuggestedTags.val = [];
+  if (suggestTimer) clearTimeout(suggestTimer);
+  suggestTimer = null;
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -165,6 +237,31 @@ function closeForm(): void {
   formIsPublic.val = true;
   formTag.val = "";
   formError.val = null;
+  aiSuggestedTags.val = [];
+  if (suggestTimer) clearTimeout(suggestTimer);
+  suggestTimer = null;
+}
+
+// ====== SVG Helpers ======
+
+function htmlNode(str: string): HTMLElement {
+  const el = document.createElement("span");
+  el.style.display = "inline-flex";
+  el.style.alignItems = "center";
+  el.innerHTML = str;
+  return el;
+}
+
+function svgSparkle(): HTMLElement {
+  return htmlNode(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3L12 3z"/></svg>`,
+  );
+}
+
+function svgSpinner(): HTMLElement {
+  return htmlNode(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>`,
+  );
 }
 
 // ====== Helpers ======
@@ -225,9 +322,29 @@ function FormCard() {
       placeholder: "What's on your mind?",
       disabled: () => formSaving.val,
       value: formContent,
-      oninput: (e: Event) =>
-        (formContent.val = (e.target as HTMLTextAreaElement).value),
+      oninput: (e: Event) => {
+        formContent.val = (e.target as HTMLTextAreaElement).value;
+        // Debounced tag suggestion
+        if (aiAvailable.val) debouncedSuggestTags();
+      },
     }),
+    // AI Optimize toolbar (between textarea and tag input)
+    () =>
+      aiAvailable.val
+        ? div(
+            { class: "ai-toolbar" },
+            button(
+              {
+                class: () =>
+                  "ai-optimize-btn" + (aiOptimizing.val ? " loading" : ""),
+                disabled: () => aiOptimizing.val || formSaving.val,
+                onclick: handleOptimize,
+                title: "AI optimize content",
+              },
+              aiOptimizing.val ? svgSpinner() : svgSparkle(),
+            ),
+          )
+        : "",
     input({
       type: "text",
       id: "form-tag",
@@ -237,6 +354,22 @@ function FormCard() {
       oninput: (e: Event) =>
         (formTag.val = (e.target as HTMLInputElement).value),
     }),
+    // AI Tag suggestions (below tag input)
+    () =>
+      aiSuggestedTags.val.length > 0
+        ? div(
+            { class: "ai-tag-suggestions" },
+            ...aiSuggestedTags.val.map((tag) =>
+              button(
+                {
+                  class: "tag-chip",
+                  onclick: () => (formTag.val = tag),
+                },
+                tag,
+              ),
+            ),
+          )
+        : "",
     div(
       { class: "form-row" },
       label(
