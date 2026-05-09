@@ -9,6 +9,25 @@ export interface Memo {
   updated_at: string;
 }
 
+export interface Prompt {
+  id: number;
+  title: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreativeItem {
+  id: number;
+  prompt_id: number;
+  extra_prompt: string;
+  embedding: Buffer | null;
+  content: string;
+  context_memo_ids: string;
+  created_at: string;
+  updated_at: string;
+}
+
 let db: Database;
 
 export function getDb(): Database {
@@ -38,6 +57,28 @@ export function initDb(): void {
       embedding  BLOB NOT NULL,
       updated_at TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (memo_id) REFERENCES memos(id) ON DELETE CASCADE
+    )
+  `);
+  d.run(`
+    CREATE TABLE IF NOT EXISTS prompts (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      title       TEXT    NOT NULL,
+      content     TEXT    NOT NULL,
+      created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
+      updated_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
+  d.run(`
+    CREATE TABLE IF NOT EXISTS creative (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      prompt_id        INTEGER NOT NULL,
+      extra_prompt     TEXT    NOT NULL DEFAULT '',
+      embedding        BLOB,
+      content          TEXT    NOT NULL DEFAULT '',
+      context_memo_ids TEXT    NOT NULL DEFAULT '',
+      created_at       TEXT    NOT NULL DEFAULT (datetime('now')),
+      updated_at       TEXT    NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (prompt_id) REFERENCES prompts(id) ON DELETE CASCADE
     )
   `);
 }
@@ -173,4 +214,123 @@ export function saveEmbedding(memoId: number, embedding: Buffer): void {
 export function deleteEmbedding(memoId: number): void {
   const d = getDb();
   d.run("DELETE FROM memo_embeddings WHERE memo_id = ?", [memoId]);
+}
+
+// --- Prompt helpers ---
+
+function rowToPrompt(row: any): Prompt {
+  return {
+    id: row.id,
+    title: row.title,
+    content: row.content,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+export function getAllPrompts(): Prompt[] {
+  const d = getDb();
+  const rows = d.query("SELECT * FROM prompts ORDER BY created_at DESC").all();
+  return rows.map(rowToPrompt);
+}
+
+export function getPrompt(id: number): Prompt | null {
+  const d = getDb();
+  const row = d.query("SELECT * FROM prompts WHERE id = ?").get(id);
+  return row ? rowToPrompt(row) : null;
+}
+
+export function createPrompt(title: string, content: string): Prompt {
+  const d = getDb();
+  const result = d.run("INSERT INTO prompts (title, content) VALUES (?, ?)", [
+    title,
+    content,
+  ]);
+  return getPrompt(Number(result.lastInsertRowid))!;
+}
+
+export function updatePrompt(
+  id: number,
+  fields: { title?: string; content?: string },
+): Prompt | null {
+  const d = getDb();
+  const existing = getPrompt(id);
+  if (!existing) return null;
+
+  const title = fields.title ?? existing.title;
+  const content = fields.content ?? existing.content;
+
+  d.run(
+    "UPDATE prompts SET title = ?, content = ?, updated_at = datetime('now') WHERE id = ?",
+    [title, content, id],
+  );
+  return getPrompt(id);
+}
+
+export function deletePrompt(id: number): boolean {
+  const d = getDb();
+  const result = d.run("DELETE FROM prompts WHERE id = ?", [id]);
+  return result.changes > 0;
+}
+
+// --- Creative helpers ---
+
+function rowToCreative(row: any): CreativeItem {
+  return {
+    id: row.id,
+    prompt_id: row.prompt_id,
+    extra_prompt: row.extra_prompt || "",
+    embedding: row.embedding || null,
+    content: row.content || "",
+    context_memo_ids: row.context_memo_ids || "",
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+export function getCreativeItems(opts: { prompt_id?: number }): CreativeItem[] {
+  const d = getDb();
+  if (opts.prompt_id !== undefined) {
+    const rows = d
+      .query(
+        "SELECT * FROM creative WHERE prompt_id = ? ORDER BY created_at DESC",
+      )
+      .all(opts.prompt_id);
+    return rows.map(rowToCreative);
+  }
+  const rows = d.query("SELECT * FROM creative ORDER BY created_at DESC").all();
+  return rows.map(rowToCreative);
+}
+
+export function getCreativeItem(id: number): CreativeItem | null {
+  const d = getDb();
+  const row = d.query("SELECT * FROM creative WHERE id = ?").get(id);
+  return row ? rowToCreative(row) : null;
+}
+
+export function createCreativeItem(fields: {
+  prompt_id: number;
+  extra_prompt: string;
+  embedding?: Buffer;
+  content: string;
+  context_memo_ids: string;
+}): CreativeItem {
+  const d = getDb();
+  const result = d.run(
+    "INSERT INTO creative (prompt_id, extra_prompt, embedding, content, context_memo_ids) VALUES (?, ?, ?, ?, ?)",
+    [
+      fields.prompt_id,
+      fields.extra_prompt,
+      fields.embedding || null,
+      fields.content,
+      fields.context_memo_ids,
+    ],
+  );
+  return getCreativeItem(Number(result.lastInsertRowid))!;
+}
+
+export function deleteCreativeItem(id: number): boolean {
+  const d = getDb();
+  const result = d.run("DELETE FROM creative WHERE id = ?", [id]);
+  return result.changes > 0;
 }

@@ -175,3 +175,30 @@ export async function generateEmbedding(
     return null;
   }
 }
+
+// --- Creative Content Generation ---
+
+export async function generateCreativeContent(
+  promptContent: string,
+  extraPrompt: string,
+  contextMemos: string[],
+): Promise<string | null> {
+  if (!deepseekBaseUrl()) return null;
+
+  const contextText =
+    contextMemos.length > 0
+      ? `\n\nRelevant context from my memos:\n${contextMemos.map((c, i) => `${i + 1}. ${c.slice(0, 500)}`).join("\n\n")}`
+      : "";
+
+  return deepseekChat([
+    {
+      role: "system",
+      content:
+        "You are a creative assistant for a personal memos app. Follow the instructions provided to generate thoughtful, well-structured content.",
+    },
+    {
+      role: "user",
+      content: `Creative task: ${promptContent}\n\nAdditional instructions: ${extraPrompt}${contextText}\n\nGenerate creative content based on all of the above.`,
+    },
+  ]);
+}

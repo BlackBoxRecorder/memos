@@ -2,6 +2,7 @@ import { initDb } from "./db";
 import { handleAuthRequest } from "./api/auth";
 import { handleMemosRequest } from "./api/memos";
 import { handleAiRequest } from "./api/ai";
+import { handleCreativeRequest } from "./api/creative";
 import { initEmbeddingCache } from "./ai/embeddings";
 
 const PORT = parseInt(process.env.PORT || "3020");
@@ -86,6 +87,11 @@ async function handleRequest(request: Request): Promise<Response> {
 
   if (path.startsWith("/api/memos")) {
     const res = await handleMemosRequest(request, path);
+    if (res) return res;
+  }
+
+  if (path.startsWith("/api/creative")) {
+    const res = await handleCreativeRequest(request, path);
     if (res) return res;
   }
 

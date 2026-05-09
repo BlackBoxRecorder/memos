@@ -1,4 +1,5 @@
 import van from "vanjs-core";
+import { CreativeTab, openPromptCreate } from "./creative";
 
 interface Memo {
   id: number;
@@ -29,8 +30,7 @@ const deleteConfirmId = van.state<number | null>(null);
 const deleteDeleting = van.state(false);
 const globalError = van.state<string | null>(null);
 const loading = van.state(false);
-
-// AI states
+const activeTab = van.state<"memos" | "creative">("memos");
 const aiAvailable = van.state(false);
 const aiOptimizing = van.state(false);
 const aiSuggestedTags = van.state<string[]>([]);
@@ -473,10 +473,19 @@ function AdminPage() {
         span({ class: "title" }, "Memos Admin"),
         div(
           { class: "actions" },
-          button(
-            { class: "btn btn-primary btn-sm", onclick: openCreateForm },
-            "+ New Memo",
-          ),
+          () =>
+            activeTab.val === "memos"
+              ? button(
+                  { class: "btn btn-primary btn-sm", onclick: openCreateForm },
+                  "+ New Memo",
+                )
+              : button(
+                  {
+                    class: "btn btn-primary btn-sm",
+                    onclick: openPromptCreate,
+                  },
+                  "+ New Prompt",
+                ),
           a({ href: "/", class: "btn btn-outline btn-sm" }, "View Site"),
           button(
             { class: "btn btn-outline btn-sm", onclick: logout },
@@ -487,6 +496,26 @@ function AdminPage() {
     ),
     div(
       { class: "admin-container" },
+      // Tab bar
+      div(
+        { class: "tab-bar" },
+        button(
+          {
+            class: () => "tab" + (activeTab.val === "memos" ? " active" : ""),
+            onclick: () => (activeTab.val = "memos"),
+          },
+          "Memos",
+        ),
+        button(
+          {
+            class: () =>
+              "tab" + (activeTab.val === "creative" ? " active" : ""),
+            onclick: () => (activeTab.val = "creative"),
+          },
+          "Creative",
+        ),
+      ),
+      // Global error banner
       () =>
         globalError.val
           ? div(
@@ -502,17 +531,23 @@ function AdminPage() {
               ),
             )
           : "",
-      () => (formMode.val.type !== "closed" ? FormCard() : ""),
-      () => {
-        if (loading.val)
-          return div({ class: "status-msg" }, "Loading memos...");
-        if (memos.val.length === 0 && formMode.val.type === "closed")
-          return div(
-            { class: "empty-state" },
-            "No memos yet. Create your first memo!",
-          );
-        return div(memos.val.map(MemoCard));
-      },
+      // Tab content
+      () =>
+        activeTab.val === "memos"
+          ? div(
+              () => (formMode.val.type !== "closed" ? FormCard() : ""),
+              () => {
+                if (loading.val)
+                  return div({ class: "status-msg" }, "Loading memos...");
+                if (memos.val.length === 0 && formMode.val.type === "closed")
+                  return div(
+                    { class: "empty-state" },
+                    "No memos yet. Create your first memo!",
+                  );
+                return div(memos.val.map(MemoCard));
+              },
+            )
+          : CreativeTab(),
     ),
   );
 }
