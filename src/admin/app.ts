@@ -432,6 +432,7 @@ function MemoCard(memo: Memo) {
     div({ class: "memo-content" }, memo.content),
     div(
       { class: "memo-meta" },
+      span({ class: "memo-id" }, `#${memo.id}`),
       span({ class: `badge ${badgeClass}` }, badgeText),
       memo.tag ? span({ class: "badge badge-tag" }, memo.tag) : "",
       span(`Created: ${formatDate(memo.created_at)}`),

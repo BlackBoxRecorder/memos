@@ -135,7 +135,11 @@ export async function handleCreativeRequest(
     const authErr = requireAuth(request);
     if (authErr) return authErr;
 
-    let body: { prompt_id?: number; extra_prompt?: string };
+    let body: {
+      prompt_id?: number;
+      extra_prompt?: string;
+      memo_ids?: number[];
+    };
     try {
       body = await request.json();
     } catch {
@@ -152,27 +156,55 @@ export async function handleCreativeRequest(
     ) {
       return json({ error: "extra_prompt is required" }, 400);
     }
+    // Validate memo_ids if provided
+    if (body.memo_ids !== undefined) {
+      if (
+        !Array.isArray(body.memo_ids) ||
+        body.memo_ids.some((id) => typeof id !== "number" || id <= 0)
+      ) {
+        return json(
+          { error: "memo_ids must be an array of positive integers" },
+          400,
+        );
+      }
+    }
 
     const prompt = getPrompt(body.prompt_id);
     if (!prompt) {
       return json({ error: "Prompt not found" }, 404);
     }
 
-    // Step 1: Generate embedding for extra_prompt
-    const embedding = await generateEmbedding(body.extra_prompt.trim());
-
-    // Step 2: Vector search related memos
     let contextMemos: string[] = [];
     let contextMemoIds = "";
-    try {
-      const semanticIds = await getSemanticResults(body.extra_prompt.trim(), 5);
-      if (semanticIds.length > 0) {
-        const memos = getMemos({ includePrivate: true, ids: semanticIds });
-        contextMemos = memos.map((m) => m.content);
-        contextMemoIds = semanticIds.join(",");
+    let embedding: Float32Array | null = null;
+
+    const isManualMode =
+      body.memo_ids !== undefined && body.memo_ids.length > 0;
+
+    if (isManualMode) {
+      // Manual mode: use user-provided memo IDs
+      const memos = getMemos({ includePrivate: true, ids: body.memo_ids });
+      contextMemos = memos.map((m) => m.content);
+      contextMemoIds = body.memo_ids!.join(",");
+    } else {
+      // Auto mode: semantic search (existing logic)
+      // Step 1: Generate embedding for extra_prompt
+      embedding = await generateEmbedding(body.extra_prompt.trim());
+
+      // Step 2: Vector search related memos
+      try {
+        const semanticIds = await getSemanticResults(
+          body.extra_prompt.trim(),
+          5,
+        );
+        if (semanticIds.length > 0) {
+          const memos = getMemos({ includePrivate: true, ids: semanticIds });
+          contextMemos = memos.map((m) => m.content);
+          contextMemoIds = semanticIds.join(",");
+        }
+      } catch {
+        // Semantic search failed, proceed without context
       }
-    } catch {
-      // Semantic search failed, proceed without context
     }
 
     // Step 3: Call AI to generate content

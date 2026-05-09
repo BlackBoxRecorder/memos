@@ -37,6 +37,8 @@ const creativeItems = van.state<CreativeItem[]>([]);
 const selectedPromptId = van.state<number | null>(null);
 const generateModalOpen = van.state(false);
 const extraPromptInput = van.state("");
+const generationMode = van.state<"auto" | "manual">("auto");
+const manualMemoIds = van.state("");
 const generating = van.state(false);
 const generateError = van.state<string | null>(null);
 const readMoreItem = van.state<CreativeItem | null>(null);
@@ -192,18 +194,40 @@ async function handleGenerate(): Promise<void> {
     generateError.val = "Please select a prompt first";
     return;
   }
+  if (generationMode.val === "manual" && !manualMemoIds.val.trim()) {
+    generateError.val = "Please enter memo IDs (comma-separated)";
+    return;
+  }
   generating.val = true;
   generateError.val = null;
   try {
+    const body: Record<string, unknown> = {
+      prompt_id: selectedPromptId.val,
+      extra_prompt: extraPromptInput.val.trim(),
+    };
+
+    if (generationMode.val === "manual") {
+      const ids = manualMemoIds.val
+        .split(",")
+        .map((s) => Number(s.trim()))
+        .filter((n) => !isNaN(n) && n > 0);
+      if (ids.length === 0) {
+        generateError.val =
+          "Invalid memo IDs. Please enter valid numeric IDs separated by commas.";
+        generating.val = false;
+        return;
+      }
+      body.memo_ids = ids;
+    }
+
     await api("/api/creative/generate", {
       method: "POST",
-      body: JSON.stringify({
-        prompt_id: selectedPromptId.val,
-        extra_prompt: extraPromptInput.val.trim(),
-      }),
+      body: JSON.stringify(body),
     });
     generateModalOpen.val = false;
     extraPromptInput.val = "";
+    manualMemoIds.val = "";
+    generationMode.val = "auto";
     await loadCreativeItems(selectedPromptId.val);
   } catch (err) {
     generateError.val = (err as Error).message;
@@ -337,6 +361,8 @@ function GenerateModal() {
         if (e.target === e.currentTarget) {
           generateModalOpen.val = false;
           extraPromptInput.val = "";
+          manualMemoIds.val = "";
+          generationMode.val = "auto";
           generateError.val = null;
         }
       },
@@ -362,6 +388,53 @@ function GenerateModal() {
         oninput: (e: Event) =>
           (extraPromptInput.val = (e.target as HTMLTextAreaElement).value),
       }),
+      // Context mode toggle
+      div(
+        { class: "context-mode-toggle" },
+        span(
+          { style: "font-size:13px;color:#666;margin-right:8px;" },
+          "Context:",
+        ),
+        button(
+          {
+            class: () =>
+              "mode-btn" + (generationMode.val === "auto" ? " active" : ""),
+            disabled: () => generating.val,
+            onclick: () => (generationMode.val = "auto"),
+          },
+          "Auto Search",
+        ),
+        button(
+          {
+            class: () =>
+              "mode-btn" + (generationMode.val === "manual" ? " active" : ""),
+            disabled: () => generating.val,
+            onclick: () => (generationMode.val = "manual"),
+          },
+          "Manual Select",
+        ),
+      ),
+      // Manual memo ID input (shown only in manual mode)
+      () =>
+        generationMode.val === "manual"
+          ? div(
+              { style: "margin-top:8px;" },
+              input({
+                type: "text",
+                placeholder: "Memo IDs (e.g. 1,3,5)",
+                value: manualMemoIds,
+                disabled: () => generating.val,
+                oninput: (e: Event) =>
+                  (manualMemoIds.val = (e.target as HTMLInputElement).value),
+              }),
+              div(
+                {
+                  style: "font-size:11px;color:#999;margin-top:4px;",
+                },
+                "Enter memo IDs separated by commas. Find IDs on the Memos tab (#number).",
+              ),
+            )
+          : "",
       div(
         { class: "modal-actions" },
         button(
@@ -370,6 +443,8 @@ function GenerateModal() {
             onclick: () => {
               generateModalOpen.val = false;
               extraPromptInput.val = "";
+              manualMemoIds.val = "";
+              generationMode.val = "auto";
               generateError.val = null;
             },
           },
