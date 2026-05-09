@@ -84,15 +84,16 @@ function truncate(str: string, max: number): string {
 export async function loadPrompts(): Promise<void> {
   try {
     const data = await api<{ prompts: Prompt[] }>("/api/creative/prompts");
-    prompts.val = data.prompts;
     // Auto-select first prompt if none selected
     if (selectedPromptId.val === null && data.prompts.length > 0) {
       const first = data.prompts[0]!;
       selectedPromptId.val = first.id;
+      prompts.val = data.prompts;
+
       loadCreativeItems(first.id);
     }
   } catch {
-    prompts.val = [];
+    //prompts.val = [];
   }
 }
 
