@@ -30,6 +30,10 @@ const aiSuggestedTags = van.state<string[]>([]);
 const aiSuggestingTags = van.state(false);
 let suggestTimer: ReturnType<typeof setTimeout> | null = null;
 
+// Timeline state
+const selectedMonth = van.state<string | null>(null);
+const collapsedYears = van.state<Set<number>>(new Set());
+
 // ====== API ======
 
 // ====== Actions ======
@@ -224,6 +228,92 @@ function closeForm(): void {
   suggestTimer = null;
 }
 
+// ====== Timeline Helpers ======
+
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+interface MonthGroup {
+  month: number;
+  name: string;
+  count: number;
+  firstMemoId: number;
+}
+
+interface YearGroup {
+  year: number;
+  months: MonthGroup[];
+}
+
+function computeTimelineData(memosList: Memo[]): YearGroup[] {
+  const yearMap = new Map<
+    number,
+    Map<number, { count: number; firstMemoId: number }>
+  >();
+
+  for (const memo of memosList) {
+    const date = new Date(memo.created_at + "Z");
+    const year = date.getFullYear();
+    const month = date.getMonth();
+
+    if (!yearMap.has(year)) yearMap.set(year, new Map());
+    const monthMap = yearMap.get(year)!;
+
+    if (!monthMap.has(month)) {
+      monthMap.set(month, { count: 1, firstMemoId: memo.id });
+    } else {
+      monthMap.get(month)!.count++;
+    }
+  }
+
+  const result: YearGroup[] = [];
+  const sortedYears = [...yearMap.keys()].sort((a, b) => b - a);
+
+  for (const year of sortedYears) {
+    const monthMap = yearMap.get(year)!;
+    const months: MonthGroup[] = [...monthMap.entries()]
+      .sort((a, b) => b[0] - a[0])
+      .map(([m, data]) => ({
+        month: m,
+        name: MONTH_NAMES[m] ?? String(m + 1),
+        count: data.count,
+        firstMemoId: data.firstMemoId,
+      }));
+    result.push({ year, months });
+  }
+
+  return result;
+}
+
+function scrollToMonth(memoId: number): void {
+  const el = document.querySelector(`[data-memo-id="${memoId}"]`);
+  if (el) {
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+
+function toggleYear(year: number): void {
+  const current = new Set(collapsedYears.val);
+  if (current.has(year)) {
+    current.delete(year);
+  } else {
+    current.add(year);
+  }
+  collapsedYears.val = current;
+}
+
 // ====== SVG Helpers ======
 
 function htmlNode(str: string): HTMLElement {
@@ -249,6 +339,50 @@ function svgSpinner(): HTMLElement {
 // ====== Helpers ======
 
 // ====== Components ======
+
+function TimelineSidebar() {
+  const { aside } = van.tags;
+  return aside({ class: "timeline-sidebar" }, () => {
+    const groups = computeTimelineData(memos.val);
+    if (groups.length === 0) return div();
+    return div(
+      ...groups.map((group) => {
+        const isCollapsed = collapsedYears.val.has(group.year);
+        return div(
+          div(
+            {
+              class: "timeline-year",
+              onclick: () => toggleYear(group.year),
+            },
+            span(String(group.year)),
+            span({ class: "arrow" }, isCollapsed ? "\u25B8" : "\u25BE"),
+          ),
+          isCollapsed
+            ? ""
+            : div(
+                { class: "timeline-months" },
+                ...group.months.map((m) => {
+                  const key = `${group.year}-${String(m.month + 1).padStart(2, "0")}`;
+                  return div(
+                    {
+                      class: () =>
+                        "timeline-month" +
+                        (selectedMonth.val === key ? " active" : ""),
+                      onclick: () => {
+                        selectedMonth.val = key;
+                        scrollToMonth(m.firstMemoId);
+                      },
+                    },
+                    span(m.name),
+                    span({ class: "count" }, String(m.count)),
+                  );
+                }),
+              ),
+        );
+      }),
+    );
+  });
+}
 
 function LoginPage() {
   const keyInput = input({
@@ -396,7 +530,7 @@ function MemoCard(memo: Memo) {
   const toggleLabel = memo.is_public ? "Make Private" : "Make Public";
 
   return div(
-    { class: "memo-card" },
+    { class: "memo-card", "data-memo-id": String(memo.id) },
     div({ class: "memo-content" }, memo.content),
     div(
       { class: "memo-meta" },
@@ -464,59 +598,66 @@ function AdminPage() {
       ),
     ),
     div(
-      { class: "admin-container" },
-      // Tab bar
-      div(
-        { class: "tab-bar" },
-        button(
-          {
-            class: () => "tab" + (activeTab.val === "memos" ? " active" : ""),
-            onclick: () => (activeTab.val = "memos"),
-          },
-          "Memos",
-        ),
-        button(
-          {
-            class: () =>
-              "tab" + (activeTab.val === "creative" ? " active" : ""),
-            onclick: () => (activeTab.val = "creative"),
-          },
-          "Creative",
-        ),
-      ),
-      // Global error banner
+      { class: "admin-layout" },
       () =>
-        globalError.val
-          ? div(
-              { class: "error-banner" },
-              globalError.val,
-              button(
-                {
-                  class: "btn btn-sm btn-outline",
-                  style: "margin-left:8px",
-                  onclick: () => (globalError.val = null),
-                },
-                "Dismiss",
-              ),
-            )
+        activeTab.val === "memos" && memos.val.length > 0
+          ? TimelineSidebar()
           : "",
-      // Tab content
-      () =>
-        activeTab.val === "memos"
-          ? div(
-              () => (formMode.val.type !== "closed" ? FormCard() : ""),
-              () => {
-                if (loading.val)
-                  return div({ class: "status-msg" }, "Loading memos...");
-                if (memos.val.length === 0 && formMode.val.type === "closed")
-                  return div(
-                    { class: "empty-state" },
-                    "No memos yet. Create your first memo!",
-                  );
-                return div(memos.val.map(MemoCard));
-              },
-            )
-          : CreativeTab(),
+      div(
+        { class: "admin-container" },
+        // Tab bar
+        div(
+          { class: "tab-bar" },
+          button(
+            {
+              class: () => "tab" + (activeTab.val === "memos" ? " active" : ""),
+              onclick: () => (activeTab.val = "memos"),
+            },
+            "Memos",
+          ),
+          button(
+            {
+              class: () =>
+                "tab" + (activeTab.val === "creative" ? " active" : ""),
+              onclick: () => (activeTab.val = "creative"),
+            },
+            "Creative",
+          ),
+        ),
+        // Global error banner
+        () =>
+          globalError.val
+            ? div(
+                { class: "error-banner" },
+                globalError.val,
+                button(
+                  {
+                    class: "btn btn-sm btn-outline",
+                    style: "margin-left:8px",
+                    onclick: () => (globalError.val = null),
+                  },
+                  "Dismiss",
+                ),
+              )
+            : "",
+        // Tab content
+        () =>
+          activeTab.val === "memos"
+            ? div(
+                () => (formMode.val.type !== "closed" ? FormCard() : ""),
+                () => {
+                  if (loading.val)
+                    return div({ class: "status-msg" }, "Loading memos...");
+                  if (memos.val.length === 0 && formMode.val.type === "closed")
+                    return div(
+                      { class: "empty-state" },
+                      "No memos yet. Create your first memo!",
+                    );
+                  return div(memos.val.map(MemoCard));
+                },
+              )
+            : CreativeTab(),
+      ),
     ),
   );
 }
