@@ -373,7 +373,7 @@ function GenerateModal() {
       },
     },
     div(
-      { class: "modal" },
+      { class: "modal modal-flex" },
       h3("Generate Creative Content"),
       () =>
         selectedPrompt
@@ -483,10 +483,11 @@ function GenerateModal() {
         const active = generating.val;
         return div(
           {
+            class: "hide-scrollbar",
             style:
               "margin-top:14px;padding:12px;background:#f8f9fb;" +
               "border-radius:6px;border:1px solid #e5e5e5;" +
-              "max-height:420px;overflow-y:auto;",
+              "flex:1;min-height:0;overflow-y:auto;",
           },
           div(
             {

@@ -564,6 +564,22 @@
             box-shadow: 0 4px 20px rgba(0, 0, 0, .12);
         }
 
+        .modal-flex {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Hide scrollbar but keep scroll functionality */
+        .hide-scrollbar {
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+
         .modal-wide {
             max-width: 680px;
         }
