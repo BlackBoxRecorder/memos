@@ -1,8 +1,9 @@
+import { Hono } from "hono";
 import { initDb } from "./db";
-import { handleAuthRequest } from "./api/auth";
-import { handleMemosRequest } from "./api/memos";
-import { handleAiRequest } from "./api/ai";
-import { handleCreativeRequest } from "./api/creative";
+import { authApp } from "./api/auth";
+import { memosApp } from "./api/memos";
+import { aiApp } from "./api/ai";
+import { creativeApp } from "./api/creative";
 import { initEmbeddingCache } from "./ai/embeddings";
 
 const PORT = parseInt(process.env.PORT || "3020");
@@ -70,72 +71,45 @@ async function serveJs(path: string): Promise<Response> {
   });
 }
 
-async function handleRequest(request: Request): Promise<Response> {
-  const url = new URL(request.url);
-  const path = url.pathname;
+const app = new Hono();
 
-  // API 路由
-  if (path.startsWith("/api/auth")) {
-    const res = await handleAuthRequest(request, path);
-    if (res) return res;
-  }
+// API 路由 — 子应用挂载
+app.route("/api/auth", authApp);
+app.route("/api/ai", aiApp);
+app.route("/api/memos", memosApp);
+app.route("/api/creative", creativeApp);
 
-  if (path.startsWith("/api/ai")) {
-    const res = await handleAiRequest(request, path);
-    if (res) return res;
-  }
+// 静态文件 + 页面路由
+// /admin/app.ts → 转译 JS
+app.get("/admin/app.ts", (c) => serveJs("/admin/app.ts"));
+app.get("/admin/app.js", (c) => serveJs("/admin/app.ts"));
 
-  if (path.startsWith("/api/memos")) {
-    const res = await handleMemosRequest(request, path);
-    if (res) return res;
-  }
+// /admin → 重定向到 /admin/
+app.get("/admin", (c) => c.redirect("/admin/"));
 
-  if (path.startsWith("/api/creative")) {
-    const res = await handleCreativeRequest(request, path);
-    if (res) return res;
-  }
+// /admin/ → admin SPA
+app.get("/admin/", (c) => serveHtml("/admin/index.html"));
+app.get("/admin/index.html", (c) => serveHtml("/admin/index.html"));
 
-  // 静态文件 + 页面路由
-  // /admin/app.ts → 转译 JS
-  if (path === "/admin/app.ts" || path === "/admin/app.js") {
-    return serveJs("/admin/app.ts");
-  }
+// /index.ts → 转译 JS
+app.get("/index.ts", (c) => serveJs("/masonry/index.ts"));
+app.get("/index.js", (c) => serveJs("/masonry/index.ts"));
 
-  // /admin → 重定向到 /admin/
-  if (path === "/admin") {
-    return new Response(null, {
-      status: 302,
-      headers: { Location: "/admin/" },
-    });
-  }
+// / → masonry 首页
+app.get("/", (c) => serveHtml("/masonry/index.html"));
+app.get("/index.html", (c) => serveHtml("/masonry/index.html"));
 
-  // /admin/ → admin SPA
-  if (path === "/admin/" || path === "/admin/index.html") {
-    return serveHtml("/admin/index.html");
-  }
-
-  // /admin/* (SPA catch-all for deep links)
+// admin SPA 深层链接 + 其他 .ts 文件
+app.notFound((c) => {
+  const path = c.req.path;
   if (path.startsWith("/admin/")) {
     return serveHtml("/admin/index.html");
   }
-
-  // /index.ts → 转译 JS
-  if (path === "/index.ts" || path === "/index.js") {
-    return serveJs("/masonry/index.ts");
-  }
-
-  // / → masonry 首页
-  if (path === "/" || path === "/index.html") {
-    return serveHtml("/masonry/index.html");
-  }
-
-  // 其他 .ts 文件
   if (path.endsWith(".ts")) {
     return serveJs(`/masonry${path}`);
   }
-
-  return new Response("Not Found", { status: 404 });
-}
+  return c.json({ error: "Not Found" }, 404);
+});
 
 // 初始化数据库
 initDb();
@@ -146,7 +120,7 @@ initEmbeddingCache();
 // 启动服务器
 Bun.serve({
   port: PORT,
-  fetch: handleRequest,
+  fetch: app.fetch,
 });
 
 console.log(`Memos server running at http://localhost:${PORT}`);

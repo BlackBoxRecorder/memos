@@ -1,80 +1,66 @@
-import { requireAuth } from "../auth";
+import { Hono } from "hono";
+import { authMiddleware } from "../auth";
 import { getAllTags } from "../db";
 import { isAiAvailable, optimizeContent, suggestTags } from "../ai/service";
-import { json } from "../util";
 
-export async function handleAiRequest(
-  request: Request,
-  path: string,
-): Promise<Response | null> {
-  const method = request.method;
+export const aiApp = new Hono();
 
-  // GET /api/ai/status — feature detection (no auth required)
-  if (method === "GET" && path === "/api/ai/status") {
-    const features = isAiAvailable();
-    return json(features);
+// GET /api/ai/status — feature detection (no auth required)
+aiApp.get("/status", (c) => {
+  return c.json(isAiAvailable());
+});
+
+// POST /api/ai/optimize — content optimization (auth required)
+aiApp.post("/optimize", authMiddleware, async (c) => {
+  let body: { content?: string };
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON" }, 400);
   }
 
-  // POST /api/ai/optimize — content optimization (auth required)
-  if (method === "POST" && path === "/api/ai/optimize") {
-    const authErr = requireAuth(request);
-    if (authErr) return authErr;
-
-    if (!isAiAvailable().optimize) {
-      return json({ error: "AI optimization is not configured" }, 503);
-    }
-
-    let body: { content?: string };
-    try {
-      body = await request.json();
-    } catch {
-      return json({ error: "Invalid JSON" }, 400);
-    }
-
-    if (
-      !body.content ||
-      typeof body.content !== "string" ||
-      body.content.trim().length === 0
-    ) {
-      return json({ error: "Content is required" }, 400);
-    }
-
-    const result = await optimizeContent(body.content.trim());
-    if (result === null) {
-      return json({ error: "AI service temporarily unavailable" }, 500);
-    }
-
-    return json({ content: result });
+  if (
+    !body.content ||
+    typeof body.content !== "string" ||
+    body.content.trim().length === 0
+  ) {
+    return c.json({ error: "Content is required" }, 400);
   }
 
-  // POST /api/ai/suggest-tags — tag suggestions (auth required)
-  if (method === "POST" && path === "/api/ai/suggest-tags") {
-    const authErr = requireAuth(request);
-    if (authErr) return authErr;
-
-    if (!isAiAvailable().tags) {
-      return json({ error: "Tag suggestion is not configured" }, 503);
-    }
-
-    let body: { content?: string };
-    try {
-      body = await request.json();
-    } catch {
-      return json({ error: "Invalid JSON" }, 400);
-    }
-
-    if (
-      !body.content ||
-      typeof body.content !== "string" ||
-      body.content.trim().length === 0
-    ) {
-      return json({ error: "Content is required" }, 400);
-    }
-
-    const existingTags = getAllTags();
-    const tags = await suggestTags(body.content.trim(), existingTags);
-    return json({ tags });
+  if (!isAiAvailable().optimize) {
+    return c.json({ error: "AI optimization is not configured" }, 503);
   }
 
-  return null;
-}
+  const result = await optimizeContent(body.content.trim());
+  if (result === null) {
+    return c.json({ error: "AI service temporarily unavailable" }, 500);
+  }
+
+  return c.json({ content: result });
+});
+
+// POST /api/ai/suggest-tags — tag suggestions (auth required)
+aiApp.post("/suggest-tags", authMiddleware, async (c) => {
+  let body: { content?: string };
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON" }, 400);
+  }
+
+  if (
+    !body.content ||
+    typeof body.content !== "string" ||
+    body.content.trim().length === 0
+  ) {
+    return c.json({ error: "Content is required" }, 400);
+  }
+
+  if (!isAiAvailable().tags) {
+    return c.json({ error: "Tag suggestion is not configured" }, 503);
+  }
+
+  const existingTags = getAllTags();
+  const tags = await suggestTags(body.content.trim(), existingTags);
+  return c.json({ tags });
+});

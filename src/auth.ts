@@ -62,3 +62,10 @@ export function requireAuth(request: Request): Response | null {
   }
   return null;
 }
+
+// Hono 中间件：认证失败直接返回 401，通过则继续后续处理
+export const authMiddleware = async (c: any, next: any) => {
+  const err = requireAuth(c.req.raw);
+  if (err) return err;
+  await next();
+};

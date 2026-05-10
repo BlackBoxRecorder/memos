@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@chenglou/pretext": "^0.0.6",
+    "hono": "^4.7.10",
     "vanjs-core": "^1.6.0"
   }
 }
