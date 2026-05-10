@@ -6,15 +6,9 @@ import {
   setAuthCookie,
   clearAuthCookie,
 } from "../auth";
+import { json } from "../util";
 
 const SECRET_KEY = process.env.MEMOS_SECRET_KEY || "memos-dev-test";
-
-function json(data: unknown, status = 200): Response {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
-}
 
 export async function handleAuthRequest(
   request: Request,

@@ -13,13 +13,7 @@ import {
   deleteEmbeddingCache,
   getSemanticResults,
 } from "../ai/embeddings";
-
-function json(data: unknown, status = 200): Response {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
-}
+import { json } from "../util";
 
 export async function handleMemosRequest(
   request: Request,

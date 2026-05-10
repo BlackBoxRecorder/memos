@@ -1,5 +1,6 @@
 import van from "vanjs-core";
 import { CreativeTab, openPromptCreate } from "./creative";
+import { api, formatDate } from "../util";
 
 interface Memo {
   id: number;
@@ -38,17 +39,6 @@ const aiSuggestingTags = van.state(false);
 let suggestTimer: ReturnType<typeof setTimeout> | null = null;
 
 // ====== API ======
-async function api<T>(path: string, options?: RequestInit): Promise<T> {
-  const resp = await fetch(path, {
-    credentials: "same-origin",
-    headers: { "Content-Type": "application/json" },
-    ...options,
-  });
-  const data = await resp.json();
-  if (!resp.ok)
-    throw new Error(data.error || `Request failed (${resp.status})`);
-  return data as T;
-}
 
 // ====== Actions ======
 async function checkAuth(): Promise<void> {
@@ -265,20 +255,6 @@ function svgSpinner(): HTMLElement {
 }
 
 // ====== Helpers ======
-function formatDate(d: string): string {
-  try {
-    const date = new Date(d + "Z");
-    return date.toLocaleDateString("zh-CN", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return d;
-  }
-}
 
 // ====== Components ======
 
