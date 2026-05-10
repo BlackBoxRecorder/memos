@@ -12,7 +12,11 @@ import {
   deleteCreativeItem,
   getMemos,
 } from "../db";
-import { generateEmbedding, generateCreativeContent } from "../ai/service";
+import {
+  generateEmbedding,
+  generateCreativeContent,
+  generateCreativeContentStream,
+} from "../ai/service";
 import { getSemanticResults } from "../ai/embeddings";
 
 export const creativeApp = new Hono();
@@ -105,7 +109,7 @@ creativeApp.get("/", (c) => {
   return c.json({ items });
 });
 
-// POST /api/creative/generate — 生成创意内容
+// POST /api/creative/generate — 生成创意内容（流式输出）
 creativeApp.post("/generate", authMiddleware, async (c) => {
   let body: {
     prompt_id?: number;
@@ -128,7 +132,6 @@ creativeApp.post("/generate", authMiddleware, async (c) => {
   ) {
     return c.json({ error: "extra_prompt is required" }, 400);
   }
-  // Validate memo_ids if provided
   if (body.memo_ids !== undefined) {
     if (
       !Array.isArray(body.memo_ids) ||
@@ -153,16 +156,11 @@ creativeApp.post("/generate", authMiddleware, async (c) => {
   const isManualMode = body.memo_ids !== undefined && body.memo_ids.length > 0;
 
   if (isManualMode) {
-    // Manual mode: use user-provided memo IDs
     const memos = getMemos({ includePrivate: true, ids: body.memo_ids });
     contextMemos = memos.map((m) => m.content);
     contextMemoIds = body.memo_ids!.join(",");
   } else {
-    // Auto mode: semantic search (existing logic)
-    // Step 1: Generate embedding for extra_prompt
     embedding = await generateEmbedding(body.extra_prompt.trim());
-
-    // Step 2: Vector search related memos
     try {
       const semanticIds = await getSemanticResults(body.extra_prompt.trim(), 5);
       if (semanticIds.length > 0) {
@@ -175,27 +173,58 @@ creativeApp.post("/generate", authMiddleware, async (c) => {
     }
   }
 
-  // Step 3: Call AI to generate content
-  const content = await generateCreativeContent(
-    prompt.content,
-    body.extra_prompt.trim(),
-    contextMemos,
-  );
+  // Build SSE stream
+  const encoder = new TextEncoder();
+  const scopePromptId = body.prompt_id;
+  const scopeExtraPrompt = body.extra_prompt.trim();
 
-  if (content === null) {
-    return c.json({ error: "AI service temporarily unavailable" }, 500);
-  }
+  const stream = new ReadableStream({
+    async start(controller) {
+      let fullContent = "";
+      try {
+        const gen = generateCreativeContentStream(
+          prompt.content,
+          scopeExtraPrompt,
+          contextMemos,
+        );
 
-  // Step 4: Save to database
-  const item = createCreativeItem({
-    prompt_id: body.prompt_id,
-    extra_prompt: body.extra_prompt.trim(),
-    embedding: embedding ? Buffer.from(embedding.buffer) : undefined,
-    content,
-    context_memo_ids: contextMemoIds,
+        for await (const chunk of gen) {
+          fullContent += chunk;
+          const msg = JSON.stringify({ type: "content", content: chunk });
+          controller.enqueue(encoder.encode(`data: ${msg}\n\n`));
+        }
+
+        // Save to DB after streaming completes
+        const item = createCreativeItem({
+          prompt_id: scopePromptId,
+          extra_prompt: scopeExtraPrompt,
+          embedding: embedding ? Buffer.from(embedding.buffer) : undefined,
+          content: fullContent,
+          context_memo_ids: contextMemoIds,
+        });
+
+        const doneMsg = JSON.stringify({ type: "done", item });
+        controller.enqueue(encoder.encode(`data: ${doneMsg}\n\n`));
+        controller.close();
+      } catch (err) {
+        const errorMsg = JSON.stringify({
+          type: "error",
+          error: (err as Error).message || "Generation failed",
+        });
+        controller.enqueue(encoder.encode(`data: ${errorMsg}\n\n`));
+        controller.close();
+      }
+    },
   });
 
-  return c.json({ item }, 201);
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+      "X-Content-Type-Options": "nosniff",
+    },
+  });
 });
 
 // DELETE /api/creative/:id — 删除 creative

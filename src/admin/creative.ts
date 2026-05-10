@@ -28,6 +28,11 @@ const generateError = van.state<string | null>(null);
 const readMoreItem = van.state<CreativeItem | null>(null);
 const creativeLoading = van.state(false);
 
+// Streaming state
+const streamContent = van.state("");
+const streamDone = van.state(false);
+let streamAbort: AbortController | null = null;
+
 // Delete confirm state for creative items
 const creativeDeleteId = van.state<number | null>(null);
 const creativeDeleting = van.state(false);
@@ -150,41 +155,89 @@ async function handleGenerate(): Promise<void> {
     generateError.val = "Please enter memo IDs (comma-separated)";
     return;
   }
+
+  const body: Record<string, unknown> = {
+    prompt_id: selectedPromptId.val,
+    extra_prompt: extraPromptInput.val.trim(),
+  };
+
+  if (generationMode.val === "manual") {
+    const ids = manualMemoIds.val
+      .split(",")
+      .map((s) => Number(s.trim()))
+      .filter((n) => !isNaN(n) && n > 0);
+    if (ids.length === 0) {
+      generateError.val =
+        "Invalid memo IDs. Please enter valid numeric IDs separated by commas.";
+      return;
+    }
+    body.memo_ids = ids;
+  }
+
   generating.val = true;
   generateError.val = null;
-  try {
-    const body: Record<string, unknown> = {
-      prompt_id: selectedPromptId.val,
-      extra_prompt: extraPromptInput.val.trim(),
-    };
+  streamContent.val = "";
+  streamDone.val = false;
 
-    if (generationMode.val === "manual") {
-      const ids = manualMemoIds.val
-        .split(",")
-        .map((s) => Number(s.trim()))
-        .filter((n) => !isNaN(n) && n > 0);
-      if (ids.length === 0) {
-        generateError.val =
-          "Invalid memo IDs. Please enter valid numeric IDs separated by commas.";
-        generating.val = false;
-        return;
-      }
-      body.memo_ids = ids;
+  // Abort any previous stream
+  if (streamAbort) streamAbort.abort();
+  streamAbort = new AbortController();
+
+  try {
+    const resp = await fetch("/api/creative/generate", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: streamAbort.signal,
+    });
+
+    if (!resp.ok) {
+      const err = await resp
+        .json()
+        .catch(() => ({ error: `Request failed (${resp.status})` }));
+      throw new Error(err.error || "Request failed");
     }
 
-    await api("/api/creative/generate", {
-      method: "POST",
-      body: JSON.stringify(body),
-    });
-    generateModalOpen.val = false;
-    extraPromptInput.val = "";
-    manualMemoIds.val = "";
-    generationMode.val = "auto";
-    await loadCreativeItems(selectedPromptId.val);
+    const reader = resp.body!.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith("data: ")) continue;
+
+        try {
+          const msg = JSON.parse(trimmed.slice(6));
+          if (msg.type === "content") {
+            streamContent.val += msg.content;
+          } else if (msg.type === "done") {
+            creativeItems.val = [msg.item, ...creativeItems.val];
+            streamDone.val = true;
+          } else if (msg.type === "error") {
+            throw new Error(msg.error);
+          }
+        } catch (err) {
+          if ((err as Error).message !== "Unexpected end of JSON input") {
+            throw err;
+          }
+        }
+      }
+    }
   } catch (err) {
+    if ((err as Error).name === "AbortError") return;
     generateError.val = (err as Error).message;
   } finally {
     generating.val = false;
+    streamAbort = null;
   }
 }
 
@@ -393,11 +446,14 @@ function GenerateModal() {
           {
             class: "btn btn-outline btn-sm",
             onclick: () => {
+              if (streamAbort) streamAbort.abort();
               generateModalOpen.val = false;
               extraPromptInput.val = "";
               manualMemoIds.val = "";
               generationMode.val = "auto";
               generateError.val = null;
+              streamContent.val = "";
+              streamDone.val = false;
             },
           },
           "Cancel",
@@ -405,16 +461,77 @@ function GenerateModal() {
         button(
           {
             class: "btn btn-primary btn-sm",
-            disabled: () => generating.val,
+            disabled: () => generating.val || streamDone.val,
             onclick: handleGenerate,
           },
-          () => (generating.val ? "Generating..." : "Generate"),
+          () =>
+            generating.val
+              ? "Generating..."
+              : streamDone.val
+                ? "Done"
+                : "Generate",
         ),
       ),
       () =>
         generateError.val
           ? div({ class: "form-error" }, generateError.val)
           : "",
+      // Streaming output area
+      () => {
+        if (!streamContent.val && !generating.val) return "";
+        const done = streamDone.val;
+        const active = generating.val;
+        return div(
+          {
+            style:
+              "margin-top:14px;padding:12px;background:#f8f9fb;" +
+              "border-radius:6px;border:1px solid #e5e5e5;" +
+              "max-height:420px;overflow-y:auto;",
+          },
+          div(
+            {
+              style: "font-size:13px;color:#888;margin-bottom:6px;",
+            },
+            done ? "Generated content:" : "Generating...",
+          ),
+          div(
+            {
+              id: "stream-output",
+              style:
+                "font-size:14px;line-height:22px;white-space:pre-wrap;" +
+                "word-break:break-word;color:#333;",
+            },
+            streamContent,
+            () =>
+              active
+                ? span(
+                    {
+                      style: "animation:blink 0.8s infinite;color:#3b82f6;",
+                    },
+                    "\u258B",
+                  )
+                : "",
+          ),
+          done
+            ? button(
+                {
+                  class: "btn btn-outline btn-sm",
+                  style: "margin-top:10px;",
+                  onclick: () => {
+                    generateModalOpen.val = false;
+                    extraPromptInput.val = "";
+                    manualMemoIds.val = "";
+                    generationMode.val = "auto";
+                    generateError.val = null;
+                    streamContent.val = "";
+                    streamDone.val = false;
+                  },
+                },
+                "Close",
+              )
+            : "",
+        );
+      },
     ),
   );
 }

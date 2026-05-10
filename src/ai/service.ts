@@ -202,3 +202,82 @@ export async function generateCreativeContent(
     },
   ]);
 }
+
+// --- Creative Content Generation (Streaming) ---
+
+export async function* generateCreativeContentStream(
+  promptContent: string,
+  extraPrompt: string,
+  contextMemos: string[],
+): AsyncGenerator<string> {
+  const baseUrl = deepseekBaseUrl();
+  if (!baseUrl) throw new Error("DeepSeek API not configured");
+
+  const contextText =
+    contextMemos.length > 0
+      ? `\n\nRelevant context from my memos:\n${contextMemos
+          .map((c, i) => `${i + 1}. ${c.slice(0, 500)}`)
+          .join("\n\n")}`
+      : "";
+
+  const res = await fetch(`${baseUrl}/v1/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${env("DEEPSEEK_API_KEY")}`,
+    },
+    body: JSON.stringify({
+      model: "deepseek-v4-flash",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a creative assistant for a personal memos app. Follow the instructions provided to generate thoughtful, well-structured content.",
+        },
+        {
+          role: "user",
+          content: `Creative task: ${promptContent}\n\nAdditional instructions: ${extraPrompt}${contextText}\n\nGenerate creative content based on all of the above.`,
+        },
+      ],
+      temperature: 0.7,
+      max_tokens: 2048,
+      stream: true,
+    }),
+  });
+
+  if (!res.ok) {
+    console.error(`DeepSeek API error: ${res.status} ${res.statusText}`);
+    throw new Error(`DeepSeek API error: ${res.status}`);
+  }
+
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error("No response body");
+
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || !trimmed.startsWith("data: ")) continue;
+
+      const data = trimmed.slice(6);
+      if (data === "[DONE]") return;
+
+      try {
+        const parsed = JSON.parse(data);
+        const content = parsed?.choices?.[0]?.delta?.content;
+        if (content) yield content;
+      } catch {
+        // skip unparseable lines
+      }
+    }
+  }
+}
