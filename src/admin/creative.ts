@@ -1,23 +1,6 @@
 import van from "vanjs-core";
 import { api, formatDate, truncate } from "../util";
-
-interface Prompt {
-  id: number;
-  title: string;
-  content: string;
-  created_at: string;
-  updated_at: string;
-}
-
-interface CreativeItem {
-  id: number;
-  prompt_id: number;
-  extra_prompt: string;
-  content: string;
-  context_memo_ids: string;
-  created_at: string;
-  updated_at: string;
-}
+import type { Prompt, CreativeItem } from "../model";
 
 type PromptFormMode =
   | { type: "closed" }

@@ -1,15 +1,7 @@
 import van from "vanjs-core";
 import { CreativeTab, openPromptCreate } from "./creative";
 import { api, formatDate } from "../util";
-
-interface Memo {
-  id: number;
-  content: string;
-  tag: string;
-  is_public: boolean;
-  created_at: string;
-  updated_at: string;
-}
+import type { Memo } from "../model";
 
 type FormMode =
   | { type: "closed" }
