@@ -18,6 +18,13 @@
 - [data/system-prompts/suggest-tags.txt](file://data/system-prompts/suggest-tags.txt)
 </cite>
 
+## 更新摘要
+**变更内容**
+- 新增上下文预览功能，提供 `/api/creative/preview-context` 端点
+- 改进流式输出处理，增强 SSE 消息格式和错误处理
+- 管理后台集成上下文预览面板，支持实时预览生成上下文
+- 优化语义检索的速率限制机制
+
 ## 目录
 1. [简介](#简介)
 2. [项目结构](#项目结构)
@@ -33,14 +40,16 @@
 ## 简介
 本文件为"创意内容 API"的完整接口文档，覆盖创意内容的创建、管理和获取功能，说明数据结构与字段定义，提供每个端点的 HTTP 方法、URL 模式、请求参数与响应格式，并结合前端管理后台展示实际使用示例。同时阐述与 AI 功能的集成方式与数据流转过程，以及创意内容的分类与标签管理指南。
 
+**更新** 本次更新包含了新增的上下文预览功能和改进的流式输出处理机制。
+
 ## 项目结构
 该项目基于 Hono 框架与 SQLite 数据库存储，提供 Web 服务、管理后台与创意内容生成能力。创意相关内容主要分布在以下模块：
-- API 层：/api/creative.ts 提供创意内容与提示词的 REST 接口
+- API 层：/api/creative.ts 提供创意内容与提示词的 REST 接口，包含新增的上下文预览功能
 - 数据模型：/model.ts 定义 Memo、Prompt、CreativeItem 数据结构
-- 数据访问层：/db.ts 封装 SQLite CRUD 与嵌入向量存储
-- AI 集成：/ai/service.ts 提供内容优化、标签建议与创意生成；/ai/embeddings.ts 提供向量缓存与语义检索
+- 数据访问层：/db.ts 封装 SQLite CRUD 与嵌入向量存储，支持上下文预览查询
+- AI 集成：/ai/service.ts 提供内容优化、标签建议与创意生成（含流式）
 - 服务器入口：/server.ts 组织路由与静态资源
-- 管理后台：/admin/creative.ts 提供创意内容的可视化管理与生成流程
+- 管理后台：/admin/creative.ts 提供创意内容的可视化管理与生成流程，包含上下文预览面板
 
 ```mermaid
 graph TB
@@ -65,36 +74,36 @@ ADMIN --> A
 
 **图表来源**
 - [src/server.ts:75-81](file://src/server.ts#L75-L81)
-- [src/api/creative.ts:1-257](file://src/api/creative.ts#L1-L257)
+- [src/api/creative.ts:1-324](file://src/api/creative.ts#L1-L324)
 - [src/db.ts:1-349](file://src/db.ts#L1-L349)
 - [src/ai/service.ts:1-408](file://src/ai/service.ts#L1-L408)
 - [src/ai/embeddings.ts:1-99](file://src/ai/embeddings.ts#L1-L99)
-- [src/admin/creative.ts:1-729](file://src/admin/creative.ts#L1-L729)
+- [src/admin/creative.ts:1-892](file://src/admin/creative.ts#L1-L892)
 
 **章节来源**
 - [src/server.ts:75-81](file://src/server.ts#L75-L81)
-- [src/api/creative.ts:1-257](file://src/api/creative.ts#L1-L257)
+- [src/api/creative.ts:1-324](file://src/api/creative.ts#L1-L324)
 - [src/db.ts:15-57](file://src/db.ts#L15-L57)
-- [src/admin/creative.ts:40-729](file://src/admin/creative.ts#L40-L729)
+- [src/admin/creative.ts:40-892](file://src/admin/creative.ts#L40-L892)
 
 ## 核心组件
-- 创意内容 API 应用：提供提示词管理与创意内容生成、查询、删除等接口
+- 创意内容 API 应用：提供提示词管理、创意内容生成、上下文预览与查询、删除等接口
 - 数据模型：定义创意内容、提示词与备忘录的数据结构
-- 数据库层：负责 SQLite 表结构初始化、CRUD 操作与嵌入向量持久化
+- 数据库层：负责 SQLite 表结构初始化、CRUD 操作与嵌入向量持久化，支持上下文预览查询
 - AI 服务：封装多种 AI 提供商的调用，提供内容优化、标签建议与创意内容生成（含流式）
 - 嵌入与语义检索：维护内存向量缓存，基于余弦相似度进行语义检索
-- 管理后台：提供可视化界面，支持选择提示词、生成创意内容、查看历史记录与删除操作
+- 管理后台：提供可视化界面，支持选择提示词、生成创意内容、上下文预览与删除操作
 
 **章节来源**
-- [src/api/creative.ts:28-257](file://src/api/creative.ts#L28-L257)
+- [src/api/creative.ts:28-324](file://src/api/creative.ts#L28-L324)
 - [src/model.ts:1-28](file://src/model.ts#L1-L28)
 - [src/db.ts:15-57](file://src/db.ts#L15-L57)
 - [src/ai/service.ts:12-408](file://src/ai/service.ts#L12-L408)
 - [src/ai/embeddings.ts:12-99](file://src/ai/embeddings.ts#L12-L99)
-- [src/admin/creative.ts:40-729](file://src/admin/creative.ts#L40-L729)
+- [src/admin/creative.ts:40-892](file://src/admin/creative.ts#L40-L892)
 
 ## 架构总览
-创意内容 API 的数据流从客户端发起请求，经由 Hono 路由进入创意应用，再调用数据库层与 AI 服务完成业务处理，最终以 JSON 或流式事件的形式返回结果。生成流程支持两种上下文模式：自动语义检索与手动指定备忘录 ID。
+创意内容 API 的数据流从客户端发起请求，经由 Hono 路由进入创意应用，再调用数据库层与 AI 服务完成业务处理，最终以 JSON 或流式事件的形式返回结果。生成流程支持两种上下文模式：自动语义检索与手动指定备忘录 ID。新增的上下文预览功能允许用户在生成前预览将使用的上下文内容。
 
 ```mermaid
 sequenceDiagram
@@ -104,8 +113,20 @@ participant A as "创意 API<br/>api/creative.ts"
 participant DB as "数据库层<br/>db.ts"
 participant AI as "AI 服务<br/>ai/service.ts"
 participant E as "嵌入缓存<br/>ai/embeddings.ts"
+C->>H : "POST /api/creative/preview-context"
+H->>A : "转发预览请求"
+A->>DB : "查询备忘录上下文"
+alt "手动模式"
+A-->>C : "返回指定备忘录列表"
+else "自动模式"
+A->>AI : "生成查询嵌入"
+A->>E : "语义检索相似备忘录"
+E-->>A : "返回相似 memo_id 列表"
+A->>DB : "加载上下文备忘录内容"
+A-->>C : "返回自动检索的备忘录列表"
+end
 C->>H : "POST /api/creative/generate"
-H->>A : "转发请求"
+H->>A : "转发生成请求"
 A->>DB : "读取提示词/备忘录"
 alt "手动模式"
 A->>AI : "直接使用 memo_ids 上下文"
@@ -123,8 +144,8 @@ A-->>C : "SSE 完成消息"
 
 **图表来源**
 - [src/server.ts:75-81](file://src/server.ts#L75-L81)
-- [src/api/creative.ts:118-247](file://src/api/creative.ts#L118-L247)
-- [src/db.ts:299-348](file://src/db.ts#L299-L348)
+- [src/api/creative.ts:118-314](file://src/api/creative.ts#L118-L314)
+- [src/db.ts:100-131](file://src/db.ts#L100-L131)
 - [src/ai/service.ts:380-407](file://src/ai/service.ts#L380-L407)
 - [src/ai/embeddings.ts:66-86](file://src/ai/embeddings.ts#L66-L86)
 
@@ -140,10 +161,14 @@ A-->>C : "SSE 完成消息"
 - Memo（备忘录）
   - 字段：id、content、tag、is_public、created_at、updated_at
   - 用途：作为创意生成的上下文来源
+- PreviewMemo（预览备忘录）
+  - 字段：id、content、tag、created_at
+  - 用途：用于上下文预览的简化备忘录模型
 
 **章节来源**
 - [src/model.ts:10-27](file://src/model.ts#L10-L27)
 - [src/db.ts:36-56](file://src/db.ts#L36-L56)
+- [src/admin/creative.ts:42](file://src/admin/creative.ts#L42)
 
 ### 提示词管理 API
 - 获取所有提示词
@@ -180,6 +205,17 @@ A-->>C : "SSE 完成消息"
   - 查询参数：prompt_id（可选，按提示词过滤）
   - 认证：否
   - 响应：包含 items 数组的对象
+- 预览上下文（新增）
+  - 方法：POST
+  - 路径：/api/creative/preview-context
+  - 认证：是（需要登录 Cookie）
+  - 请求体：
+    - prompt_id: number（必填）
+    - extra_prompt: string（必填，附加指令）
+    - memo_ids: number[]（可选，手动指定备忘录 ID 列表）
+  - 响应：包含 memos 数组和 mode 字段的对象
+    - memos：预览的备忘录列表（包含 id、content、tag、created_at）
+    - mode：上下文模式（"manual" 或 "auto"）
 - 生成创意内容（流式）
   - 方法：POST
   - 路径：/api/creative/generate
@@ -201,12 +237,13 @@ A-->>C : "SSE 完成消息"
   - 响应：{ ok: true } 或错误信息
 
 **章节来源**
-- [src/api/creative.ts:107-256](file://src/api/creative.ts#L107-L256)
+- [src/api/creative.ts:107-324](file://src/api/creative.ts#L107-L324)
 - [src/db.ts:299-348](file://src/db.ts#L299-L348)
 
 ### 生成流程与上下文模式
 - 自动模式：根据 extra_prompt 生成查询嵌入，通过语义检索返回相似备忘录 ID，再加载其内容作为上下文
 - 手动模式：直接使用请求体中的 memo_ids 作为上下文
+- 上下文预览：在生成前预览将使用的上下文内容，支持两种模式的实时预览
 - 生成完成后，将创意内容与上下文信息持久化到数据库
 
 ```mermaid
@@ -218,7 +255,8 @@ Auto --> Embed["生成查询嵌入"]
 Embed --> Search["语义检索相似备忘录"]
 Search --> Load["加载备忘录内容"]
 Manual --> Load
-Load --> Stream["流式生成创意内容"]
+Load --> Preview["上下文预览"]
+Preview --> Stream["流式生成创意内容"]
 Stream --> Save["保存创意内容到数据库"]
 Save --> Done(["结束"])
 ```
@@ -232,12 +270,19 @@ Save --> Done(["结束"])
 - 选择提示词并生成创意内容
   - 在管理后台选择一个提示词，输入额外指令，选择自动或手动上下文模式，点击生成按钮
   - 浏览器接收 SSE 流，实时显示生成进度，完成后将新创意内容插入列表顶部
+- 上下文预览功能
+  - 点击"Context preview"面板，可预览将使用的上下文内容
+  - 支持手动模式下的 ID 输入预览和自动模式下的语义检索预览
+  - 预览结果包含备忘录 ID、标签、创建时间和内容摘要
 - 查看与删除创意内容
   - 支持展开查看完整内容，或删除已生成的创意内容项
+
+**更新** 管理后台新增了上下文预览功能，用户可以在生成前预览将使用的上下文内容。
 
 **章节来源**
 - [src/admin/creative.ts:145-271](file://src/admin/creative.ts#L145-L271)
 - [src/admin/creative.ts:273-284](file://src/admin/creative.ts#L273-L284)
+- [src/admin/creative.ts:456-546](file://src/admin/creative.ts#L456-L546)
 
 ## 依赖关系分析
 - 服务器入口将 /api/creative 路由挂载至创意应用
@@ -256,28 +301,30 @@ Admin["admin/creative.ts"] --> Creative
 
 **图表来源**
 - [src/server.ts:75-81](file://src/server.ts#L75-L81)
-- [src/api/creative.ts:1-257](file://src/api/creative.ts#L1-L257)
+- [src/api/creative.ts:1-324](file://src/api/creative.ts#L1-L324)
 - [src/db.ts:1-349](file://src/db.ts#L1-L349)
 - [src/ai/service.ts:1-408](file://src/ai/service.ts#L1-L408)
 - [src/ai/embeddings.ts:1-99](file://src/ai/embeddings.ts#L1-L99)
-- [src/admin/creative.ts:1-729](file://src/admin/creative.ts#L1-L729)
+- [src/admin/creative.ts:1-892](file://src/admin/creative.ts#L1-L892)
 
 **章节来源**
 - [src/server.ts:75-81](file://src/server.ts#L75-L81)
-- [src/api/creative.ts:1-257](file://src/api/creative.ts#L1-L257)
+- [src/api/creative.ts:1-324](file://src/api/creative.ts#L1-L324)
 - [src/db.ts:1-349](file://src/db.ts#L1-L349)
 - [src/ai/service.ts:1-408](file://src/ai/service.ts#L1-L408)
 - [src/ai/embeddings.ts:1-99](file://src/ai/embeddings.ts#L1-L99)
-- [src/admin/creative.ts:1-729](file://src/admin/creative.ts#L1-L729)
+- [src/admin/creative.ts:1-892](file://src/admin/creative.ts#L1-L892)
 
 ## 性能考虑
 - 流式生成：使用 SSE 将生成过程分片传输，降低首屏等待时间
 - 语义检索：基于内存向量缓存与余弦相似度，避免频繁外部调用
 - 嵌入维度与阈值：嵌入维度为 1024，相似度阈值为 0.3，可根据需求调整
 - 生成超时：AI 请求统一设置 60 秒超时，防止长时间阻塞
+- 速率限制：上下文预览和生成都实施了速率限制，防止滥用
 - 建议
   - 在高并发场景下，合理配置多个 AI 提供商的 API Key，确保外部服务可用
   - 对长文本生成，建议限制 extra_prompt 长度，避免超出模型上下文长度
+  - 使用上下文预览功能来减少无效生成尝试
 
 ## 故障排除指南
 - 生成失败
@@ -291,15 +338,19 @@ Admin["admin/creative.ts"] --> Creative
   - 提示词与创意内容的创建、更新、删除均需登录态（Cookie），请先通过 /api/auth/login 获取 Cookie
 - SSE 连接异常
   - 确保客户端正确解析 data: 前缀的消息，注意流式解析的缓冲区处理
+- 上下文预览问题
+  - 确认选择了有效的提示词和附加指令
+  - 手动模式下检查 memo_ids 格式是否正确（逗号分隔的正整数）
+  - 自动模式下检查 AI 嵌入服务是否正常工作
 
 **章节来源**
-- [src/api/creative.ts:118-247](file://src/api/creative.ts#L118-L247)
+- [src/api/creative.ts:118-314](file://src/api/creative.ts#L118-L314)
 - [src/ai/service.ts:36-62](file://src/ai/service.ts#L36-L62)
 - [src/ai/embeddings.ts:12-35](file://src/ai/embeddings.ts#L12-L35)
 - [README.md:104-111](file://README.md#L104-L111)
 
 ## 结论
-创意内容 API 提供了从提示词管理到创意内容生成、存储与查询的完整闭环。通过与 AI 服务和嵌入缓存的集成，系统能够灵活地选择上下文模式，实现高质量的创意内容生成。管理后台进一步简化了用户的操作体验，适合个人知识管理与创意工作流的集成。
+创意内容 API 提供了从提示词管理到创意内容生成、存储与查询的完整闭环。通过与 AI 服务和嵌入缓存的集成，系统能够灵活地选择上下文模式，实现高质量的创意内容生成。新增的上下文预览功能进一步提升了用户体验，让用户能够在生成前预览和验证上下文内容。管理后台的可视化界面简化了用户的操作体验，适合个人知识管理与创意工作流的集成。
 
 ## 附录
 
@@ -326,9 +377,13 @@ Admin["admin/creative.ts"] --> Creative
 - 选择提示词后方可生成
 - 自动模式基于语义检索，手动模式基于用户提供的 memo_ids
 - 生成成功后，创意内容会立即出现在列表顶部
+- 上下文预览功能支持实时预览，帮助用户验证生成上下文
+
+**更新** 管理后台新增了上下文预览功能，用户可以通过"Context preview"面板实时查看将使用的上下文内容。
 
 **章节来源**
 - [src/admin/creative.ts:145-271](file://src/admin/creative.ts#L145-L271)
+- [src/admin/creative.ts:456-546](file://src/admin/creative.ts#L456-L546)
 
 ### AI 提供商配置
 系统支持多种 AI 提供商，可通过 ai.config.json 进行配置：
@@ -359,3 +414,22 @@ Admin["admin/creative.ts"] --> Creative
 - [data/system-prompts/creative.txt:1-2](file://data/system-prompts/creative.txt#L1-L2)
 - [data/system-prompts/optimize.txt:1-8](file://data/system-prompts/optimize.txt#L1-L8)
 - [data/system-prompts/suggest-tags.txt:1-4](file://data/system-prompts/suggest-tags.txt#L1-L4)
+
+### 上下文预览功能详解
+- 预览端点：/api/creative/preview-context
+- 功能特性：
+  - 支持手动和自动两种上下文模式
+  - 实时预览将使用的备忘录内容
+  - 包含备忘录 ID、标签、创建时间和内容摘要
+  - 自动模式消耗 AI 配额进行语义检索
+  - 手动模式直接返回指定备忘录
+- 管理后台集成：
+  - "Context preview" 面板提供一键预览功能
+  - 支持预览面板的展开/收起
+  - 预览结果实时更新，无需重新生成
+
+**新增** 上下文预览功能提供了强大的上下文验证能力，帮助用户在生成前确认使用的上下文内容。
+
+**章节来源**
+- [src/api/creative.ts:118-183](file://src/api/creative.ts#L118-L183)
+- [src/admin/creative.ts:456-546](file://src/admin/creative.ts#L456-L546)

@@ -21,7 +21,7 @@
 
 ## 更新摘要
 **变更内容**
-- 新增多提供商AI配置系统，支持DeepSeek、Kimi、GLM、DashScope
+- 新增多提供商AI配置系统，支持DeepSeek、Kimi、GLM、DashScope四个提供商
 - 新增速率限制集成，支持AI调用和备忘录创建的两层窗口限制
 - 新增AI配置文件`ai.config.json`和动态模型选择功能
 - 更新API端点以支持多提供商架构和速率限制
@@ -89,8 +89,8 @@ ADMIN --> AISVC
 **图表来源**
 - [src/server.ts:75-82](file://src/server.ts#L75-L82)
 - [src/api/ai.ts:17-109](file://src/api/ai.ts#L17-L109)
-- [src/api/creative.ts:28-257](file://src/api/creative.ts#L28-L257)
-- [src/config/rate-limit.ts:26-144](file://src/config/rate-limit.ts#L26-L144)
+- [src/api/creative.ts:28-324](file://src/api/creative.ts#L28-L324)
+- [src/config/rate-limit.ts:26-145](file://src/config/rate-limit.ts#L26-L145)
 - [src/ai/service.ts:34-66](file://src/ai/service.ts#L34-L66)
 - [src/ai/embeddings.ts:1-99](file://src/ai/embeddings.ts#L1-L99)
 - [src/db.ts:197-221](file://src/db.ts#L197-L221)
@@ -99,8 +99,8 @@ ADMIN --> AISVC
 **章节来源**
 - [src/server.ts:75-82](file://src/server.ts#L75-L82)
 - [src/api/ai.ts:17-109](file://src/api/ai.ts#L17-L109)
-- [src/api/creative.ts:28-257](file://src/api/creative.ts#L28-L257)
-- [src/config/rate-limit.ts:26-144](file://src/config/rate-limit.ts#L26-L144)
+- [src/api/creative.ts:28-324](file://src/api/creative.ts#L28-L324)
+- [src/config/rate-limit.ts:26-145](file://src/config/rate-limit.ts#L26-L145)
 - [src/ai/service.ts:34-66](file://src/ai/service.ts#L34-L66)
 - [src/ai/embeddings.ts:1-99](file://src/ai/embeddings.ts#L1-L99)
 - [src/db.ts:197-221](file://src/db.ts#L197-L221)
@@ -127,8 +127,8 @@ ADMIN --> AISVC
 **章节来源**
 - [src/api/ai.ts:19-109](file://src/api/ai.ts#L19-L109)
 - [src/ai/embeddings.ts:7-99](file://src/ai/embeddings.ts#L7-L99)
-- [src/api/creative.ts:118-257](file://src/api/creative.ts#L118-L257)
-- [src/config/rate-limit.ts:9-144](file://src/config/rate-limit.ts#L9-L144)
+- [src/api/creative.ts:185-324](file://src/api/creative.ts#L185-L324)
+- [src/config/rate-limit.ts:9-145](file://src/config/rate-limit.ts#L9-L145)
 
 ## 架构总览
 AI 集成以"配置驱动 + 服务层 + 路由层 + 数据层 + 速率限制"分层组织：
@@ -167,7 +167,6 @@ Note over SVC,DB : 语义搜索时会调用 SVC.generateEmbedding 并持久化
 - [src/server.ts:75-82](file://src/server.ts#L75-L82)
 - [src/api/ai.ts:30-68](file://src/api/ai.ts#L30-L68)
 - [src/config/rate-limit.ts:69-102](file://src/config/rate-limit.ts#L69-L102)
-- [src/ai/service.ts:64-77](file://src/ai/service.ts#L64-L77)
 - [src/ai/service.ts:240-255](file://src/ai/service.ts#L240-L255)
 
 ## 详细组件分析
@@ -259,14 +258,13 @@ AIService --> DashScope : "调用"
 
 **图表来源**
 - [src/ai/service.ts:14-27](file://src/ai/service.ts#L14-L27)
-- [src/ai/service.ts:64-77](file://src/ai/service.ts#L64-L77)
+- [src/ai/service.ts:36-66](file://src/ai/service.ts#L36-L66)
 - [src/ai/service.ts:304-344](file://src/ai/service.ts#L304-L344)
 - [src/ai/service.ts:348-407](file://src/ai/service.ts#L348-L407)
 
 **章节来源**
 - [src/ai/service.ts:14-27](file://src/ai/service.ts#L14-L27)
 - [src/ai/service.ts:36-66](file://src/ai/service.ts#L36-L66)
-- [src/ai/service.ts:64-77](file://src/ai/service.ts#L64-L77)
 - [src/ai/service.ts:304-344](file://src/ai/service.ts#L304-L344)
 - [src/ai/service.ts:348-407](file://src/ai/service.ts#L348-L407)
 
@@ -374,13 +372,13 @@ API-->>C : SSE data : {type : "done", item}
 ```
 
 **图表来源**
-- [src/api/creative.ts:118-247](file://src/api/creative.ts#L118-L247)
+- [src/api/creative.ts:185-314](file://src/api/creative.ts#L185-L314)
 - [src/config/rate-limit.ts:69-102](file://src/config/rate-limit.ts#L69-L102)
 - [src/ai/service.ts:348-407](file://src/ai/service.ts#L348-L407)
 - [src/ai/embeddings.ts:66-86](file://src/ai/embeddings.ts#L66-L86)
 
 **章节来源**
-- [src/api/creative.ts:118-247](file://src/api/creative.ts#L118-L247)
+- [src/api/creative.ts:185-314](file://src/api/creative.ts#L185-L314)
 - [src/ai/service.ts:348-407](file://src/ai/service.ts#L348-L407)
 - [src/ai/embeddings.ts:66-86](file://src/ai/embeddings.ts#L66-L86)
 
@@ -417,7 +415,7 @@ Deny --> End
 - [src/config/rate-limit.ts:104-132](file://src/config/rate-limit.ts#L104-L132)
 
 **章节来源**
-- [src/config/rate-limit.ts:1-144](file://src/config/rate-limit.ts#L1-L144)
+- [src/config/rate-limit.ts:1-145](file://src/config/rate-limit.ts#L1-L145)
 
 ## 依赖关系分析
 - 服务层依赖
@@ -516,7 +514,7 @@ ADMIN --> SVC
 - [src/api/ai.ts:19-109](file://src/api/ai.ts#L19-L109)
 - [src/ai/service.ts:89-106](file://src/ai/service.ts#L89-L106)
 - [src/ai/service.ts:240-255](file://src/ai/service.ts#L240-L255)
-- [src/config/rate-limit.ts:134-144](file://src/config/rate-limit.ts#L134-L144)
+- [src/config/rate-limit.ts:134-145](file://src/config/rate-limit.ts#L134-L145)
 
 ## 结论
 本项目提供了完整的多提供商AI集成功能：内容优化、标签建议、嵌入与语义搜索、创意内容生成（含流式）。通过JSON配置文件管理多提供商，既保证了易用性，也便于扩展与维护。新的配置系统支持动态提供商发现和模型选择，速率限制系统确保服务稳定运行。建议在生产环境中合理配置密钥与超时参数，并结合业务需求对返回数量与相似度阈值进行调优。
@@ -579,7 +577,14 @@ ADMIN --> SVC
       "name": "DashScope",
       "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode",
       "apiKeyEnv": "DASHSCOPE_API_KEY",
-      "models": ["deepseek-v4-pro", "deepseek-v4-flash", "kimi-k2.5", "kimi-k2.6", "glm-5", "qwen-3.5"]
+      "models": [
+        "deepseek-v4-pro",
+        "deepseek-v4-flash",
+        "kimi-k2.5",
+        "kimi-k2.6",
+        "glm-5",
+        "qwen-3.5"
+      ]
     }
   ],
   "default": {
