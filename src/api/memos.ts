@@ -1,6 +1,12 @@
 import { Hono } from "hono";
 import { requireAuth, authMiddleware } from "../auth";
 import {
+  checkRateLimit,
+  recordRateLimit,
+  getClientIP,
+  formatRateLimitError,
+} from "../config/rate-limit";
+import {
   getMemos,
   getMemo,
   createMemo,
@@ -89,11 +95,19 @@ memosApp.post("/", authMiddleware, async (c) => {
     return c.json({ error: "Content is required" }, 400);
   }
 
+  const ip = getClientIP(c);
+  const rateError = checkRateLimit(ip, "memo");
+  if (rateError) {
+    return c.json({ error: formatRateLimitError("memo", rateError) }, 429);
+  }
+
   const memo = createMemo(
     body.content.trim(),
     body.is_public !== false,
     body.tag,
   );
+
+  recordRateLimit(ip, "memo");
 
   // Fire-and-forget embedding generation
   generateAndStoreEmbedding(memo.id, memo.content).catch((err) =>

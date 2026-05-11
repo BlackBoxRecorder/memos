@@ -18,6 +18,12 @@ import {
   generateCreativeContentStream,
 } from "../ai/service";
 import { getSemanticResults } from "../ai/embeddings";
+import {
+  checkRateLimit,
+  recordRateLimit,
+  getClientIP,
+  formatRateLimitError,
+} from "../config/rate-limit";
 
 export const creativeApp = new Hono();
 
@@ -150,6 +156,13 @@ creativeApp.post("/generate", authMiddleware, async (c) => {
   if (!prompt) {
     return c.json({ error: "Prompt not found" }, 404);
   }
+
+  const ip = getClientIP(c);
+  const rateError = checkRateLimit(ip, "ai");
+  if (rateError) {
+    return c.json({ error: formatRateLimitError("ai", rateError) }, 429);
+  }
+  recordRateLimit(ip, "ai");
 
   let contextMemos: string[] = [];
   let contextMemoIds = "";

@@ -7,6 +7,12 @@ import {
   suggestTags,
   getAvailableModels,
 } from "../ai/service";
+import {
+  checkRateLimit,
+  recordRateLimit,
+  getClientIP,
+  formatRateLimitError,
+} from "../config/rate-limit";
 
 export const aiApp = new Hono();
 
@@ -41,6 +47,12 @@ aiApp.post("/optimize", authMiddleware, async (c) => {
     return c.json({ error: "AI optimization is not configured" }, 503);
   }
 
+  const ip = getClientIP(c);
+  const rateError = checkRateLimit(ip, "ai");
+  if (rateError) {
+    return c.json({ error: formatRateLimitError("ai", rateError) }, 429);
+  }
+
   const result = await optimizeContent(
     body.content.trim(),
     body.provider,
@@ -49,6 +61,8 @@ aiApp.post("/optimize", authMiddleware, async (c) => {
   if (result === null) {
     return c.json({ error: "AI service temporarily unavailable" }, 500);
   }
+
+  recordRateLimit(ip, "ai");
 
   return c.json({ content: result });
 });
@@ -74,6 +88,12 @@ aiApp.post("/suggest-tags", authMiddleware, async (c) => {
     return c.json({ error: "Tag suggestion is not configured" }, 503);
   }
 
+  const ip2 = getClientIP(c);
+  const rateError2 = checkRateLimit(ip2, "ai");
+  if (rateError2) {
+    return c.json({ error: formatRateLimitError("ai", rateError2) }, 429);
+  }
+
   const existingTags = getAllTags();
   const tags = await suggestTags(
     body.content.trim(),
@@ -81,5 +101,8 @@ aiApp.post("/suggest-tags", authMiddleware, async (c) => {
     body.provider,
     body.model,
   );
+
+  recordRateLimit(ip2, "ai");
+
   return c.json({ tags });
 });

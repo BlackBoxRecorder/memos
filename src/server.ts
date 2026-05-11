@@ -5,6 +5,7 @@ import { memosApp } from "./api/memos";
 import { aiApp } from "./api/ai";
 import { creativeApp } from "./api/creative";
 import { initEmbeddingCache } from "./ai/embeddings";
+import { initSeedData } from "./init/seed";
 
 const PORT = parseInt(process.env.PORT || "3020");
 const STATIC_BASE = import.meta.dir;
@@ -113,6 +114,9 @@ app.notFound((c) => {
 
 // 初始化数据库
 initDb();
+
+// 首次启动种子数据（内置 prompts + 示例 memos）
+initSeedData();
 
 // 初始化向量缓存
 initEmbeddingCache();

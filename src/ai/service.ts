@@ -2,6 +2,11 @@
 // All chat APIs use OpenAI-compatible format via standard fetch()
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import {
+  getOptimizePrompt,
+  getSuggestTagsPrompt,
+  getCreativePrompt,
+} from "./prompts";
 
 const AI_REQUEST_TIMEOUT_MS = 60_000; // 60s timeout for AI API requests
 const CONFIG_PATH = join(import.meta.dir, "../../ai.config.json");
@@ -232,14 +237,6 @@ async function* chatCompletionStream(
 
 // --- Content Optimization ---
 
-const OPTIMIZE_SYSTEM_PROMPT = `You are a writing assistant for a personal memos app. Optimize the user's memo content:
-- Extract and clarify core viewpoints
-- Highlight key information naturally
-- Keep language fluent and natural
-- Make expression more concise without losing meaning
-- If the content is too terse, appropriately expand and enrich it
-- Return ONLY the optimized text, no explanations or prefixes`;
-
 export async function optimizeContent(
   content: string,
   providerId?: string,
@@ -249,10 +246,10 @@ export async function optimizeContent(
   const mdl = model || getDefaultModel();
   if (!resolveProvider(pid)) return null;
   return chatCompletion(pid, mdl, [
-    { role: "system", content: OPTIMIZE_SYSTEM_PROMPT },
+    { role: "system", content: getOptimizePrompt() },
     {
       role: "user",
-      content: `Please optimize the following memo content:\n\n${content}`,
+      content: `请优化以下备忘录内容：\n\n${content}`,
     },
   ]);
 }
@@ -270,16 +267,12 @@ export async function suggestTags(
   if (!resolveProvider(pid) || !content.trim()) return [];
 
   const tagsStr =
-    existingTags.length > 0
-      ? `Existing tags: ${existingTags.join(", ")}. `
-      : "";
+    existingTags.length > 0 ? `已有标签: ${existingTags.join(", ")}。` : "";
 
   const result = await chatCompletion(pid, mdl, [
     {
       role: "system",
-      content: `You are a tag suggestion assistant. Analyze the content and suggest the most appropriate 1-3 tags.
-${tagsStr}Prefer reusing existing tags when they fit well. Suggest new concise tags only when no existing tag fits.
-Return ONLY a JSON array of strings, like ["tag1", "tag2"]. No explanations.`,
+      content: getSuggestTagsPrompt().replace("{EXISTING_TAGS}", tagsStr),
     },
     { role: "user", content },
   ]);
@@ -365,7 +358,7 @@ export async function generateCreativeContent(
 
   const contextText =
     contextMemos.length > 0
-      ? `\n\nRelevant context from my memos:\n${contextMemos
+      ? `\n\n相关备忘录上下文：\n${contextMemos
           .map((c, i) => `${i + 1}. ${c.slice(0, 500)}`)
           .join("\n\n")}`
       : "";
@@ -373,12 +366,11 @@ export async function generateCreativeContent(
   return chatCompletion(pid, mdl, [
     {
       role: "system",
-      content:
-        "You are a creative assistant for a personal memos app. Follow the instructions provided to generate thoughtful, well-structured content.",
+      content: getCreativePrompt(),
     },
     {
       role: "user",
-      content: `Creative task: ${promptContent}\n\nAdditional instructions: ${extraPrompt}${contextText}\n\nGenerate creative content based on all of the above.`,
+      content: `创意任务：${promptContent}\n\n附加说明：${extraPrompt}${contextText}\n\n请根据以上所有内容生成创意输出。`,
     },
   ]);
 }
@@ -397,7 +389,7 @@ export async function* generateCreativeContentStream(
 
   const contextText =
     contextMemos.length > 0
-      ? `\n\nRelevant context from my memos:\n${contextMemos
+      ? `\n\n相关备忘录上下文：\n${contextMemos
           .map((c, i) => `${i + 1}. ${c.slice(0, 500)}`)
           .join("\n\n")}`
       : "";
@@ -405,12 +397,11 @@ export async function* generateCreativeContentStream(
   yield* chatCompletionStream(pid, mdl, [
     {
       role: "system",
-      content:
-        "You are a creative assistant for a personal memos app. Follow the instructions provided to generate thoughtful, well-structured content.",
+      content: getCreativePrompt(),
     },
     {
       role: "user",
-      content: `Creative task: ${promptContent}\n\nAdditional instructions: ${extraPrompt}${contextText}\n\nGenerate creative content based on all of the above.`,
+      content: `创意任务：${promptContent}\n\n附加说明：${extraPrompt}${contextText}\n\n请根据以上所有内容生成创意输出。`,
     },
   ]);
 }
