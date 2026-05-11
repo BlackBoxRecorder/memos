@@ -1,8 +1,8 @@
 import van from "vanjs-core";
-import { CreativeTab, openPromptCreate } from "./creative";
+import { CreativeTab, openPromptCreate, creativeItems } from "./creative";
 import { selectedProvider, selectedModel } from "./ai-state";
 import { api, formatDate } from "../util";
-import type { Memo } from "../model";
+import type { Memo, CreativeItem } from "../model";
 
 type FormMode =
   | { type: "closed" }
@@ -37,6 +37,12 @@ const selectedMonth = van.state<string | null>(null);
 const collapsedYears = van.state<Set<number>>(new Set());
 let cachedTimelineMemos: Memo[] | null = null;
 let cachedTimelineData: YearGroup[] | null = null;
+
+// Creative timeline state
+const selectedCreativeMonth = van.state<string | null>(null);
+const collapsedCreativeYears = van.state<Set<number>>(new Set());
+let cachedTimelineCreative: CreativeItem[] | null = null;
+let cachedTimelineCreativeData: YearGroup[] | null = null;
 
 // AI model selector state
 const aiModelsOpen = van.state(false);
@@ -363,14 +369,16 @@ interface YearGroup {
   months: MonthGroup[];
 }
 
-function computeTimelineData(memosList: Memo[]): YearGroup[] {
+function computeTimelineData(
+  items: Array<{ id: number; created_at: string }>,
+): YearGroup[] {
   const yearMap = new Map<
     number,
     Map<number, { count: number; firstMemoId: number }>
   >();
 
-  for (const memo of memosList) {
-    const date = new Date(memo.created_at + "Z");
+  for (const item of items) {
+    const date = new Date(item.created_at + "Z");
     const year = date.getFullYear();
     const month = date.getMonth();
 
@@ -378,7 +386,7 @@ function computeTimelineData(memosList: Memo[]): YearGroup[] {
     const monthMap = yearMap.get(year)!;
 
     if (!monthMap.has(month)) {
-      monthMap.set(month, { count: 1, firstMemoId: memo.id });
+      monthMap.set(month, { count: 1, firstMemoId: item.id });
     } else {
       monthMap.get(month)!.count++;
     }
@@ -408,6 +416,23 @@ function scrollToMonth(memoId: number): void {
   if (el) {
     el.scrollIntoView({ behavior: "smooth", block: "start" });
   }
+}
+
+function scrollToCreativeItem(itemId: number): void {
+  const el = document.querySelector(`[data-creative-id="${itemId}"]`);
+  if (el) {
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+
+function toggleCreativeYear(year: number): void {
+  const current = new Set(collapsedCreativeYears.val);
+  if (current.has(year)) {
+    current.delete(year);
+  } else {
+    current.add(year);
+  }
+  collapsedCreativeYears.val = current;
 }
 
 function toggleYear(year: number): void {
@@ -546,6 +571,55 @@ function TimelineSidebar() {
                       onclick: () => {
                         selectedMonth.val = key;
                         scrollToMonth(m.firstMemoId);
+                      },
+                    },
+                    span(m.name),
+                    span({ class: "count" }, String(m.count)),
+                  );
+                }),
+              ),
+        );
+      }),
+    );
+  });
+}
+
+function CreativeTimelineSidebar() {
+  const { aside } = van.tags;
+  return aside({ class: "timeline-sidebar" }, () => {
+    const currentItems = creativeItems.val;
+    if (cachedTimelineCreative !== currentItems) {
+      cachedTimelineCreativeData = computeTimelineData(currentItems);
+      cachedTimelineCreative = currentItems;
+    }
+    const groups = cachedTimelineCreativeData || [];
+    if (groups.length === 0) return div();
+    return div(
+      ...groups.map((group) => {
+        const isCollapsed = collapsedCreativeYears.val.has(group.year);
+        return div(
+          div(
+            {
+              class: "timeline-year",
+              onclick: () => toggleCreativeYear(group.year),
+            },
+            span(String(group.year)),
+            span({ class: "arrow" }, isCollapsed ? "\u25B8" : "\u25BE"),
+          ),
+          isCollapsed
+            ? ""
+            : div(
+                { class: "timeline-months" },
+                ...group.months.map((m) => {
+                  const key = `${group.year}-${String(m.month + 1).padStart(2, "0")}`;
+                  return div(
+                    {
+                      class: () =>
+                        "timeline-month" +
+                        (selectedCreativeMonth.val === key ? " active" : ""),
+                      onclick: () => {
+                        selectedCreativeMonth.val = key;
+                        scrollToCreativeItem(m.firstMemoId);
                       },
                     },
                     span(m.name),
@@ -775,10 +849,15 @@ function AdminPage() {
     ),
     div(
       { class: "admin-layout" },
-      () =>
-        activeTab.val === "memos" && memos.val.length > 0
-          ? TimelineSidebar()
-          : "",
+      () => {
+        if (activeTab.val === "memos" && memos.val.length > 0) {
+          return TimelineSidebar();
+        }
+        if (activeTab.val === "creative" && creativeItems.val.length > 0) {
+          return CreativeTimelineSidebar();
+        }
+        return "";
+      },
       div(
         { class: "admin-container" },
         // Tab bar

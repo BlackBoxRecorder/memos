@@ -18,7 +18,7 @@ const promptFormContent = van.state("");
 const promptFormError = van.state<string | null>(null);
 const promptFormSaving = van.state(false);
 
-const creativeItems = van.state<CreativeItem[]>([]);
+export const creativeItems = van.state<CreativeItem[]>([]);
 const selectedPromptId = van.state<number | null>(null);
 const generateModalOpen = van.state(false);
 const extraPromptInput = van.state("");
@@ -618,7 +618,7 @@ function CreativeCard(item: CreativeItem) {
     : item.content;
 
   return div(
-    { class: "creative-card" },
+    { class: "creative-card", "data-creative-id": String(item.id) },
     div(
       { class: "creative-content" },
       displayContent,
