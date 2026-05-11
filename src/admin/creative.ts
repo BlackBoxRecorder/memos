@@ -1,7 +1,7 @@
 import van from "vanjs-core";
 import { api, formatDate, truncate } from "../util";
 import { getSelectedAiModel } from "./ai-state";
-import type { Prompt, CreativeItem } from "../model";
+import type { Prompt, CreativeItem, Memo } from "../model";
 
 type PromptFormMode =
   | { type: "closed" }
@@ -37,6 +37,27 @@ let streamAbort: AbortController | null = null;
 // Delete confirm state for creative items
 const creativeDeleteId = van.state<number | null>(null);
 const creativeDeleting = van.state(false);
+
+// Context preview state
+type PreviewMemo = Pick<Memo, "id" | "content" | "tag" | "created_at">;
+const previewOpen = van.state(false);
+const previewMemos = van.state<PreviewMemo[]>([]);
+const previewLoading = van.state(false);
+const previewError = van.state<string | null>(null);
+const previewFetched = van.state(false);
+
+function resetPreview(): void {
+  previewFetched.val = false;
+  previewMemos.val = [];
+  previewError.val = null;
+}
+
+function parseManualIds(): number[] {
+  return manualMemoIds.val
+    .split(",")
+    .map((s) => Number(s.trim()))
+    .filter((n) => !isNaN(n) && n > 0);
+}
 
 // ====== API ======
 
@@ -142,6 +163,55 @@ async function selectPrompt(id: number): Promise<void> {
   await loadCreativeItems(id);
 }
 
+async function loadPreviewContext(): Promise<void> {
+  if (selectedPromptId.val === null) {
+    previewError.val = "Please select a prompt first";
+    previewFetched.val = false;
+    previewMemos.val = [];
+    return;
+  }
+  if (!extraPromptInput.val.trim()) {
+    previewError.val = "Please enter additional instructions first";
+    previewFetched.val = false;
+    previewMemos.val = [];
+    return;
+  }
+
+  const body: Record<string, unknown> = {
+    prompt_id: selectedPromptId.val,
+    extra_prompt: extraPromptInput.val.trim(),
+  };
+
+  if (generationMode.val === "manual") {
+    const ids = parseManualIds();
+    if (ids.length === 0) {
+      previewError.val =
+        "Invalid memo IDs. Please enter valid numeric IDs separated by commas.";
+      previewFetched.val = false;
+      previewMemos.val = [];
+      return;
+    }
+    body.memo_ids = ids;
+  }
+
+  previewLoading.val = true;
+  previewError.val = null;
+  try {
+    const data = await api<{ memos: PreviewMemo[] }>(
+      "/api/creative/preview-context",
+      { method: "POST", body: JSON.stringify(body) },
+    );
+    previewMemos.val = data.memos;
+    previewFetched.val = true;
+  } catch (err) {
+    previewError.val = (err as Error).message;
+    previewMemos.val = [];
+    previewFetched.val = false;
+  } finally {
+    previewLoading.val = false;
+  }
+}
+
 async function handleGenerate(): Promise<void> {
   if (!extraPromptInput.val.trim()) {
     generateError.val = "Please enter additional instructions";
@@ -167,10 +237,7 @@ async function handleGenerate(): Promise<void> {
   body.model = model;
 
   if (generationMode.val === "manual") {
-    const ids = manualMemoIds.val
-      .split(",")
-      .map((s) => Number(s.trim()))
-      .filter((n) => !isNaN(n) && n > 0);
+    const ids = parseManualIds();
     if (ids.length === 0) {
       generateError.val =
         "Invalid memo IDs. Please enter valid numeric IDs separated by commas.";
@@ -386,6 +453,111 @@ function TagCloud() {
   );
 }
 
+function PreviewPanel() {
+  return div(
+    {
+      style: "margin:10px 0;padding:10px;background:#f5f5f5;border-radius:6px;",
+    },
+    div(
+      {
+        style:
+          "cursor:pointer;display:flex;align-items:center;gap:6px;font-size:13px;color:#555;",
+        onclick: () => (previewOpen.val = !previewOpen.val),
+      },
+      () => (previewOpen.val ? "\u25BC" : "\u25B6"),
+      "Context preview",
+      span(
+        { style: "margin-left:auto;" },
+        button(
+          {
+            class: "btn btn-outline btn-sm",
+            disabled: () => previewLoading.val || generating.val,
+            onclick: (e: Event) => {
+              e.stopPropagation();
+              previewOpen.val = true;
+              loadPreviewContext();
+            },
+          },
+          () =>
+            previewLoading.val
+              ? "Loading..."
+              : previewFetched.val
+                ? "Refresh"
+                : "Preview",
+        ),
+      ),
+    ),
+    () => (previewOpen.val ? renderPreviewBody() : ""),
+  );
+}
+
+function renderPreviewBody() {
+  if (previewError.val) {
+    return div(
+      {
+        style: "margin-top:8px;font-size:12px;color:#c0392b;",
+      },
+      previewError.val,
+    );
+  }
+  if (previewLoading.val && !previewFetched.val) {
+    return div(
+      { style: "margin-top:8px;font-size:12px;color:#888;" },
+      "Loading context...",
+    );
+  }
+  if (!previewFetched.val) {
+    return div(
+      { style: "margin-top:8px;font-size:12px;color:#888;" },
+      'Click "Preview" to see which memos will be used as context.',
+    );
+  }
+  if (previewMemos.val.length === 0) {
+    return div(
+      { style: "margin-top:8px;font-size:12px;color:#888;" },
+      "No related memos found.",
+    );
+  }
+  return div(
+    { style: "margin-top:8px;display:flex;flex-direction:column;gap:6px;" },
+    ...previewMemos.val.map((m) =>
+      div(
+        {
+          style:
+            "padding:8px;background:#fff;border:1px solid #e5e5e5;" +
+            "border-radius:4px;font-size:12px;color:#333;",
+        },
+        div(
+          { class: "creative-meta", style: "margin-bottom:4px;" },
+          span({ class: "badge" }, "#" + String(m.id)),
+          m.tag ? span({ class: "badge badge-tag" }, m.tag) : "",
+          span(formatDate(m.created_at)),
+        ),
+        div(
+          {
+            style:
+              "line-height:18px;white-space:pre-wrap;word-break:break-word;",
+          },
+          truncate(m.content, 120),
+        ),
+      ),
+    ),
+  );
+}
+
+function closeGenerateModal(): void {
+  if (streamAbort) streamAbort.abort();
+  generateModalOpen.val = false;
+  extraPromptInput.val = "";
+  manualMemoIds.val = "";
+  generationMode.val = "auto";
+  generateError.val = null;
+  streamContent.val = "";
+  streamDone.val = false;
+  previewOpen.val = false;
+  resetPreview();
+}
+
 function GenerateModal() {
   const selectedPrompt = prompts.val.find((p) => p.id === selectedPromptId.val);
   return div(
@@ -393,11 +565,7 @@ function GenerateModal() {
       class: "modal-overlay",
       onclick: (e: Event) => {
         if (e.target === e.currentTarget) {
-          generateModalOpen.val = false;
-          extraPromptInput.val = "";
-          manualMemoIds.val = "";
-          generationMode.val = "auto";
-          generateError.val = null;
+          closeGenerateModal();
         }
       },
     },
@@ -419,8 +587,10 @@ function GenerateModal() {
         placeholder: "Additional instructions for AI generation...",
         value: extraPromptInput,
         disabled: () => generating.val,
-        oninput: (e: Event) =>
-          (extraPromptInput.val = (e.target as HTMLTextAreaElement).value),
+        oninput: (e: Event) => {
+          extraPromptInput.val = (e.target as HTMLTextAreaElement).value;
+          resetPreview();
+        },
       }),
       // Context mode toggle
       div(
@@ -434,7 +604,10 @@ function GenerateModal() {
             class: () =>
               "mode-btn" + (generationMode.val === "auto" ? " active" : ""),
             disabled: () => generating.val,
-            onclick: () => (generationMode.val = "auto"),
+            onclick: () => {
+              generationMode.val = "auto";
+              resetPreview();
+            },
           },
           "Auto Search",
         ),
@@ -443,7 +616,10 @@ function GenerateModal() {
             class: () =>
               "mode-btn" + (generationMode.val === "manual" ? " active" : ""),
             disabled: () => generating.val,
-            onclick: () => (generationMode.val = "manual"),
+            onclick: () => {
+              generationMode.val = "manual";
+              resetPreview();
+            },
           },
           "Manual Select",
         ),
@@ -458,8 +634,10 @@ function GenerateModal() {
                 placeholder: "Memo IDs (e.g. 1,3,5)",
                 value: manualMemoIds,
                 disabled: () => generating.val,
-                oninput: (e: Event) =>
-                  (manualMemoIds.val = (e.target as HTMLInputElement).value),
+                oninput: (e: Event) => {
+                  manualMemoIds.val = (e.target as HTMLInputElement).value;
+                  resetPreview();
+                },
               }),
               div(
                 {
@@ -469,21 +647,14 @@ function GenerateModal() {
               ),
             )
           : "",
+      // Context preview panel
+      PreviewPanel(),
       div(
         { class: "modal-actions" },
         button(
           {
             class: "btn btn-outline btn-sm",
-            onclick: () => {
-              if (streamAbort) streamAbort.abort();
-              generateModalOpen.val = false;
-              extraPromptInput.val = "";
-              manualMemoIds.val = "";
-              generationMode.val = "auto";
-              generateError.val = null;
-              streamContent.val = "";
-              streamDone.val = false;
-            },
+            onclick: closeGenerateModal,
           },
           "Cancel",
         ),
@@ -547,15 +718,7 @@ function GenerateModal() {
                 {
                   class: "btn btn-outline btn-sm",
                   style: "margin-top:10px;",
-                  onclick: () => {
-                    generateModalOpen.val = false;
-                    extraPromptInput.val = "";
-                    manualMemoIds.val = "";
-                    generationMode.val = "auto";
-                    generateError.val = null;
-                    streamContent.val = "";
-                    streamDone.val = false;
-                  },
+                  onclick: closeGenerateModal,
                 },
                 "Close",
               )

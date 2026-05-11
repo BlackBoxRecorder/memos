@@ -115,6 +115,73 @@ creativeApp.get("/", (c) => {
   return c.json({ items });
 });
 
+// POST /api/creative/preview-context — 预览生成将使用的上下文 memos
+creativeApp.post("/preview-context", authMiddleware, async (c) => {
+  let body: {
+    prompt_id?: number;
+    extra_prompt?: string;
+    memo_ids?: number[];
+  };
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON" }, 400);
+  }
+
+  if (!body.prompt_id || typeof body.prompt_id !== "number") {
+    return c.json({ error: "prompt_id is required" }, 400);
+  }
+  if (
+    !body.extra_prompt ||
+    typeof body.extra_prompt !== "string" ||
+    body.extra_prompt.trim().length === 0
+  ) {
+    return c.json({ error: "extra_prompt is required" }, 400);
+  }
+  if (body.memo_ids !== undefined) {
+    if (
+      !Array.isArray(body.memo_ids) ||
+      body.memo_ids.some((id) => typeof id !== "number" || id <= 0)
+    ) {
+      return c.json(
+        { error: "memo_ids must be an array of positive integers" },
+        400,
+      );
+    }
+  }
+
+  const prompt = getPrompt(body.prompt_id);
+  if (!prompt) {
+    return c.json({ error: "Prompt not found" }, 404);
+  }
+
+  const isManualMode = body.memo_ids !== undefined && body.memo_ids.length > 0;
+
+  if (isManualMode) {
+    const memos = getMemos({ includePrivate: true, ids: body.memo_ids });
+    return c.json({ memos, mode: "manual" });
+  }
+
+  // Auto mode: consumes AI quota because it calls embedding + semantic search
+  const ip = getClientIP(c);
+  const rateError = checkRateLimit(ip, "ai");
+  if (rateError) {
+    return c.json({ error: formatRateLimitError("ai", rateError) }, 429);
+  }
+  recordRateLimit(ip, "ai");
+
+  try {
+    const semanticIds = await getSemanticResults(body.extra_prompt.trim(), 5);
+    if (semanticIds.length === 0) {
+      return c.json({ memos: [], mode: "auto" });
+    }
+    const memos = getMemos({ includePrivate: true, ids: semanticIds });
+    return c.json({ memos, mode: "auto" });
+  } catch {
+    return c.json({ memos: [], mode: "auto" });
+  }
+});
+
 // POST /api/creative/generate — 生成创意内容（流式输出）
 creativeApp.post("/generate", authMiddleware, async (c) => {
   let body: {
