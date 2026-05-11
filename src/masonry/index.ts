@@ -34,6 +34,11 @@ type State = {
 
 let st: State = { cards: [], currentSearch: "", currentTag: "" };
 
+// --- pagination state ---
+let currentPage = 0;
+let hasMore = true;
+let loadingMore = false;
+
 type DomCache = {
   container: HTMLDivElement;
   cards: Array<HTMLDivElement | undefined>;
@@ -218,6 +223,17 @@ function clearAllCards(): void {
 window.addEventListener("resize", () => scheduleRender());
 window.addEventListener("scroll", () => scheduleRender(), true);
 
+// --- infinite scroll ---
+window.addEventListener("scroll", () => {
+  if (loadingMore || !hasMore) return;
+  const scrolledNearBottom =
+    window.innerHeight + window.scrollY >=
+    document.documentElement.scrollHeight - 400;
+  if (scrolledNearBottom) {
+    fetchAndRender(st.currentSearch, st.currentTag, currentPage + 1);
+  }
+});
+
 let scheduledRaf: number | null = null;
 function scheduleRender() {
   if (scheduledRaf != null) return;
@@ -305,21 +321,33 @@ async function loadCount(): Promise<void> {
 }
 
 // --- fetch and render with filters ---
-async function fetchAndRender(search: string, tag: string): Promise<void> {
-  showStatus("Loading...");
+async function fetchAndRender(
+  search: string,
+  tag: string,
+  page: number = 0,
+): Promise<void> {
+  if (page === 0) {
+    showStatus("Loading...");
+  }
+  loadingMore = true;
   try {
     const params = new URLSearchParams();
     if (search) params.set("search", search);
     if (tag) params.set("tag", tag);
-    const url = `/api/memos${params.toString() ? "?" + params.toString() : ""}`;
+    params.set("page", String(page));
+    params.set("limit", "50");
+    const url = `/api/memos?${params.toString()}`;
 
     const resp = await fetch(url);
     if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
-    const data: { memos: { content: string }[] } = await resp.json();
+    const data: { memos: { content: string }[]; hasMore: boolean } =
+      await resp.json();
 
     hideStatus();
+    hasMore = data.hasMore;
+    currentPage = page;
 
-    if (data.memos.length === 0) {
+    if (data.memos.length === 0 && page === 0) {
       st = { cards: [], currentSearch: search, currentTag: tag };
       clearAllCards();
       domCache.container.style.height = "0px";
@@ -327,26 +355,37 @@ async function fetchAndRender(search: string, tag: string): Promise<void> {
       return;
     }
 
-    st = {
-      cards: data.memos.map((m) => ({
-        text: m.content,
-        prepared: getOrPrepare(m.content, font),
-      })),
-      currentSearch: search,
-      currentTag: tag,
-    };
+    const newCards = data.memos.map((m) => ({
+      text: m.content,
+      prepared: getOrPrepare(m.content, font),
+    }));
 
-    clearAllCards();
+    if (page === 0) {
+      st = { cards: newCards, currentSearch: search, currentTag: tag };
+      clearAllCards();
+    } else {
+      st.cards = [...st.cards, ...newCards];
+    }
+
     scheduleRender();
 
-    // Update URL for bookmarkability
-    const newUrl = params.toString()
-      ? `${window.location.pathname}?${params.toString()}`
-      : window.location.pathname;
-    history.replaceState(null, "", newUrl);
+    // Update URL for bookmarkability (only on first page)
+    if (page === 0) {
+      const urlParams = new URLSearchParams();
+      if (search) urlParams.set("search", search);
+      if (tag) urlParams.set("tag", tag);
+      const newUrl = urlParams.toString()
+        ? `${window.location.pathname}?${urlParams.toString()}`
+        : window.location.pathname;
+      history.replaceState(null, "", newUrl);
+    }
   } catch (err) {
     console.error("Failed to load memos:", err);
-    showStatus("Failed to load memos. Please try again later.", true);
+    if (page === 0) {
+      showStatus("Failed to load memos. Please try again later.", true);
+    }
+  } finally {
+    loadingMore = false;
   }
 }
 

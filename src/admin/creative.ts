@@ -208,6 +208,17 @@ async function handleGenerate(): Promise<void> {
     const decoder = new TextDecoder();
     let buffer = "";
 
+    let pendingStreamContent = "";
+    let rafScheduled = false;
+
+    const flushStreamContent = () => {
+      if (pendingStreamContent) {
+        streamContent.val += pendingStreamContent;
+        pendingStreamContent = "";
+      }
+      rafScheduled = false;
+    };
+
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
@@ -223,7 +234,11 @@ async function handleGenerate(): Promise<void> {
         try {
           const msg = JSON.parse(trimmed.slice(6));
           if (msg.type === "content") {
-            streamContent.val += msg.content;
+            pendingStreamContent += msg.content;
+            if (!rafScheduled) {
+              rafScheduled = true;
+              requestAnimationFrame(flushStreamContent);
+            }
           } else if (msg.type === "done") {
             creativeItems.val = [msg.item, ...creativeItems.val];
             streamDone.val = true;
@@ -239,6 +254,12 @@ async function handleGenerate(): Promise<void> {
           throw err;
         }
       }
+    }
+
+    // Flush any remaining pending content after stream ends
+    if (pendingStreamContent) {
+      streamContent.val += pendingStreamContent;
+      pendingStreamContent = "";
     }
   } catch (err) {
     if ((err as Error).name === "AbortError") return;

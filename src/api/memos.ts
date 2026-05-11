@@ -43,7 +43,20 @@ memosApp.get("/", async (c) => {
     }
   }
 
-  return c.json({ memos: result });
+  // When all=true (admin), return everything without pagination
+  if (allParam === "true") {
+    return c.json({ memos: result });
+  }
+
+  // Pagination support
+  const page = Number(c.req.query("page") || "0");
+  const limit = Number(c.req.query("limit") || "50");
+  const start = page * limit;
+  const paged = result.slice(start, start + limit + 1);
+  const hasMore = paged.length > limit;
+  const memos = hasMore ? paged.slice(0, limit) : paged;
+
+  return c.json({ memos, hasMore });
 });
 
 // GET /api/memos/count

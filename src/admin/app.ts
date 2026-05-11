@@ -30,10 +30,13 @@ const aiOptimizing = van.state(false);
 const aiSuggestedTags = van.state<string[]>([]);
 const aiSuggestingTags = van.state(false);
 let suggestTimer: ReturnType<typeof setTimeout> | null = null;
+let tagSuggestAbort: AbortController | null = null;
 
 // Timeline state
 const selectedMonth = van.state<string | null>(null);
 const collapsedYears = van.state<Set<number>>(new Set());
+let cachedTimelineMemos: Memo[] | null = null;
+let cachedTimelineData: YearGroup[] | null = null;
 
 // AI model selector state
 const aiModelsOpen = van.state(false);
@@ -226,6 +229,20 @@ async function handleOptimize(): Promise<void> {
   const content = formContent.val.trim();
   if (!content || aiOptimizing.val) return;
 
+  if (content.length < 10) {
+    formError.val = "Content too short to optimize (minimum 10 characters)";
+    return;
+  }
+  if (content.length > 2000) {
+    if (
+      !confirm(
+        "Content is very long (>2000 chars). Optimization may take longer. Continue?",
+      )
+    ) {
+      return;
+    }
+  }
+
   aiOptimizing.val = true;
   formError.val = null;
   try {
@@ -246,8 +263,12 @@ async function handleOptimize(): Promise<void> {
 }
 
 async function suggestTagsForContent(): Promise<void> {
+  // 取消前一个未完成的请求
+  if (tagSuggestAbort) tagSuggestAbort.abort();
+  tagSuggestAbort = new AbortController();
+
   const content = formContent.val.trim();
-  if (content.length < 20) {
+  if (!content) {
     aiSuggestedTags.val = [];
     return;
   }
@@ -261,11 +282,15 @@ async function suggestTagsForContent(): Promise<void> {
         provider: selectedProvider.val,
         model: selectedModel.val,
       }),
+      signal: tagSuggestAbort.signal,
     });
     aiSuggestedTags.val = data.tags || [];
-  } catch {
-    aiSuggestedTags.val = [];
+  } catch (err) {
+    if ((err as Error).name !== "AbortError") {
+      aiSuggestedTags.val = [];
+    }
   } finally {
+    tagSuggestAbort = null;
     aiSuggestingTags.val = false;
   }
 }
@@ -488,7 +513,12 @@ function ModelSelector() {
 function TimelineSidebar() {
   const { aside } = van.tags;
   return aside({ class: "timeline-sidebar" }, () => {
-    const groups = computeTimelineData(memos.val);
+    const currentMemos = memos.val;
+    if (cachedTimelineMemos !== currentMemos) {
+      cachedTimelineData = computeTimelineData(currentMemos);
+      cachedTimelineMemos = currentMemos;
+    }
+    const groups = cachedTimelineData || [];
     if (groups.length === 0) return div();
     return div(
       ...groups.map((group) => {
