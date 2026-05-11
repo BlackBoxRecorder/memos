@@ -1,0 +1,43 @@
+{
+  "providers": [
+    {
+      "id": "deepseek",
+      "name": "DeepSeek",
+      "baseUrl": "https://api.deepseek.com",
+      "apiKeyEnv": "DEEPSEEK_API_KEY",
+      "models": ["deepseek-v4-pro", "deepseek-v4-flash"]
+    },
+    {
+      "id": "kimi",
+      "name": "Kimi",
+      "baseUrl": "https://api.moonshot.cn",
+      "apiKeyEnv": "KIMI_API_KEY",
+      "models": ["kimi-k2.5", "kimi-k2.6"]
+    },
+    {
+      "id": "glm",
+      "name": "GLM",
+      "baseUrl": "https://open.bigmodel.cn/api/paas",
+      "apiKeyEnv": "GLM_API_KEY",
+      "models": ["glm-4.7", "glm-4.7-flash", "glm-5"]
+    },
+    {
+      "id": "dashscope",
+      "name": "DashScope",
+      "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode",
+      "apiKeyEnv": "DASHSCOPE_API_KEY",
+      "models": [
+        "deepseek-v4-pro",
+        "deepseek-v4-flash",
+        "kimi-k2.5",
+        "kimi-k2.6",
+        "glm-5",
+        "qwen-3.5"
+      ]
+    }
+  ],
+  "default": {
+    "provider": "deepseek",
+    "model": "deepseek-v4-flash"
+  }
+}

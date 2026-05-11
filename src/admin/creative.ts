@@ -1,5 +1,6 @@
 import van from "vanjs-core";
 import { api, formatDate, truncate } from "../util";
+import { getSelectedAiModel } from "./ai-state";
 import type { Prompt, CreativeItem } from "../model";
 
 type PromptFormMode =
@@ -159,6 +160,11 @@ async function handleGenerate(): Promise<void> {
     prompt_id: selectedPromptId.val,
     extra_prompt: extraPromptInput.val.trim(),
   };
+
+  // Add current AI model selection
+  const { provider, model } = getSelectedAiModel();
+  body.provider = provider;
+  body.model = model;
 
   if (generationMode.val === "manual") {
     const ids = manualMemoIds.val

@@ -1,5 +1,6 @@
 import van from "vanjs-core";
 import { CreativeTab, openPromptCreate } from "./creative";
+import { selectedProvider, selectedModel } from "./ai-state";
 import { api, formatDate } from "../util";
 import type { Memo } from "../model";
 
@@ -34,6 +35,41 @@ let suggestTimer: ReturnType<typeof setTimeout> | null = null;
 const selectedMonth = van.state<string | null>(null);
 const collapsedYears = van.state<Set<number>>(new Set());
 
+// AI model selector state
+const aiModelsOpen = van.state(false);
+const aiModels = van.state<
+  Array<{ id: string; name: string; models: string[] }>
+>([]);
+
+// --- localStorage helpers for model selection ---
+const LS_KEY = "memos-ai-model";
+
+function saveModelSelection(provider: string, model: string): void {
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify({ provider, model }));
+  } catch {
+    // localStorage unavailable
+  }
+}
+
+function loadModelSelection(): { provider: string; model: string } | null {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (
+      parsed &&
+      typeof parsed.provider === "string" &&
+      typeof parsed.model === "string"
+    ) {
+      return { provider: parsed.provider, model: parsed.model };
+    }
+  } catch {
+    // corrupted or unavailable
+  }
+  return null;
+}
+
 // ====== API ======
 
 // ====== Actions ======
@@ -44,6 +80,7 @@ async function checkAuth(): Promise<void> {
     if (data.authenticated) {
       await loadMemos();
       checkAiStatus();
+      loadAiModels();
     }
   } catch {
     authenticated.val = false;
@@ -60,6 +97,7 @@ async function login(key: string): Promise<void> {
     globalError.val = null;
     await loadMemos();
     checkAiStatus();
+    loadAiModels();
   } catch (err) {
     globalError.val = (err as Error).message;
   }
@@ -149,6 +187,39 @@ async function checkAiStatus(): Promise<void> {
   }
 }
 
+async function loadAiModels(): Promise<void> {
+  try {
+    const data = await api<{
+      providers: Array<{ id: string; name: string; models: string[] }>;
+      default: { provider: string; model: string };
+    }>("/api/ai/models");
+    aiModels.val = data.providers;
+
+    // Try to restore saved selection
+    const saved = loadModelSelection();
+    if (saved) {
+      const prov = data.providers.find((p) => p.id === saved.provider);
+      if (prov && prov.models.includes(saved.model)) {
+        selectedProvider.val = saved.provider;
+        selectedModel.val = saved.model;
+        return;
+      }
+    }
+
+    // Fall back to default
+    if (data.default.provider && data.default.model) {
+      selectedProvider.val = data.default.provider;
+      selectedModel.val = data.default.model;
+    } else if (data.providers.length > 0) {
+      const first = data.providers[0];
+      selectedProvider.val = first.id;
+      selectedModel.val = first.models[0] || "";
+    }
+  } catch {
+    aiModels.val = [];
+  }
+}
+
 async function handleOptimize(): Promise<void> {
   const content = formContent.val.trim();
   if (!content || aiOptimizing.val) return;
@@ -158,7 +229,11 @@ async function handleOptimize(): Promise<void> {
   try {
     const data = await api<{ content: string }>("/api/ai/optimize", {
       method: "POST",
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({
+        content,
+        provider: selectedProvider.val,
+        model: selectedModel.val,
+      }),
     });
     formContent.val = data.content;
   } catch (err) {
@@ -179,7 +254,11 @@ async function suggestTagsForContent(): Promise<void> {
   try {
     const data = await api<{ tags: string[] }>("/api/ai/suggest-tags", {
       method: "POST",
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({
+        content,
+        provider: selectedProvider.val,
+        model: selectedModel.val,
+      }),
     });
     aiSuggestedTags.val = data.tags || [];
   } catch {
@@ -336,9 +415,72 @@ function svgSpinner(): HTMLElement {
   );
 }
 
+function svgChevronDown(): HTMLElement {
+  return htmlNode(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4.5l3 3 3-3"/></svg>`,
+  );
+}
+
 // ====== Helpers ======
 
 // ====== Components ======
+
+function ModelSelector() {
+  return div(
+    {
+      class: () => "model-select" + (aiModelsOpen.val ? " open" : ""),
+      tabindex: "0",
+      onblur: (e: FocusEvent) => {
+        // Close on blur if the new focus target is not inside this element
+        const tgt = e.relatedTarget as HTMLElement | null;
+        const el = e.currentTarget as HTMLElement;
+        if (!tgt || !el.contains(tgt)) {
+          aiModelsOpen.val = false;
+        }
+      },
+    },
+    div(
+      {
+        class: "model-select-trigger",
+        onclick: () => (aiModelsOpen.val = !aiModelsOpen.val),
+      },
+      span({ class: "model-select-label" }, () => {
+        const prov = aiModels.val.find((p) => p.id === selectedProvider.val);
+        const name = prov ? `${prov.name}/${selectedModel.val}` : "No models";
+        return name;
+      }),
+      span(
+        {
+          class: () => "model-select-arrow" + (aiModelsOpen.val ? " open" : ""),
+        },
+        svgChevronDown(),
+      ),
+    ),
+    div({ class: "model-select-dropdown" }, () =>
+      aiModels.val.flatMap((prov) => [
+        div({ class: "model-select-group" }, prov.name),
+        ...prov.models.map((m) =>
+          div(
+            {
+              class: () =>
+                "model-select-option" +
+                (selectedProvider.val === prov.id && selectedModel.val === m
+                  ? " active"
+                  : ""),
+              onclick: () => {
+                selectedProvider.val = prov.id;
+                selectedModel.val = m;
+                saveModelSelection(prov.id, m);
+                aiModelsOpen.val = false;
+              },
+            },
+            m,
+          ),
+        ),
+      ]),
+    ),
+  );
+}
 
 function TimelineSidebar() {
   const { aside } = van.tags;
@@ -576,6 +718,7 @@ function AdminPage() {
         span({ class: "title" }, "Memos Admin"),
         div(
           { class: "actions" },
+          () => (aiModels.val.length > 0 ? ModelSelector() : ""),
           () =>
             activeTab.val === "memos"
               ? button(

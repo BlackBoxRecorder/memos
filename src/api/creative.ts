@@ -115,6 +115,8 @@ creativeApp.post("/generate", authMiddleware, async (c) => {
     prompt_id?: number;
     extra_prompt?: string;
     memo_ids?: number[];
+    provider?: string;
+    model?: string;
   };
   try {
     body = await c.req.json();
@@ -177,6 +179,8 @@ creativeApp.post("/generate", authMiddleware, async (c) => {
   const encoder = new TextEncoder();
   const scopePromptId = body.prompt_id;
   const scopeExtraPrompt = body.extra_prompt.trim();
+  const scopeProvider = body.provider;
+  const scopeModel = body.model;
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -186,6 +190,8 @@ creativeApp.post("/generate", authMiddleware, async (c) => {
           prompt.content,
           scopeExtraPrompt,
           contextMemos,
+          scopeProvider,
+          scopeModel,
         );
 
         for await (const chunk of gen) {

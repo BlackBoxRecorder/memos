@@ -1,7 +1,12 @@
 import { Hono } from "hono";
 import { authMiddleware } from "../auth";
 import { getAllTags } from "../db";
-import { isAiAvailable, optimizeContent, suggestTags } from "../ai/service";
+import {
+  isAiAvailable,
+  optimizeContent,
+  suggestTags,
+  getAvailableModels,
+} from "../ai/service";
 
 export const aiApp = new Hono();
 
@@ -10,9 +15,14 @@ aiApp.get("/status", (c) => {
   return c.json(isAiAvailable());
 });
 
+// GET /api/ai/models — list available providers & models (no auth required)
+aiApp.get("/models", (c) => {
+  return c.json(getAvailableModels());
+});
+
 // POST /api/ai/optimize — content optimization (auth required)
 aiApp.post("/optimize", authMiddleware, async (c) => {
-  let body: { content?: string };
+  let body: { content?: string; provider?: string; model?: string };
   try {
     body = await c.req.json();
   } catch {
@@ -31,7 +41,11 @@ aiApp.post("/optimize", authMiddleware, async (c) => {
     return c.json({ error: "AI optimization is not configured" }, 503);
   }
 
-  const result = await optimizeContent(body.content.trim());
+  const result = await optimizeContent(
+    body.content.trim(),
+    body.provider,
+    body.model,
+  );
   if (result === null) {
     return c.json({ error: "AI service temporarily unavailable" }, 500);
   }
@@ -41,7 +55,7 @@ aiApp.post("/optimize", authMiddleware, async (c) => {
 
 // POST /api/ai/suggest-tags — tag suggestions (auth required)
 aiApp.post("/suggest-tags", authMiddleware, async (c) => {
-  let body: { content?: string };
+  let body: { content?: string; provider?: string; model?: string };
   try {
     body = await c.req.json();
   } catch {
@@ -61,6 +75,11 @@ aiApp.post("/suggest-tags", authMiddleware, async (c) => {
   }
 
   const existingTags = getAllTags();
-  const tags = await suggestTags(body.content.trim(), existingTags);
+  const tags = await suggestTags(
+    body.content.trim(),
+    existingTags,
+    body.provider,
+    body.model,
+  );
   return c.json({ tags });
 });
