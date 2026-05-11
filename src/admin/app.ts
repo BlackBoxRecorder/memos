@@ -212,8 +212,10 @@ async function loadAiModels(): Promise<void> {
       selectedModel.val = data.default.model;
     } else if (data.providers.length > 0) {
       const first = data.providers[0];
-      selectedProvider.val = first.id;
-      selectedModel.val = first.models[0] || "";
+      if (first) {
+        selectedProvider.val = first.id;
+        selectedModel.val = first.models[0] || "";
+      }
     }
   } catch {
     aiModels.val = [];
@@ -456,7 +458,8 @@ function ModelSelector() {
         svgChevronDown(),
       ),
     ),
-    div({ class: "model-select-dropdown" }, () =>
+    div(
+      { class: "model-select-dropdown" },
       aiModels.val.flatMap((prov) => [
         div({ class: "model-select-group" }, prov.name),
         ...prov.models.map((m) =>
