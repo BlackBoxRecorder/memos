@@ -20,10 +20,7 @@ export const memosApp = new Hono();
 // GET /api/memos
 memosApp.get("/", async (c) => {
   const allParam = c.req.query("all");
-  const includePrivate =
-    allParam === "true"
-      ? requireAuth(c.req.raw) === null
-      : requireAuth(c.req.raw) === null;
+  const includePrivate = allParam === "true" && requireAuth(c.req.raw) === null;
   const search = c.req.query("search") || undefined;
   const tag = c.req.query("tag") || undefined;
 

@@ -272,6 +272,7 @@ function render() {
 async function loadTags(): Promise<void> {
   try {
     const resp = await fetch("/api/memos/tags");
+    if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
     const data: { tags: string[] } = await resp.json();
     const dropdown = document.querySelector("#tag-select .select-dropdown");
     if (!dropdown) return;
@@ -292,6 +293,7 @@ async function loadTags(): Promise<void> {
 async function loadCount(): Promise<void> {
   try {
     const resp = await fetch("/api/memos/count");
+    if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
     const data: { count: number } = await resp.json();
     const countEl = document.getElementById("memo-count");
     if (countEl) {

@@ -1,6 +1,8 @@
 // AI API client — DeepSeek (chat/optimize/tags) + DashScope (embeddings)
 // All APIs use OpenAI-compatible format via standard fetch()
 
+const AI_REQUEST_TIMEOUT_MS = 60_000; // 60s timeout for AI API requests
+
 function env(key: string): string {
   return process.env[key] || "";
 }
@@ -50,6 +52,7 @@ async function deepseekChat(
         temperature: 0.7,
         max_tokens: 2048,
       }),
+      signal: AbortSignal.timeout(AI_REQUEST_TIMEOUT_MS),
     });
 
     if (!res.ok) {
@@ -159,6 +162,7 @@ export async function generateEmbedding(
         input: text,
         dimensions: 1024,
       }),
+      signal: AbortSignal.timeout(AI_REQUEST_TIMEOUT_MS),
     });
 
     if (!res.ok) {
@@ -243,6 +247,7 @@ export async function* generateCreativeContentStream(
       max_tokens: 2048,
       stream: true,
     }),
+    signal: AbortSignal.timeout(AI_REQUEST_TIMEOUT_MS),
   });
 
   if (!res.ok) {

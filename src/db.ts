@@ -56,7 +56,36 @@ export function initDb(): void {
   `);
 }
 
-function rowToMemo(row: any): Memo {
+// 数据库行类型
+interface MemoRow {
+  id: number;
+  content: string;
+  tag: string;
+  is_public: number;
+  created_at: string;
+  updated_at: string;
+}
+
+interface PromptRow {
+  id: number;
+  title: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface CreativeRow {
+  id: number;
+  prompt_id: number;
+  extra_prompt: string;
+  embedding: Buffer | null;
+  content: string;
+  context_memo_ids: string;
+  created_at: string;
+  updated_at: string;
+}
+
+function rowToMemo(row: MemoRow): Memo {
   return {
     id: row.id,
     content: row.content,
@@ -97,7 +126,7 @@ export function getMemos(opts: {
   const where =
     conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
   const sql = `SELECT * FROM memos ${where} ORDER BY created_at DESC`;
-  const rows = d.query(sql).all(...params);
+  const rows = d.query(sql).all(...params) as MemoRow[];
   return rows.map(rowToMemo);
 }
 
@@ -105,22 +134,24 @@ export function getAllTags(): string[] {
   const d = getDb();
   const rows = d
     .query("SELECT DISTINCT tag FROM memos WHERE tag != '' ORDER BY tag")
-    .all() as any[];
-  return rows.map((r: any) => r.tag);
+    .all() as { tag: string }[];
+  return rows.map((r) => r.tag);
 }
 
 export function countMemos(opts: { includePrivate: boolean }): number {
   const d = getDb();
   const where = opts.includePrivate ? "" : "WHERE is_public = 1";
-  const row = d
-    .query(`SELECT COUNT(*) as count FROM memos ${where}`)
-    .get() as any;
+  const row = d.query(`SELECT COUNT(*) as count FROM memos ${where}`).get() as {
+    count: number;
+  };
   return row.count;
 }
 
 export function getMemo(id: number): Memo | null {
   const d = getDb();
-  const row = d.query("SELECT * FROM memos WHERE id = ?").get(id);
+  const row = d.query("SELECT * FROM memos WHERE id = ?").get(id) as
+    | MemoRow
+    | undefined;
   return row ? rowToMemo(row) : null;
 }
 
@@ -191,7 +222,7 @@ export function deleteEmbedding(memoId: number): void {
 
 // --- Prompt helpers ---
 
-function rowToPrompt(row: any): Prompt {
+function rowToPrompt(row: PromptRow): Prompt {
   return {
     id: row.id,
     title: row.title,
@@ -203,13 +234,17 @@ function rowToPrompt(row: any): Prompt {
 
 export function getAllPrompts(): Prompt[] {
   const d = getDb();
-  const rows = d.query("SELECT * FROM prompts ORDER BY created_at DESC").all();
+  const rows = d
+    .query("SELECT * FROM prompts ORDER BY created_at DESC")
+    .all() as PromptRow[];
   return rows.map(rowToPrompt);
 }
 
 export function getPrompt(id: number): Prompt | null {
   const d = getDb();
-  const row = d.query("SELECT * FROM prompts WHERE id = ?").get(id);
+  const row = d.query("SELECT * FROM prompts WHERE id = ?").get(id) as
+    | PromptRow
+    | undefined;
   return row ? rowToPrompt(row) : null;
 }
 
@@ -248,7 +283,7 @@ export function deletePrompt(id: number): boolean {
 
 // --- Creative helpers ---
 
-function rowToCreative(row: any): CreativeItem {
+function rowToCreative(row: CreativeRow): CreativeItem {
   return {
     id: row.id,
     prompt_id: row.prompt_id,
@@ -268,16 +303,20 @@ export function getCreativeItems(opts: { prompt_id?: number }): CreativeItem[] {
       .query(
         "SELECT * FROM creative WHERE prompt_id = ? ORDER BY created_at DESC",
       )
-      .all(opts.prompt_id);
+      .all(opts.prompt_id) as CreativeRow[];
     return rows.map(rowToCreative);
   }
-  const rows = d.query("SELECT * FROM creative ORDER BY created_at DESC").all();
+  const rows = d
+    .query("SELECT * FROM creative ORDER BY created_at DESC")
+    .all() as CreativeRow[];
   return rows.map(rowToCreative);
 }
 
 export function getCreativeItem(id: number): CreativeItem | null {
   const d = getDb();
-  const row = d.query("SELECT * FROM creative WHERE id = ?").get(id);
+  const row = d.query("SELECT * FROM creative WHERE id = ?").get(id) as
+    | CreativeRow
+    | undefined;
   return row ? rowToCreative(row) : null;
 }
 

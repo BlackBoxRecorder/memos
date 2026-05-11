@@ -1,4 +1,6 @@
 // 内存 session 存储 — 仅一个管理员用户，服务重启即失效
+import type { Context, Next } from "hono";
+
 const sessions = new Set<string>();
 
 const COOKIE_NAME = "memos_token";
@@ -52,6 +54,43 @@ export function clearAuthCookie(headers: Headers): void {
   );
 }
 
+// --- 登录频率限制 ---
+const loginAttempts = new Map<
+  string,
+  { count: number; firstAttempt: number }
+>();
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOGIN_COOLDOWN_MS = 60_000; // 1 分钟
+
+// 返回 null 表示允许尝试，否则返回冷却剩余时间（毫秒）
+export function checkLoginRateLimit(ip: string): number | null {
+  const now = Date.now();
+  const entry = loginAttempts.get(ip);
+  if (!entry) return null;
+  if (now - entry.firstAttempt > LOGIN_COOLDOWN_MS) {
+    loginAttempts.delete(ip);
+    return null;
+  }
+  if (entry.count >= MAX_LOGIN_ATTEMPTS) {
+    return LOGIN_COOLDOWN_MS - (now - entry.firstAttempt);
+  }
+  return null;
+}
+
+export function recordLoginAttempt(ip: string): void {
+  const now = Date.now();
+  const entry = loginAttempts.get(ip);
+  if (!entry || now - entry.firstAttempt > LOGIN_COOLDOWN_MS) {
+    loginAttempts.set(ip, { count: 1, firstAttempt: now });
+  } else {
+    entry.count++;
+  }
+}
+
+export function clearLoginAttempts(ip: string): void {
+  loginAttempts.delete(ip);
+}
+
 // 返回 null 表示认证通过，否则返回 401 Response
 export function requireAuth(request: Request): Response | null {
   if (!isAuthenticated(request)) {
@@ -64,7 +103,7 @@ export function requireAuth(request: Request): Response | null {
 }
 
 // Hono 中间件：认证失败直接返回 401，通过则继续后续处理
-export const authMiddleware = async (c: any, next: any) => {
+export const authMiddleware = async (c: Context, next: Next) => {
   const err = requireAuth(c.req.raw);
   if (err) return err;
   await next();

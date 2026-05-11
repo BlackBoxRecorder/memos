@@ -6,9 +6,25 @@ import {
   isAuthenticated,
   setAuthCookie,
   clearAuthCookie,
+  checkLoginRateLimit,
+  recordLoginAttempt,
+  clearLoginAttempts,
 } from "../auth";
 
-const SECRET_KEY = process.env.MEMOS_SECRET_KEY || "memos-dev-test";
+const SECRET_KEY = (() => {
+  const key = process.env.MEMOS_SECRET_KEY;
+  if (key) return key;
+  if (process.env.NODE_ENV === "production") {
+    console.error(
+      "FATAL: MEMOS_SECRET_KEY environment variable is not set in production. Exiting.",
+    );
+    process.exit(1);
+  }
+  console.warn(
+    "WARNING: Using default MEMOS_SECRET_KEY. Set MEMOS_SECRET_KEY in production!",
+  );
+  return "memos-dev-test";
+})();
 
 export const authApp = new Hono();
 
@@ -19,6 +35,20 @@ authApp.get("/check", (c) => {
 
 // POST /api/auth/login
 authApp.post("/login", async (c) => {
+  const ip =
+    c.req.header("X-Forwarded-For") || c.req.header("X-Real-IP") || "unknown";
+
+  // Rate limiting check
+  const cooldown = checkLoginRateLimit(ip);
+  if (cooldown !== null) {
+    return c.json(
+      {
+        error: `Too many login attempts. Please wait ${Math.ceil(cooldown / 1000)} seconds.`,
+      },
+      429,
+    );
+  }
+
   let body: { key?: string };
   try {
     body = await c.req.json();
@@ -27,9 +57,11 @@ authApp.post("/login", async (c) => {
   }
 
   if (!body.key || body.key !== SECRET_KEY) {
+    recordLoginAttempt(ip);
     return c.json({ error: "Invalid key" }, 401);
   }
 
+  clearLoginAttempts(ip);
   const token = createSession();
   setAuthCookie(c.res.headers, token);
   return c.json({ ok: true });

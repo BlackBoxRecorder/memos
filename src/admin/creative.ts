@@ -43,12 +43,11 @@ const creativeDeleting = van.state(false);
 export async function loadPrompts(): Promise<void> {
   try {
     const data = await api<{ prompts: Prompt[] }>("/api/creative/prompts");
+    prompts.val = data.prompts;
     // Auto-select first prompt if none selected
     if (selectedPromptId.val === null && data.prompts.length > 0) {
       const first = data.prompts[0]!;
       selectedPromptId.val = first.id;
-      prompts.val = data.prompts;
-
       loadCreativeItems(first.id);
     }
   } catch {
@@ -226,9 +225,12 @@ async function handleGenerate(): Promise<void> {
             throw new Error(msg.error);
           }
         } catch (err) {
-          if ((err as Error).message !== "Unexpected end of JSON input") {
-            throw err;
+          // If parse failed (e.g. incomplete chunk), put back in buffer for next chunk
+          if ((err as Error).name === "SyntaxError") {
+            buffer = line + "\n" + buffer;
+            continue;
           }
+          throw err;
         }
       }
     }
