@@ -17,7 +17,7 @@
     {
       "id": "glm",
       "name": "GLM",
-      "baseUrl": "https://open.bigmodel.cn/api/paas",
+      "baseUrl": "https://open.bigmodel.cn/api/paas/v4",
       "apiKeyEnv": "GLM_API_KEY",
       "models": ["glm-4.7", "glm-4.7-flash", "glm-5"]
     },
