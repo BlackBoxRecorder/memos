@@ -102,9 +102,9 @@
         }
 
         .admin-topbar-inner {
-            max-width: 900px;
+            max-width: 720px;
             margin: 0 auto;
-            padding: 12px 20px 12px 200px;
+            padding: 12px 20px;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -226,7 +226,8 @@
         .admin-layout {
             display: flex;
             max-width: 900px;
-            margin: 0 auto;
+            /* Shift left by half sidebar width so content center = page center */
+            margin-left: calc(50% - 540px);
             align-items: flex-start;
         }
 
@@ -327,6 +328,9 @@
 
             .admin-layout {
                 display: block;
+                margin-left: 0;
+                max-width: 720px;
+                margin: 0 auto;
             }
 
             .admin-container {
@@ -336,6 +340,7 @@
 
             .admin-topbar-inner {
                 padding: 12px 20px;
+                max-width: 720px;
             }
         }
 
