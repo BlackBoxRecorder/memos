@@ -315,7 +315,7 @@ function openCreateForm(): void {
   formIsPublic.val = true;
   formTag.val = "";
   formError.val = null;
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  document.body.style.overflow = "hidden";
 }
 
 function openEditForm(memo: Memo): void {
@@ -327,7 +327,7 @@ function openEditForm(memo: Memo): void {
   aiSuggestedTags.val = [];
   if (suggestTimer) clearTimeout(suggestTimer);
   suggestTimer = null;
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  document.body.style.overflow = "hidden";
 }
 
 function closeForm(): void {
@@ -339,6 +339,7 @@ function closeForm(): void {
   aiSuggestedTags.val = [];
   if (suggestTimer) clearTimeout(suggestTimer);
   suggestTimer = null;
+  document.body.style.overflow = "";
 }
 
 // ====== Read More Modal ======
@@ -675,92 +676,105 @@ function LoginPage() {
   );
 }
 
-function FormCard() {
-  const isEdit = formMode.val.type === "edit";
-  const title = isEdit ? "Edit Memo" : "New Memo";
+function FormModal() {
+  const isEdit = () => formMode.val.type === "edit";
+  const title = () => (isEdit() ? "Edit Memo" : "New Memo");
   return div(
-    { class: "form-card" },
-    h2(title),
-    textarea({
-      id: "form-content",
-      placeholder: "What's on your mind?",
-      disabled: () => formSaving.val,
-      value: formContent,
-      oninput: (e: Event) => {
-        formContent.val = (e.target as HTMLTextAreaElement).value;
-        // Debounced tag suggestion
-        if (aiAvailable.val) debouncedSuggestTags();
+    {
+      class: "modal-overlay",
+      style: () =>
+        formMode.val.type !== "closed" ? "display:flex" : "display:none",
+      onclick: (e: Event) => {
+        if (e.target === e.currentTarget) closeForm();
       },
-    }),
-    // AI Optimize toolbar (between textarea and tag input)
-    () =>
-      aiAvailable.val
-        ? div(
-            { class: "ai-toolbar" },
-            button(
-              {
-                class: () =>
-                  "ai-optimize-btn" + (aiOptimizing.val ? " loading" : ""),
-                disabled: () => aiOptimizing.val || formSaving.val,
-                onclick: handleOptimize,
-                title: "AI optimize content",
-              },
-              aiOptimizing.val ? svgSpinner() : svgSparkle(),
-            ),
-          )
-        : "",
-    input({
-      type: "text",
-      id: "form-tag",
-      placeholder: "Tag (optional)",
-      value: formTag,
-      disabled: () => formSaving.val,
-      oninput: (e: Event) =>
-        (formTag.val = (e.target as HTMLInputElement).value),
-    }),
-    // AI Tag suggestions (below tag input)
-    () =>
-      aiSuggestedTags.val.length > 0
-        ? div(
-            { class: "ai-tag-suggestions" },
-            ...aiSuggestedTags.val.map((tag) =>
+    },
+    div(
+      { class: "modal modal-wide" },
+      h3(title),
+      textarea({
+        id: "form-content",
+        placeholder: "What's on your mind?",
+        disabled: () => formSaving.val,
+        value: formContent,
+        oninput: (e: Event) => {
+          formContent.val = (e.target as HTMLTextAreaElement).value;
+          // Debounced tag suggestion
+          if (aiAvailable.val) debouncedSuggestTags();
+        },
+      }),
+      // AI Optimize toolbar (between textarea and tag input)
+      () =>
+        aiAvailable.val
+          ? div(
+              { class: "ai-toolbar" },
               button(
                 {
-                  class: "tag-chip",
-                  onclick: () => (formTag.val = tag),
+                  class: () =>
+                    "ai-optimize-btn" + (aiOptimizing.val ? " loading" : ""),
+                  disabled: () => aiOptimizing.val || formSaving.val,
+                  onclick: handleOptimize,
+                  title: "AI optimize content",
                 },
-                tag,
+                aiOptimizing.val ? svgSpinner() : svgSparkle(),
               ),
-            ),
-          )
-        : "",
-    div(
-      { class: "form-row" },
-      label(
-        { class: "form-check" },
-        input({
-          type: "checkbox",
-          id: "form-is-public",
-          checked: formIsPublic,
-          disabled: () => formSaving.val,
-          oninput: (e: Event) =>
-            (formIsPublic.val = (e.target as HTMLInputElement).checked),
-        }),
-        "Public",
+            )
+          : "",
+      input({
+        type: "text",
+        id: "form-tag",
+        placeholder: "Tag (optional)",
+        value: formTag,
+        disabled: () => formSaving.val,
+        oninput: (e: Event) =>
+          (formTag.val = (e.target as HTMLInputElement).value),
+      }),
+      // AI Tag suggestions (below tag input)
+      () =>
+        aiSuggestedTags.val.length > 0
+          ? div(
+              { class: "ai-tag-suggestions" },
+              ...aiSuggestedTags.val.map((tag) =>
+                button(
+                  {
+                    class: "tag-chip",
+                    onclick: () => (formTag.val = tag),
+                  },
+                  tag,
+                ),
+              ),
+            )
+          : "",
+      div(
+        { class: "form-row" },
+        label(
+          { class: "form-check" },
+          input({
+            type: "checkbox",
+            id: "form-is-public",
+            checked: formIsPublic,
+            disabled: () => formSaving.val,
+            oninput: (e: Event) =>
+              (formIsPublic.val = (e.target as HTMLInputElement).checked),
+          }),
+          "Public",
+        ),
+        div({ style: "flex:1" }),
+        button(
+          { class: "btn btn-outline btn-sm", onclick: closeForm },
+          "Cancel",
+        ),
+        button(
+          {
+            class: "btn btn-primary btn-sm",
+            id: "form-save-btn",
+            onclick: saveForm,
+            disabled: () => formSaving.val,
+          },
+          () => (formSaving.val ? "Saving..." : "Save"),
+        ),
       ),
-      div({ style: "flex:1" }),
-      button({ class: "btn btn-outline btn-sm", onclick: closeForm }, "Cancel"),
-      button(
-        {
-          class: "btn btn-primary btn-sm",
-          id: "form-save-btn",
-          onclick: saveForm,
-          disabled: () => formSaving.val,
-        },
-        () => (formSaving.val ? "Saving..." : "Save"),
-      ),
+      () => (formError.val ? div({ class: "form-error" }, formError.val) : ""),
     ),
-    () => (formError.val ? div({ class: "form-error" }, formError.val) : ""),
   );
 }
 
@@ -952,7 +966,6 @@ function AdminPage() {
         () =>
           activeTab.val === "memos"
             ? div(
-                () => (formMode.val.type !== "closed" ? FormCard() : ""),
                 () => {
                   if (loading.val)
                     return div({ class: "status-msg" }, "Loading memos...");
@@ -967,6 +980,7 @@ function AdminPage() {
             : CreativeTab(),
       ),
     ),
+    () => (formMode.val.type !== "closed" ? FormModal() : ""),
     () => (readMoreText.val != null ? ReadMoreModal() : ""),
   );
 }
