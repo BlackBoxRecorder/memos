@@ -965,18 +965,16 @@ function AdminPage() {
         // Tab content
         () =>
           activeTab.val === "memos"
-            ? div(
-                () => {
-                  if (loading.val)
-                    return div({ class: "status-msg" }, "Loading memos...");
-                  if (memos.val.length === 0 && formMode.val.type === "closed")
-                    return div(
-                      { class: "empty-state" },
-                      "No memos yet. Create your first memo!",
-                    );
-                  return div(memos.val.map(MemoCard));
-                },
-              )
+            ? div(() => {
+                if (loading.val)
+                  return div({ class: "status-msg" }, "Loading memos...");
+                if (memos.val.length === 0 && formMode.val.type === "closed")
+                  return div(
+                    { class: "empty-state" },
+                    "No memos yet. Create your first memo!",
+                  );
+                return div(memos.val.map(MemoCard));
+              })
             : CreativeTab(),
       ),
     ),
