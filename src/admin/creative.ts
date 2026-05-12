@@ -46,12 +46,22 @@ const previewLoading = van.state(false);
 const previewError = van.state<string | null>(null);
 const previewFetched = van.state(false);
 
+/** Reset context preview state to initial (not fetched). */
 function resetPreview(): void {
+  console.log(
+    "[DEBUG resetPreview] called, current activeElement=",
+    document.activeElement?.tagName,
+  );
   previewFetched.val = false;
   previewMemos.val = [];
   previewError.val = null;
+  console.log(
+    "[DEBUG resetPreview] done, activeElement=",
+    document.activeElement?.tagName,
+  );
 }
 
+/** Parse comma-separated memo ID string into validated number array. */
 function parseManualIds(): number[] {
   return manualMemoIds.val
     .split(",")
@@ -62,6 +72,7 @@ function parseManualIds(): number[] {
 // ====== API ======
 
 // ====== Actions ======
+/** Fetch all creative prompts from server. Auto-selects the first prompt if none is currently selected. */
 export async function loadPrompts(): Promise<void> {
   try {
     const data = await api<{ prompts: Prompt[] }>("/api/creative/prompts");
@@ -77,6 +88,7 @@ export async function loadPrompts(): Promise<void> {
   }
 }
 
+/** Fetch creative items for a specific prompt, or all items if no promptId given. */
 async function loadCreativeItems(promptId?: number): Promise<void> {
   creativeLoading.val = true;
   try {
@@ -90,6 +102,7 @@ async function loadCreativeItems(promptId?: number): Promise<void> {
   }
 }
 
+/** Open the prompt form in create mode with empty fields. */
 export function openPromptCreate(): void {
   promptFormMode.val = { type: "create" };
   promptFormTitle.val = "";
@@ -97,6 +110,7 @@ export function openPromptCreate(): void {
   promptFormError.val = null;
 }
 
+/** Open the prompt form in edit mode, pre-filled with the given prompt's data. */
 function openPromptEdit(prompt: Prompt): void {
   promptFormMode.val = { type: "edit", id: prompt.id };
   promptFormTitle.val = prompt.title;
@@ -104,6 +118,7 @@ function openPromptEdit(prompt: Prompt): void {
   promptFormError.val = null;
 }
 
+/** Close the prompt form and reset all related state. */
 function closePromptForm(): void {
   promptFormMode.val = { type: "closed" };
   promptFormTitle.val = "";
@@ -111,6 +126,7 @@ function closePromptForm(): void {
   promptFormError.val = null;
 }
 
+/** Validate and save the prompt form (create or edit), then refresh the prompts list. */
 async function savePromptForm(): Promise<void> {
   if (!promptFormTitle.val.trim()) {
     promptFormError.val = "Title is required";
@@ -144,6 +160,7 @@ async function savePromptForm(): Promise<void> {
   }
 }
 
+/** Delete a prompt by ID. Clears selected state and creative items if the deleted prompt was active. */
 async function deletePrompt(id: number): Promise<void> {
   try {
     await api(`/api/creative/prompts/${id}`, { method: "DELETE" });
@@ -158,11 +175,13 @@ async function deletePrompt(id: number): Promise<void> {
   }
 }
 
+/** Select a prompt by ID and load its associated creative items. */
 async function selectPrompt(id: number): Promise<void> {
   selectedPromptId.val = id;
   await loadCreativeItems(id);
 }
 
+/** Fetch context preview from server showing which memos will be used for generation. Supports both auto-search and manual memo ID modes. */
 async function loadPreviewContext(): Promise<void> {
   if (selectedPromptId.val === null) {
     previewError.val = "Please select a prompt first";
@@ -212,6 +231,7 @@ async function loadPreviewContext(): Promise<void> {
   }
 }
 
+/** Main creative generation entry: validates inputs, builds request body, starts SSE stream and renders output in real-time. */
 async function handleGenerate(): Promise<void> {
   if (!extraPromptInput.val.trim()) {
     generateError.val = "Please enter additional instructions";
@@ -337,6 +357,7 @@ async function handleGenerate(): Promise<void> {
   }
 }
 
+/** Delete a creative item by ID, then reload the current prompt's items. */
 async function deleteCreativeItem(id: number): Promise<void> {
   creativeDeleting.val = true;
   try {
@@ -352,6 +373,7 @@ async function deleteCreativeItem(id: number): Promise<void> {
 
 // ====== Components ======
 
+/** Modal form component for creating or editing a creative prompt. */
 function PromptForm() {
   const isEdit = promptFormMode.val.type === "edit";
   const title = isEdit ? "Edit Prompt" : "New Prompt";
@@ -367,7 +389,7 @@ function PromptForm() {
       div(
         { class: "form-card", style: "margin-bottom:0;box-shadow:none;" },
         h3(title),
-        div({ class: "prompt-label" }, "Title"),
+
         input({
           type: "text",
           placeholder: "Prompt title",
@@ -409,6 +431,7 @@ function PromptForm() {
   );
 }
 
+/** Horizontal tag cloud showing all prompts as selectable tags with edit/delete actions. */
 function TagCloud() {
   return div(
     { class: "tag-cloud" },
@@ -453,10 +476,8 @@ function TagCloud() {
   );
 }
 
+/** Collapsible panel that fetches and displays a preview of memos that will be used as generation context. */
 function PreviewPanel() {
-  const hasData = previewFetched.val && !previewError.val;
-  const memoCount = previewMemos.val.length;
-
   return div(
     {},
     // Compact toggle bar
@@ -467,8 +488,10 @@ function PreviewPanel() {
       },
       () => (previewOpen.val ? "\u25BC" : "\u25B6"),
       "Context Preview",
-      () =>
-        hasData
+      () => {
+        const hasData = previewFetched.val && !previewError.val;
+        const memoCount = previewMemos.val.length;
+        return hasData
           ? span(
               {
                 class:
@@ -478,7 +501,8 @@ function PreviewPanel() {
                 ? "No results"
                 : memoCount + " memo" + (memoCount !== 1 ? "s" : ""),
             )
-          : "",
+          : "";
+      },
       span(
         { style: "margin-left:auto;" },
         button(
@@ -505,6 +529,7 @@ function PreviewPanel() {
   );
 }
 
+/** Renders the expanded body of the context preview panel. Handles error/loading/empty/data states. */
 function renderPreviewBody() {
   if (previewError.val) {
     return div(
@@ -564,6 +589,7 @@ function renderPreviewBody() {
   );
 }
 
+/** Close the generate modal: abort any in-progress stream and reset all modal state. */
 function closeGenerateModal(): void {
   if (streamAbort) streamAbort.abort();
   generateModalOpen.val = false;
@@ -577,7 +603,9 @@ function closeGenerateModal(): void {
   resetPreview();
 }
 
+/** Main generation modal: configuration form (prompt selection, context mode, extra instructions) + real-time streaming output display. */
 function GenerateModal() {
+  console.log("[DEBUG GenerateModal] called/rendered");
   const selectedPrompt = prompts.val.find((p) => p.id === selectedPromptId.val);
   const hasStarted = generating.val || !!streamContent.val || streamDone.val;
 
@@ -637,7 +665,6 @@ function GenerateModal() {
           },
           div(
             { class: "modal-section" },
-            div({ class: "modal-section-title" }, "Configuration"),
             () =>
               selectedPrompt
                 ? div(
@@ -651,12 +678,48 @@ function GenerateModal() {
                 : "",
             textarea({
               placeholder: "Additional instructions for AI generation...",
-              value: extraPromptInput.val,
+              value: extraPromptInput,
               disabled: () => generating.val,
               oninput: (e: Event) => {
-                extraPromptInput.val = (e.target as HTMLTextAreaElement).value;
+                const ta = e.target as HTMLTextAreaElement;
+                console.log(
+                  "[DEBUG oninput] value=",
+                  ta.value,
+                  "activeElement=",
+                  document.activeElement?.tagName,
+                  "isSame=",
+                  document.activeElement === ta,
+                );
+                extraPromptInput.val = ta.value;
+                console.log(
+                  "[DEBUG oninput] after state set, activeElement=",
+                  document.activeElement?.tagName,
+                );
                 resetPreview();
+                console.log(
+                  "[DEBUG oninput] after resetPreview, activeElement=",
+                  document.activeElement?.tagName,
+                  "isSame=",
+                  document.activeElement === ta,
+                );
+                // Check again after a microtask (VanJS updates are async)
+                queueMicrotask(() => {
+                  console.log(
+                    "[DEBUG oninput microtask] activeElement=",
+                    document.activeElement?.tagName,
+                    "isSame=",
+                    document.activeElement === ta,
+                    "textarea.value=",
+                    ta.value,
+                  );
+                });
               },
+              onfocus: () => console.log("[DEBUG FOCUS] textarea gained focus"),
+              onblur: () =>
+                console.log(
+                  "[DEBUG BLUR] textarea lost focus, activeElement=",
+                  document.activeElement?.tagName,
+                ),
             }),
             // Context mode toggle
             div(
@@ -702,14 +765,48 @@ function GenerateModal() {
                     input({
                       type: "text",
                       placeholder: "Memo IDs (e.g. 1,3,5)",
-                      value: manualMemoIds.val,
+                      value: manualMemoIds,
                       disabled: () => generating.val,
                       oninput: (e: Event) => {
-                        manualMemoIds.val = (
-                          e.target as HTMLInputElement
-                        ).value;
+                        const inp = e.target as HTMLInputElement;
+                        console.log(
+                          "[DEBUG oninput memoIds] value=",
+                          inp.value,
+                          "activeElement=",
+                          document.activeElement?.tagName,
+                          "isSame=",
+                          document.activeElement === inp,
+                        );
+                        manualMemoIds.val = inp.value;
+                        console.log(
+                          "[DEBUG oninput memoIds] after state set, activeElement=",
+                          document.activeElement?.tagName,
+                        );
                         resetPreview();
+                        console.log(
+                          "[DEBUG oninput memoIds] after resetPreview, activeElement=",
+                          document.activeElement?.tagName,
+                          "isSame=",
+                          document.activeElement === inp,
+                        );
+                        queueMicrotask(() => {
+                          console.log(
+                            "[DEBUG oninput memoIds microtask] activeElement=",
+                            document.activeElement?.tagName,
+                            "isSame=",
+                            document.activeElement === inp,
+                            "input.value=",
+                            inp.value,
+                          );
+                        });
                       },
+                      onfocus: () =>
+                        console.log("[DEBUG FOCUS] memoIds input gained focus"),
+                      onblur: () =>
+                        console.log(
+                          "[DEBUG BLUR] memoIds input lost focus, activeElement=",
+                          document.activeElement?.tagName,
+                        ),
                     }),
                     div(
                       {
@@ -822,6 +919,7 @@ function GenerateModal() {
   );
 }
 
+/** Modal displaying the full content of a creative item (for items longer than 200 chars). */
 function ReadMoreModal() {
   const item = readMoreItem.val;
   if (!item) return "";
@@ -866,6 +964,7 @@ function ReadMoreModal() {
   );
 }
 
+/** Single creative item card with truncated content, metadata badges, and delete action. */
 function CreativeCard(item: CreativeItem) {
   const prompt = prompts.val.find((p) => p.id === item.prompt_id);
   const isLong = item.content.length > 200;
@@ -930,6 +1029,7 @@ function CreativeCard(item: CreativeItem) {
 
 // ====== Main Creative Tab Component ======
 
+/** Root component of the Creative tab: tag cloud, generate button, modals, and conditional content list. */
 export function CreativeTab() {
   // Load data on first render
   if (prompts.val.length === 0) {
