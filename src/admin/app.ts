@@ -487,6 +487,30 @@ function svgChevronDown(): HTMLElement {
   );
 }
 
+function svgLock(): HTMLElement {
+  return htmlNode(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`,
+  );
+}
+
+function svgUnlock(): HTMLElement {
+  return htmlNode(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>`,
+  );
+}
+
+function svgEdit(): HTMLElement {
+  return htmlNode(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>`,
+  );
+}
+
+function svgTrash(): HTMLElement {
+  return htmlNode(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>`,
+  );
+}
+
 // ====== Helpers ======
 
 // ====== Components ======
@@ -803,7 +827,6 @@ function DeleteConfirm(id: number) {
 function MemoCard(memo: Memo) {
   const badgeClass = memo.is_public ? "badge-public" : "badge-private";
   const badgeText = memo.is_public ? "Public" : "Private";
-  const toggleLabel = memo.is_public ? "Make Private" : "Make Public";
 
   return div(
     { class: "memo-card", "data-memo-id": String(memo.id) },
@@ -827,26 +850,32 @@ function MemoCard(memo: Memo) {
       memo.updated_at !== memo.created_at
         ? span(`Updated: ${formatDate(memo.updated_at)}`)
         : "",
-    ),
-    div(
-      { class: "memo-actions" },
-      button(
-        {
-          class: "btn btn-outline btn-sm",
-          onclick: () => toggleVisibility(memo),
-        },
-        toggleLabel,
-      ),
-      button(
-        { class: "btn btn-outline btn-sm", onclick: () => openEditForm(memo) },
-        "Edit",
-      ),
-      button(
-        {
-          class: "btn btn-danger btn-sm",
-          onclick: () => (deleteConfirmId.val = memo.id),
-        },
-        "Delete",
+      span(
+        { class: "memo-meta-icons" },
+        button(
+          {
+            class: "memo-icon-btn",
+            title: memo.is_public ? "Make Private" : "Make Public",
+            onclick: () => toggleVisibility(memo),
+          },
+          memo.is_public ? svgUnlock() : svgLock(),
+        ),
+        button(
+          {
+            class: "memo-icon-btn",
+            title: "Edit",
+            onclick: () => openEditForm(memo),
+          },
+          svgEdit(),
+        ),
+        button(
+          {
+            class: "memo-icon-btn delete",
+            title: "Delete",
+            onclick: () => (deleteConfirmId.val = memo.id),
+          },
+          svgTrash(),
+        ),
       ),
     ),
     () => (deleteConfirmId.val === memo.id ? DeleteConfirm(memo.id) : ""),
