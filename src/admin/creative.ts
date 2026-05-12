@@ -10,6 +10,22 @@ type PromptFormMode =
 
 const { div, span, button, input, textarea, h3 } = van.tags;
 
+// ====== SVG Helpers ======
+
+function htmlNode(str: string): HTMLElement {
+  const el = document.createElement("span");
+  el.style.display = "inline-flex";
+  el.style.alignItems = "center";
+  el.innerHTML = str;
+  return el;
+}
+
+function svgTrash(): HTMLElement {
+  return htmlNode(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>`,
+  );
+}
+
 // ====== State ======
 const prompts = van.state<Prompt[]>([]);
 const promptFormMode = van.state<PromptFormMode>({ type: "closed" });
@@ -994,8 +1010,19 @@ function CreativeCard(item: CreativeItem) {
         ? span({ class: "badge" }, "Extra: " + truncate(item.extra_prompt, 40))
         : "",
       span(formatDate(item.created_at)),
+      span(
+        { class: "creative-meta-icons" },
+        button(
+          {
+            class: "creative-icon-btn delete",
+            title: "Delete",
+            onclick: () => (creativeDeleteId.val = item.id),
+          },
+          svgTrash(),
+        ),
+      ),
     ),
-    div({ class: "memo-actions" }, () =>
+    () =>
       creativeDeleteId.val === item.id
         ? div(
             { class: "delete-confirm" },
@@ -1016,14 +1043,7 @@ function CreativeCard(item: CreativeItem) {
               "Cancel",
             ),
           )
-        : button(
-            {
-              class: "btn btn-danger btn-sm",
-              onclick: () => (creativeDeleteId.val = item.id),
-            },
-            "Delete",
-          ),
-    ),
+        : "",
   );
 }
 

@@ -591,6 +591,41 @@
             color: #c00;
         }
 
+        /* Creative card icon buttons (mirrors memo-icon-btn) */
+        .creative-meta-icons {
+            display: inline-flex;
+            align-items: center;
+            gap: 2px;
+            margin-left: auto;
+        }
+
+        .creative-icon-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            padding: 0;
+            border: 1px solid transparent;
+            border-radius: 6px;
+            background: transparent;
+            cursor: pointer;
+            color: #bbb;
+            transition: all 0.15s;
+        }
+
+        .creative-icon-btn:hover {
+            background: #f0f4ff;
+            border-color: #c4d5f5;
+            color: #3b82f6;
+        }
+
+        .creative-icon-btn.delete:hover {
+            background: #fef2f2;
+            border-color: #fcc;
+            color: #c00;
+        }
+
         /* Delete confirm */
         .delete-confirm {
             margin-top: 8px;
