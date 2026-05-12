@@ -3,28 +3,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
 
 <body>
-    <div id="filter-bar">
-        <div id="site-header">
-            <h1 class="site-title">Memos</h1>
-            <span class="memo-count" id="memo-count"></span>
-        </div>
-        <div class="filter-center">
-            <input id="search-input" type="search" placeholder="Search memos..." />
-            <div class="custom-select" id="tag-select" tabindex="0">
-                <div class="select-trigger">
-                    <span class="select-label">All tags</span>
-                    <svg class="select-arrow" width="12" height="12" viewBox="0 0 12 12" fill="none"
-                        stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M3 4.5l3 3 3-3" />
-                    </svg>
-                </div>
-                <div class="select-dropdown">
-                    <div class="select-option selected" data-value="">All tags</div>
-                </div>
-            </div>
-        </div>
-        <a href="/admin/" id="admin-btn">Admin</a>
-    </div>
+    <div id="app"></div>
     <style>
         * {
             margin: 0;
@@ -309,6 +288,28 @@
             color: #3b82f6;
         }
 
+        /* Read more button on card */
+        .card-readmore-btn {
+            position: absolute;
+            bottom: 8px;
+            left: 16px;
+            border: none;
+            border-radius: 6px;
+            background: rgba(59, 130, 246, 0.08);
+            color: #3b82f6;
+            cursor: pointer;
+            font-size: 13px;
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            padding: 4px 10px;
+            transition: background 0.15s, color 0.15s;
+            line-height: 20px;
+        }
+
+        .card-readmore-btn:hover {
+            background: rgba(59, 130, 246, 0.18);
+            color: #2563eb;
+        }
+
         /* Buttons (shared with modal) */
         .btn {
             display: inline-flex;
@@ -417,6 +418,20 @@
         .similar-memo-text {
             font-size: 14px;
             line-height: 21px;
+            color: #333;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        /* Read more modal body */
+        .readmore-modal-body {
+            overflow-y: auto;
+            max-height: 60vh;
+        }
+
+        .readmore-modal-text {
+            font-size: 15px;
+            line-height: 24px;
             color: #333;
             white-space: pre-wrap;
             word-break: break-word;

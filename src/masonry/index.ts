@@ -1,3 +1,4 @@
+import van from "vanjs-core";
 import { prepare, layout, type PreparedText } from "@chenglou/pretext";
 
 // --- config ---
@@ -8,6 +9,7 @@ const gap = 12;
 const maxColWidth = 400;
 const singleColumnMaxViewportWidth = 520;
 
+// --- types ---
 type Card = {
   id: number;
   text: string;
@@ -27,33 +29,33 @@ type LayoutState = {
   positionedCards: PositionedCard[];
 };
 
-type State = {
-  cards: Card[];
-  currentSearch: string;
-  currentTag: string;
+type SimilarMemo = {
+  id: number;
+  content: string;
+  tag: string;
 };
 
-let st: State = { cards: [], currentSearch: "", currentTag: "" };
+// --- VanJS tags ---
+const { div, span, button, input, h1, h3, a } = van.tags;
 
-// --- pagination state ---
-let currentPage = 0;
-let hasMore = true;
-let loadingMore = false;
-
-type DomCache = {
-  container: HTMLDivElement;
-  cards: Array<HTMLDivElement | undefined>;
-  statusEl: HTMLDivElement | null;
-};
-
-const domCache: DomCache = {
-  container: document.createElement("div"),
-  cards: [],
-  statusEl: null,
-};
-
-domCache.container.style.position = "relative";
-document.body.appendChild(domCache.container);
+// --- state ---
+const cards = van.state<Card[]>([]);
+const search = van.state("");
+const tag = van.state("");
+const page = van.state(0);
+const hasMore = van.state(true);
+const loading = van.state(false);
+const loadingMore = van.state(false);
+const error = van.state<string | null>(null);
+const tags = van.state<string[]>([]);
+const memoCount = van.state<number | null>(null);
+const tagSelectOpen = van.state(false);
+const similarMemoId = van.state<number | null>(null);
+const similarMemos = van.state<SimilarMemo[]>([]);
+const similarLoading = van.state(false);
+const similarError = van.state<string | null>(null);
+const readMoreText = van.state<string | null>(null);
+const windowWidth = van.state(0);
 
 // --- prepared text cache ---
 const preparedCache = new Map<string, PreparedText>();
@@ -66,121 +68,55 @@ function getOrPrepare(text: string, f: string): PreparedText {
   return p;
 }
 
-// --- status messages ---
-function showStatus(message: string, isError = false): void {
-  if (!domCache.statusEl) {
-    domCache.statusEl = document.createElement("div");
-    domCache.statusEl.style.cssText =
-      "text-align:center;padding:60px 20px;font-size:15px;color:#666;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif";
-    document.body.insertBefore(domCache.statusEl, domCache.container);
-  }
-  domCache.statusEl.style.color = isError ? "#c00" : "#666";
-  domCache.statusEl.textContent = message;
+// --- utility ---
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
-function hideStatus(): void {
-  if (domCache.statusEl) {
-    domCache.statusEl.remove();
-    domCache.statusEl = null;
+function truncateText(
+  text: string,
+  maxLen: number = 100,
+): { displayText: string; isTruncated: boolean } {
+  if (text.length <= maxLen) {
+    return { displayText: text, isTruncated: false };
   }
-}
-
-// --- custom select helpers ---
-function getCustomSelectValue(): string {
-  const selected = document.querySelector(
-    "#tag-select .select-option.selected",
-  ) as HTMLElement | null;
-  return selected?.dataset.value || "";
-}
-
-function setCustomSelectValue(value: string): void {
-  const select = document.getElementById("tag-select");
-  if (!select) return;
-
-  const options = select.querySelectorAll(".select-option");
-  let selectedText = "";
-  for (let i = 0; i < options.length; i++) {
-    const el = options[i] as HTMLElement;
-    const isMatch = el.dataset.value === value;
-    el.classList.toggle("selected", isMatch);
-    if (isMatch) selectedText = el.textContent || "";
-  }
-
-  const triggerLabel = select.querySelector(
-    ".select-label",
-  ) as HTMLElement | null;
-  if (triggerLabel) {
-    triggerLabel.textContent = selectedText || value || "All tags";
-  }
-}
-
-function initCustomSelect(): void {
-  const select = document.getElementById("tag-select");
-  if (!select) return;
-
-  const trigger = select.querySelector(".select-trigger") as HTMLElement;
-
-  trigger.addEventListener("click", (e) => {
-    e.stopPropagation();
-    const isOpen = select.classList.contains("open");
-    document.querySelectorAll(".custom-select.open").forEach((el) => {
-      if (el !== select) el.classList.remove("open");
-    });
-    select.classList.toggle("open", !isOpen);
-  });
-
-  select.addEventListener("click", (e) => {
-    const target = e.target as HTMLElement;
-    if (!target.classList.contains("select-option")) return;
-
-    const value = target.dataset.value || "";
-    setCustomSelectValue(value);
-    select.classList.remove("open");
-
-    const searchInput = document.getElementById(
-      "search-input",
-    ) as HTMLInputElement | null;
-    fetchAndRender(searchInput?.value.trim() || "", value);
-  });
-
-  document.addEventListener("click", () => {
-    select.classList.remove("open");
-  });
+  return { displayText: text.slice(0, maxLen) + "...", isTruncated: true };
 }
 
 // --- masonry layout ---
-function computeLayout(windowWidth: number): LayoutState {
+function computeLayout(cardsArr: Card[], winWidth: number): LayoutState {
   let colCount: number;
   let colWidth: number;
-  if (windowWidth <= singleColumnMaxViewportWidth) {
+  if (winWidth <= singleColumnMaxViewportWidth) {
     colCount = 1;
-    colWidth = Math.min(maxColWidth, windowWidth - gap * 2);
+    colWidth = Math.min(maxColWidth, winWidth - gap * 2);
   } else {
-    const minColWidth = 100 + windowWidth * 0.1;
-    colCount = Math.max(
-      2,
-      Math.floor((windowWidth + gap) / (minColWidth + gap)),
-    );
+    const minColWidth = 100 + winWidth * 0.1;
+    colCount = Math.max(2, Math.floor((winWidth + gap) / (minColWidth + gap)));
     colWidth = Math.min(
       maxColWidth,
-      (windowWidth - (colCount + 1) * gap) / colCount,
+      (winWidth - (colCount + 1) * gap) / colCount,
     );
   }
   const textWidth = colWidth - cardPadding * 2;
   const contentWidth = colCount * colWidth + (colCount - 1) * gap;
-  const offsetLeft = (windowWidth - contentWidth) / 2;
+  const offsetLeft = (winWidth - contentWidth) / 2;
 
   const colHeights = new Float64Array(colCount);
   for (let c = 0; c < colCount; c++) colHeights[c] = gap;
 
   const positionedCards: PositionedCard[] = [];
-  for (let i = 0; i < st.cards.length; i++) {
+  for (let i = 0; i < cardsArr.length; i++) {
     let shortest = 0;
     for (let c = 1; c < colCount; c++) {
       if (colHeights[c]! < colHeights[shortest]!) shortest = c;
     }
 
-    const { height } = layout(st.cards[i]!.prepared, textWidth, lineHeight);
+    const { height } = layout(cardsArr[i]!.prepared, textWidth, lineHeight);
     const totalH = height + cardPadding * 2;
 
     positionedCards.push({
@@ -201,328 +137,100 @@ function computeLayout(windowWidth: number): LayoutState {
   return { colWidth, contentHeight, positionedCards };
 }
 
-function getOrCreateCardNode(cardIndex: number): HTMLDivElement {
-  const existingNode = domCache.cards[cardIndex];
-  if (existingNode) return existingNode;
+// --- layout cache ---
+let _layoutCards: Card[] | null = null;
+let _layoutWidth = 0;
+let _layoutResult: LayoutState | null = null;
 
-  const card = st.cards[cardIndex]!;
-  const node = document.createElement("div");
-  node.className = "card";
-  node.dataset.memoId = String(card.id);
-  node.innerHTML = `
-    <div class="card-text">${escapeHtml(card.text)}</div>
-    <button class="card-similar-btn" title="Find similar memos" data-action="similar">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="11" cy="11" r="8"></circle>
-        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-      </svg>
-    </button>
-  `;
-  domCache.container.appendChild(node);
-  domCache.cards[cardIndex] = node;
-  return node;
-}
-
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
-function clearAllCards(): void {
-  for (const node of domCache.cards) {
-    if (node) node.remove();
+function getLayout(): LayoutState {
+  if (
+    _layoutCards === cards.val &&
+    _layoutWidth === windowWidth.val &&
+    _layoutResult
+  ) {
+    return _layoutResult;
   }
-  domCache.cards = [];
+  _layoutResult = computeLayout(cards.val, windowWidth.val);
+  _layoutCards = cards.val;
+  _layoutWidth = windowWidth.val;
+  return _layoutResult;
 }
 
-// --- events ---
-window.addEventListener("resize", () => scheduleRender());
-window.addEventListener("scroll", () => scheduleRender(), true);
-
-// --- infinite scroll ---
-window.addEventListener("scroll", () => {
-  if (loadingMore || !hasMore) return;
-  const scrolledNearBottom =
-    window.innerHeight + window.scrollY >=
-    document.documentElement.scrollHeight - 400;
-  if (scrolledNearBottom) {
-    fetchAndRender(st.currentSearch, st.currentTag, currentPage + 1);
-  }
-});
-
-let scheduledRaf: number | null = null;
-function scheduleRender() {
-  if (scheduledRaf != null) return;
-  scheduledRaf = requestAnimationFrame(
-    function renderAndMaybeScheduleAnotherRender() {
-      scheduledRaf = null;
-      render();
-    },
-  );
-}
-
-function render() {
-  if (st.cards.length === 0) return;
-
-  const windowWidth = document.documentElement.clientWidth;
-  const windowHeight = document.documentElement.clientHeight;
-  const scrollTop = window.scrollY;
-
-  const layoutState = computeLayout(windowWidth);
-  domCache.container.style.height = `${layoutState.contentHeight}px`;
-
-  const viewTop = scrollTop - 200;
-  const viewBottom = scrollTop + windowHeight + 200;
-  const visibleFlags = new Uint8Array(st.cards.length);
-
-  for (let i = 0; i < layoutState.positionedCards.length; i++) {
-    const positionedCard = layoutState.positionedCards[i]!;
-    if (
-      positionedCard.y > viewBottom ||
-      positionedCard.y + positionedCard.h < viewTop
-    )
-      continue;
-
-    visibleFlags[positionedCard.cardIndex] = 1;
-    const node = getOrCreateCardNode(positionedCard.cardIndex);
-    node.style.left = `${positionedCard.x}px`;
-    node.style.top = `${positionedCard.y}px`;
-    node.style.width = `${layoutState.colWidth}px`;
-    node.style.height = `${positionedCard.h}px`;
-  }
-
-  for (let cardIndex = 0; cardIndex < domCache.cards.length; cardIndex++) {
-    const node = domCache.cards[cardIndex];
-    if (node && visibleFlags[cardIndex] === 0) {
-      node.remove();
-      domCache.cards[cardIndex] = undefined;
-    }
-  }
-}
-
-// --- similar memos modal ---
-
-let similarModalOverlay: HTMLDivElement | null = null;
-let similarModalContent: HTMLDivElement | null = null;
-let similarModalBody: HTMLDivElement | null = null;
-let similarModalTitle: HTMLHeadingElement | null = null;
-
-function ensureModalDom(): void {
-  if (similarModalOverlay) return;
-
-  similarModalOverlay = document.createElement("div");
-  similarModalOverlay.className = "modal-overlay";
-  similarModalOverlay.style.display = "none";
-  similarModalOverlay.addEventListener("click", (e) => {
-    if (e.target === similarModalOverlay) closeSimilarModal();
-  });
-
-  similarModalContent = document.createElement("div");
-  similarModalContent.className = "modal";
-
-  const header = document.createElement("div");
-  header.style.cssText =
-    "display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;";
-
-  similarModalTitle = document.createElement("h3");
-  similarModalTitle.style.margin = "0";
-  similarModalTitle.textContent = "Similar Memos";
-
-  const closeBtn = document.createElement("button");
-  closeBtn.className = "btn btn-outline btn-sm";
-  closeBtn.textContent = "\u2715";
-  closeBtn.addEventListener("click", closeSimilarModal);
-
-  header.appendChild(similarModalTitle);
-  header.appendChild(closeBtn);
-
-  similarModalBody = document.createElement("div");
-  similarModalBody.className = "similar-modal-body";
-
-  similarModalContent.appendChild(header);
-  similarModalContent.appendChild(similarModalBody);
-  similarModalOverlay.appendChild(similarModalContent);
-  document.body.appendChild(similarModalOverlay);
-}
-
-function showModalLoading(): void {
-  if (!similarModalBody) return;
-  similarModalBody.innerHTML = `<div class="similar-status">Searching for similar memos...</div>`;
-}
-
-function showModalError(msg: string): void {
-  if (!similarModalBody) return;
-  similarModalBody.innerHTML = `<div class="similar-status similar-error">${escapeHtml(msg)}</div>`;
-}
-
-function showModalEmpty(): void {
-  if (!similarModalBody) return;
-  similarModalBody.innerHTML = `<div class="similar-status">No similar memos found.</div>`;
-}
-
-function showModalResults(
-  memos: Array<{ id: number; content: string; tag: string }>,
-): void {
-  if (!similarModalBody || !similarModalTitle) return;
-  similarModalTitle.textContent = `Similar Memos (${memos.length})`;
-
-  const items = memos
-    .map(
-      (m) => `
-      <div class="similar-memo-item">
-        <div class="similar-memo-meta">
-          <span class="similar-memo-id">#${m.id}</span>
-          ${m.tag ? `<span class="similar-memo-tag">${escapeHtml(m.tag)}</span>` : ""}
-        </div>
-        <div class="similar-memo-text">${escapeHtml(m.content)}</div>
-      </div>
-    `,
-    )
-    .join("");
-
-  similarModalBody.innerHTML = items;
-}
-
-async function openSimilarModal(memoId: number): Promise<void> {
-  ensureModalDom();
-  if (!similarModalOverlay || !similarModalTitle) return;
-
-  similarModalTitle.textContent = "Similar Memos";
-  showModalLoading();
-  similarModalOverlay.style.display = "flex";
-  document.body.style.overflow = "hidden";
-
-  try {
-    const resp = await fetch(`/api/memos/${memoId}/similar`);
-    if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
-    const data: {
-      memos: Array<{ id: number; content: string; tag: string }>;
-    } = await resp.json();
-
-    if (data.memos.length === 0) {
-      showModalEmpty();
-    } else {
-      showModalResults(data.memos);
-    }
-  } catch (err) {
-    showModalError(
-      err instanceof Error ? err.message : "Failed to load similar memos",
-    );
-  }
-}
-
-function closeSimilarModal(): void {
-  if (similarModalOverlay) {
-    similarModalOverlay.style.display = "none";
-  }
-  document.body.style.overflow = "";
-}
-
-// --- event delegation for card buttons ---
-domCache.container.addEventListener("click", (e) => {
-  const target = e.target as HTMLElement;
-  const btn = target.closest("[data-action='similar']") as HTMLElement | null;
-  if (!btn) return;
-  e.stopPropagation();
-  const card = btn.closest(".card") as HTMLElement | null;
-  const memoId = card?.dataset.memoId;
-  if (memoId) openSimilarModal(Number(memoId));
-});
-
-// --- tag loading ---
+// --- data loading ---
 async function loadTags(): Promise<void> {
   try {
     const resp = await fetch("/api/memos/tags");
     if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
     const data: { tags: string[] } = await resp.json();
-    const dropdown = document.querySelector("#tag-select .select-dropdown");
-    if (!dropdown) return;
-    for (let i = 0; i < data.tags.length; i++) {
-      const tag = data.tags[i]!;
-      const opt = document.createElement("div");
-      opt.className = "select-option";
-      opt.dataset.value = tag;
-      opt.textContent = tag;
-      dropdown.appendChild(opt);
-    }
+    tags.val = data.tags;
   } catch (err) {
     console.error("Failed to load tags:", err);
   }
 }
 
-// --- memo count ---
 async function loadCount(): Promise<void> {
   try {
     const resp = await fetch("/api/memos/count");
     if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
     const data: { count: number } = await resp.json();
-    const countEl = document.getElementById("memo-count");
-    if (countEl) {
-      countEl.textContent = `${data.count} items`;
-    }
+    memoCount.val = data.count;
   } catch (err) {
     console.error("Failed to load count:", err);
   }
 }
 
-// --- fetch and render with filters ---
-async function fetchAndRender(
-  search: string,
-  tag: string,
-  page: number = 0,
-): Promise<void> {
-  if (page === 0) {
-    showStatus("Loading...");
+async function fetchAndRender(pageNum: number = 0): Promise<void> {
+  const currentSearch = search.val.trim();
+  const currentTag = tag.val;
+
+  if (pageNum === 0) {
+    loading.val = true;
+    error.val = null;
+    cards.val = [];
   }
-  loadingMore = true;
+  loadingMore.val = true;
+
   try {
     const params = new URLSearchParams();
-    if (search) params.set("search", search);
-    if (tag) params.set("tag", tag);
-    params.set("page", String(page));
+    if (currentSearch) params.set("search", currentSearch);
+    if (currentTag) params.set("tag", currentTag);
+    params.set("page", String(pageNum));
     params.set("limit", "50");
     const url = `/api/memos?${params.toString()}`;
 
     const resp = await fetch(url);
     if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
-    const data: { memos: { id: number; content: string }[]; hasMore: boolean } =
-      await resp.json();
+    const data: {
+      memos: { id: number; content: string }[];
+      hasMore: boolean;
+    } = await resp.json();
 
-    hideStatus();
-    hasMore = data.hasMore;
-    currentPage = page;
+    loading.val = false;
+    hasMore.val = data.hasMore;
+    page.val = pageNum;
+    error.val = null;
 
-    if (data.memos.length === 0 && page === 0) {
-      st = { cards: [], currentSearch: search, currentTag: tag };
-      clearAllCards();
-      domCache.container.style.height = "0px";
-      showStatus("No memos found.");
+    if (data.memos.length === 0 && pageNum === 0) {
       return;
     }
 
-    const newCards = data.memos.map((m) => ({
+    const newCards: Card[] = data.memos.map((m) => ({
       id: m.id,
       text: m.content,
-      prepared: getOrPrepare(m.content, font),
+      prepared: getOrPrepare(truncateText(m.content).displayText, font),
     }));
 
-    if (page === 0) {
-      st = { cards: newCards, currentSearch: search, currentTag: tag };
-      clearAllCards();
+    if (pageNum === 0) {
+      cards.val = newCards;
     } else {
-      st.cards = [...st.cards, ...newCards];
+      cards.val = [...cards.val, ...newCards];
     }
 
-    scheduleRender();
-
     // Update URL for bookmarkability (only on first page)
-    if (page === 0) {
+    if (pageNum === 0) {
       const urlParams = new URLSearchParams();
-      if (search) urlParams.set("search", search);
-      if (tag) urlParams.set("tag", tag);
+      if (currentSearch) urlParams.set("search", currentSearch);
+      if (currentTag) urlParams.set("tag", currentTag);
       const newUrl = urlParams.toString()
         ? `${window.location.pathname}?${urlParams.toString()}`
         : window.location.pathname;
@@ -530,49 +238,387 @@ async function fetchAndRender(
     }
   } catch (err) {
     console.error("Failed to load memos:", err);
-    if (page === 0) {
-      showStatus("Failed to load memos. Please try again later.", true);
+    loading.val = false;
+    if (pageNum === 0) {
+      error.val = (err as Error).message || "Failed to load memos.";
     }
   } finally {
-    loadingMore = false;
+    loadingMore.val = false;
   }
 }
 
-// --- debounced search + tag change ---
+// --- debounced search ---
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
-document.addEventListener("DOMContentLoaded", () => {
-  const searchInput = document.getElementById(
-    "search-input",
-  ) as HTMLInputElement;
-
-  searchInput?.addEventListener("input", () => {
-    if (debounceTimer) clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => {
-      fetchAndRender(searchInput.value.trim(), getCustomSelectValue());
-    }, 250);
-  });
-
-  initCustomSelect();
-});
-
-// --- init: load tags and initial state from URL ---
-async function init(): Promise<void> {
-  const urlParams = new URLSearchParams(window.location.search);
-  const initialSearch = urlParams.get("search") || "";
-  const initialTag = urlParams.get("tag") || "";
-
-  const searchInput = document.getElementById(
-    "search-input",
-  ) as HTMLInputElement;
-  if (searchInput) searchInput.value = initialSearch;
-
-  await loadTags();
-  await loadCount();
-
-  if (initialTag) setCustomSelectValue(initialTag);
-
-  await fetchAndRender(initialSearch, initialTag);
+function debouncedSearch(): void {
+  if (debounceTimer) clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => {
+    fetchAndRender(0);
+  }, 2000);
 }
 
-init();
+// --- SVG helpers ---
+function svgNode(str: string): HTMLElement {
+  const el = document.createElement("span");
+  el.style.display = "inline-flex";
+  el.style.alignItems = "center";
+  el.innerHTML = str;
+  return el;
+}
+
+function svgSearchIcon(): HTMLElement {
+  return svgNode(
+    `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>`,
+  );
+}
+
+function svgChevronDown(): HTMLElement {
+  return svgNode(
+    `<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4.5l3 3 3-3"/></svg>`,
+  );
+}
+
+// --- similar modal helpers ---
+async function openSimilarModal(memoId: number): Promise<void> {
+  similarMemoId.val = memoId;
+  similarMemos.val = [];
+  similarLoading.val = true;
+  similarError.val = null;
+  document.body.style.overflow = "hidden";
+
+  try {
+    const resp = await fetch(`/api/memos/${memoId}/similar`);
+    if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
+    const data: { memos: SimilarMemo[] } = await resp.json();
+    similarMemos.val = data.memos;
+  } catch (err) {
+    similarError.val =
+      err instanceof Error ? err.message : "Failed to load similar memos";
+  } finally {
+    similarLoading.val = false;
+  }
+}
+
+function closeSimilarModal(): void {
+  similarMemoId.val = null;
+  document.body.style.overflow = "";
+}
+
+function openReadMore(text: string): void {
+  readMoreText.val = text;
+  document.body.style.overflow = "hidden";
+}
+
+function closeReadMore(): void {
+  readMoreText.val = null;
+  document.body.style.overflow = "";
+}
+
+// --- components ---
+
+function SiteHeader() {
+  return div({ id: "site-header" }, h1({ class: "site-title" }, "Memos"), () =>
+    memoCount.val != null
+      ? span({ class: "memo-count" }, `${memoCount.val} items`)
+      : "",
+  );
+}
+
+function SearchInput() {
+  return input({
+    id: "search-input",
+    type: "search",
+    placeholder: "Search memos...",
+    value: search.val,
+    oninput: (e: Event) => {
+      search.val = (e.target as HTMLInputElement).value;
+      debouncedSearch();
+    },
+  });
+}
+
+function TagSelect() {
+  return div(
+    {
+      id: "tag-select",
+      class: () => "custom-select" + (tagSelectOpen.val ? " open" : ""),
+      tabindex: "0",
+      onblur: (e: FocusEvent) => {
+        const tgt = e.relatedTarget as HTMLElement | null;
+        const el = e.currentTarget as HTMLElement;
+        if ((!tgt || !el.contains(tgt)) && tagSelectOpen.val) {
+          tagSelectOpen.val = false;
+        }
+      },
+    },
+    div(
+      {
+        class: "select-trigger",
+        onclick: (e: Event) => {
+          e.stopPropagation();
+          tagSelectOpen.val = !tagSelectOpen.val;
+        },
+      },
+      span({ class: "select-label" }, () => tag.val || "All tags"),
+      span({ class: "select-arrow" }, svgChevronDown()),
+    ),
+    div({ class: "select-dropdown" }, () =>
+      div(
+        div(
+          {
+            class: () => "select-option" + (tag.val === "" ? " selected" : ""),
+            "data-value": "",
+            onclick: () => {
+              tag.val = "";
+              tagSelectOpen.val = false;
+              fetchAndRender(0);
+            },
+          },
+          "All tags",
+        ),
+        tags.val.map((t) =>
+          div(
+            {
+              class: () => "select-option" + (tag.val === t ? " selected" : ""),
+              "data-value": t,
+              onclick: () => {
+                tag.val = t;
+                tagSelectOpen.val = false;
+                fetchAndRender(0);
+              },
+            },
+            t,
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+function FilterBar() {
+  return div(
+    { id: "filter-bar" },
+    SiteHeader(),
+    div({ class: "filter-center" }, SearchInput(), TagSelect()),
+    a({ href: "/admin/", id: "admin-btn" }, "Admin"),
+  );
+}
+
+function MasonryCard(card: Card, index: number, layoutState: LayoutState) {
+  const pos = layoutState.positionedCards[index]!;
+  const { displayText, isTruncated } = truncateText(card.text);
+
+  return div(
+    {
+      class: "card",
+      "data-memo-id": String(card.id),
+      style: `left:${pos.x}px;top:${pos.y}px;width:${layoutState.colWidth}px;height:${pos.h}px`,
+    },
+    div({ class: "card-text" }, escapeHtml(displayText)),
+    () =>
+      isTruncated
+        ? button(
+            {
+              class: "card-readmore-btn",
+              onclick: () => openReadMore(card.text),
+            },
+            "Read more",
+          )
+        : "",
+    button(
+      {
+        class: "card-similar-btn",
+        title: "Find similar memos",
+        onclick: (e: Event) => {
+          e.stopPropagation();
+          openSimilarModal(card.id);
+        },
+      },
+      svgSearchIcon(),
+    ),
+  );
+}
+
+function MasonryContainer() {
+  return div(
+    {
+      style: () => {
+        const l = getLayout();
+        return `position:relative;height:${l.contentHeight}px`;
+      },
+    },
+    () =>
+      div(
+        cards.val.map((c, i) => {
+          const l = getLayout();
+          return MasonryCard(c, i, l);
+        }),
+      ),
+  );
+}
+
+function SimilarModal() {
+  return div(
+    {
+      class: "modal-overlay",
+      style: () =>
+        similarMemoId.val != null ? "display:flex" : "display:none",
+      onclick: (e: Event) => {
+        if (e.target === e.currentTarget) closeSimilarModal();
+      },
+    },
+    div(
+      { class: "modal" },
+      div(
+        {
+          style:
+            "display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;",
+        },
+        h3({ style: "margin:0" }, () => {
+          const count = similarMemos.val.length;
+          return count > 0 ? `Similar Memos (${count})` : "Similar Memos";
+        }),
+        button(
+          {
+            class: "btn btn-outline btn-sm",
+            onclick: closeSimilarModal,
+          },
+          "\u2715",
+        ),
+      ),
+      div({ class: "similar-modal-body" }, () => {
+        if (similarLoading.val)
+          return div(
+            { class: "similar-status" },
+            "Searching for similar memos...",
+          );
+        if (similarError.val)
+          return div(
+            { class: "similar-status similar-error" },
+            escapeHtml(similarError.val),
+          );
+        if (similarMemos.val.length === 0 && !similarLoading.val)
+          return div({ class: "similar-status" }, "No similar memos found.");
+        return div(
+          similarMemos.val.map((m) =>
+            div(
+              { class: "similar-memo-item" },
+              div(
+                { class: "similar-memo-meta" },
+                span({ class: "similar-memo-id" }, `#${m.id}`),
+                m.tag
+                  ? span({ class: "similar-memo-tag" }, escapeHtml(m.tag))
+                  : "",
+              ),
+              div({ class: "similar-memo-text" }, escapeHtml(m.content)),
+            ),
+          ),
+        );
+      }),
+    ),
+  );
+}
+
+function ReadMoreModal() {
+  return div(
+    {
+      class: "modal-overlay",
+      style: () => (readMoreText.val != null ? "display:flex" : "display:none"),
+      onclick: (e: Event) => {
+        if (e.target === e.currentTarget) closeReadMore();
+      },
+    },
+    div(
+      { class: "modal" },
+      div(
+        {
+          style:
+            "display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;",
+        },
+        h3({ style: "margin:0" }, "Memo"),
+        button(
+          {
+            class: "btn btn-outline btn-sm",
+            onclick: closeReadMore,
+          },
+          "\u2715",
+        ),
+      ),
+      div(
+        { class: "readmore-modal-body" },
+        div({ class: "readmore-modal-text" }, () =>
+          escapeHtml(readMoreText.val || ""),
+        ),
+      ),
+    ),
+  );
+}
+
+function App() {
+  // Resize handler
+  window.addEventListener("resize", () => {
+    windowWidth.val = document.documentElement.clientWidth;
+  });
+
+  // Scroll handler (infinite scroll)
+  window.addEventListener("scroll", () => {
+    if (loadingMore.val || !hasMore.val) return;
+    const scrolledNearBottom =
+      window.innerHeight + window.scrollY >=
+      document.documentElement.scrollHeight - 400;
+    if (scrolledNearBottom) {
+      fetchAndRender(page.val + 1);
+    }
+  });
+
+  return div(
+    FilterBar(),
+    () => {
+      if (loading.val && cards.val.length === 0)
+        return div(
+          {
+            style:
+              "text-align:center;padding:60px 20px;font-size:15px;color:#666;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif",
+          },
+          "Loading...",
+        );
+      if (error.val && cards.val.length === 0)
+        return div(
+          {
+            style:
+              "text-align:center;padding:60px 20px;font-size:15px;color:#c00;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif",
+          },
+          error.val,
+        );
+      if (!loading.val && cards.val.length === 0 && !error.val)
+        return div(
+          {
+            style:
+              "text-align:center;padding:60px 20px;font-size:15px;color:#666;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif",
+          },
+          "No memos found.",
+        );
+      return MasonryContainer();
+    },
+    () => (similarMemoId.val != null ? SimilarModal() : ""),
+    () => (readMoreText.val != null ? ReadMoreModal() : ""),
+  );
+}
+
+// --- initialisation ---
+const urlParams = new URLSearchParams(window.location.search);
+const initialSearch = urlParams.get("search") || "";
+const initialTag = urlParams.get("tag") || "";
+
+search.val = initialSearch;
+tag.val = initialTag;
+
+const appEl = document.getElementById("app")!;
+const root = App();
+van.add(appEl, root);
+
+// Load data
+loadTags();
+loadCount();
+windowWidth.val = document.documentElement.clientWidth;
+fetchAndRender(0);
