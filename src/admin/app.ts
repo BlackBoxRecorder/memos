@@ -1,7 +1,7 @@
 import van from "vanjs-core";
 import { CreativeTab, openPromptCreate, creativeItems } from "./creative";
 import { selectedProvider, selectedModel } from "./ai-state";
-import { api, formatDate } from "../util";
+import { api, formatDate, truncate } from "../util";
 import type { Memo, CreativeItem } from "../model";
 
 type FormMode =
@@ -9,7 +9,7 @@ type FormMode =
   | { type: "create" }
   | { type: "edit"; id: number };
 
-const { div, span, button, input, textarea, a, h1, h2, label } = van.tags;
+const { div, span, button, input, textarea, a, h1, h2, h3, label } = van.tags;
 
 // ====== State ======
 const authenticated = van.state<boolean | null>(null);
@@ -31,6 +31,7 @@ const aiSuggestedTags = van.state<string[]>([]);
 const aiSuggestingTags = van.state(false);
 let suggestTimer: ReturnType<typeof setTimeout> | null = null;
 let tagSuggestAbort: AbortController | null = null;
+const readMoreText = van.state<string | null>(null);
 
 // Timeline state
 const selectedMonth = van.state<string | null>(null);
@@ -338,6 +339,18 @@ function closeForm(): void {
   aiSuggestedTags.val = [];
   if (suggestTimer) clearTimeout(suggestTimer);
   suggestTimer = null;
+}
+
+// ====== Read More Modal ======
+
+function openReadMore(text: string): void {
+  readMoreText.val = text;
+  document.body.style.overflow = "hidden";
+}
+
+function closeReadMore(): void {
+  readMoreText.val = null;
+  document.body.style.overflow = "";
 }
 
 // ====== Timeline Helpers ======
@@ -780,7 +793,17 @@ function MemoCard(memo: Memo) {
 
   return div(
     { class: "memo-card", "data-memo-id": String(memo.id) },
-    div({ class: "memo-content" }, memo.content),
+    div({ class: "memo-content" }, truncate(memo.content, 200), () =>
+      memo.content.length > 200
+        ? button(
+            {
+              class: "read-more-btn",
+              onclick: () => openReadMore(memo.content),
+            },
+            "Read more",
+          )
+        : "",
+    ),
     div(
       { class: "memo-meta" },
       span({ class: "memo-id" }, `#${memo.id}`),
@@ -813,6 +836,36 @@ function MemoCard(memo: Memo) {
       ),
     ),
     () => (deleteConfirmId.val === memo.id ? DeleteConfirm(memo.id) : ""),
+  );
+}
+
+function ReadMoreModal() {
+  return div(
+    {
+      class: "modal-overlay",
+      style: () => (readMoreText.val != null ? "display:flex" : "display:none"),
+      onclick: (e: Event) => {
+        if (e.target === e.currentTarget) closeReadMore();
+      },
+    },
+    div(
+      { class: "modal" },
+      div(
+        {
+          style:
+            "display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;",
+        },
+        h3({ style: "margin:0" }, "Memo"),
+        button(
+          {
+            class: "btn btn-outline btn-sm",
+            onclick: closeReadMore,
+          },
+          "\u2715",
+        ),
+      ),
+      div({ class: "read-more-content" }, () => readMoreText.val || ""),
+    ),
   );
 }
 
@@ -914,6 +967,7 @@ function AdminPage() {
             : CreativeTab(),
       ),
     ),
+    () => (readMoreText.val != null ? ReadMoreModal() : ""),
   );
 }
 
