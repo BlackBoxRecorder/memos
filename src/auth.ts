@@ -30,6 +30,21 @@ export function isAuthenticated(request: Request): boolean {
   return token !== null && sessions.has(token);
 }
 
+// --- Bearer Token 认证（CLI/API 调用用） ---
+export function getBearerToken(request: Request): string | null {
+  const auth = request.headers.get("Authorization");
+  if (!auth) return null;
+  const match = auth.match(/^Bearer\s+(.+)$/i);
+  return match?.[1] ?? null;
+}
+
+export function isBearerAuthenticated(request: Request): boolean {
+  const key = process.env.MEMOS_SECRET_KEY;
+  if (!key) return false;
+  const token = getBearerToken(request);
+  return token !== null && token === key;
+}
+
 export function createSession(): string {
   const token = crypto.randomUUID();
   sessions.add(token);
@@ -92,17 +107,19 @@ export function clearLoginAttempts(ip: string): void {
 }
 
 // 返回 null 表示认证通过，否则返回 401 Response
+// 同时支持 session cookie 和 Bearer token 两种认证方式
 export function requireAuth(request: Request): Response | null {
-  if (!isAuthenticated(request)) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), {
-      status: 401,
-      headers: { "Content-Type": "application/json" },
-    });
+  if (isAuthenticated(request) || isBearerAuthenticated(request)) {
+    return null;
   }
-  return null;
+  return new Response(JSON.stringify({ error: "Unauthorized" }), {
+    status: 401,
+    headers: { "Content-Type": "application/json" },
+  });
 }
 
 // Hono 中间件：认证失败直接返回 401，通过则继续后续处理
+// 同时支持 session cookie 和 Bearer token 两种认证方式
 export const authMiddleware = async (c: Context, next: Next) => {
   const err = requireAuth(c.req.raw);
   if (err) return err;
