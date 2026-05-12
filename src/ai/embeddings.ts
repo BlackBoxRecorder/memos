@@ -1,27 +1,32 @@
 // Embedding cache & semantic search engine
 // Pure in-memory cosine similarity, no SQLite extensions needed
 
-import { getAllEmbeddings, saveEmbedding, deleteEmbedding } from "../db";
+import {
+  getAllEmbeddings,
+  saveEmbedding,
+  deleteEmbedding,
+  getMemos,
+} from "../db";
 import { generateEmbedding, isAiAvailable } from "./service";
 
-const SIMILARITY_THRESHOLD = 0.3;
+const SIMILARITY_THRESHOLD = 0.5;
 
 // In-memory cache: memo_id → Float32Array
 const cache = new Map<number, Float32Array>();
 
-export function initEmbeddingCache(): void {
+export async function initEmbeddingCache(): Promise<void> {
   if (!isAiAvailable().embedding) return;
 
+  // 1. Load existing embeddings from DB
   const rows = getAllEmbeddings();
   for (const row of rows) {
     try {
       if (row.embedding) {
-        // Buffer to Float32Array
+        const buf = row.embedding as Buffer;
         const arr = new Float32Array(
-          row.embedding.buffer.slice(
-            row.embedding.byteOffset,
-            row.embedding.byteOffset + row.embedding.byteLength,
-          ),
+          buf.buffer,
+          buf.byteOffset,
+          buf.byteLength / 4,
         );
         cache.set(row.memo_id, arr);
       }
@@ -29,9 +34,34 @@ export function initEmbeddingCache(): void {
       // skip corrupt entries
     }
   }
-  if (cache.size > 0) {
-    console.log(`Loaded ${cache.size} embeddings into cache`);
+  console.log(`Loaded ${cache.size} existing embeddings into cache`);
+
+  // 2. Find memos without embeddings and generate them
+  const allMemos = getMemos({ includePrivate: true });
+  const missing = allMemos.filter((m) => !cache.has(m.id));
+
+  if (missing.length === 0) {
+    console.log("All memos have embeddings, nothing to generate");
+    return;
   }
+
+  console.log(
+    `Generating embeddings for ${missing.length} memos without embeddings...`,
+  );
+
+  let generated = 0;
+  for (const memo of missing) {
+    try {
+      await generateAndStoreEmbedding(memo.id, memo.content);
+      generated++;
+    } catch (err) {
+      console.error(`Failed to generate embedding for memo ${memo.id}:`, err);
+    }
+  }
+
+  console.log(
+    `Generated ${generated} new embeddings, cache total: ${cache.size}`,
+  );
 }
 
 export function upsertEmbedding(memoId: number, embedding: Float32Array): void {
@@ -76,6 +106,23 @@ export async function getSemanticResults(
 
   for (const [id, emb] of cache) {
     const score = cosineSimilarity(queryEmbedding, emb);
+    if (score >= SIMILARITY_THRESHOLD) {
+      scored.push({ id, score });
+    }
+  }
+
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, limit).map((s) => s.id);
+}
+
+export function getSimilarMemoIds(memoId: number, limit = 5): number[] {
+  const targetEmb = cache.get(memoId);
+  if (!targetEmb) return [];
+
+  const scored: Array<{ id: number; score: number }> = [];
+  for (const [id, emb] of cache) {
+    if (id === memoId) continue;
+    const score = cosineSimilarity(targetEmb, emb);
     if (score >= SIMILARITY_THRESHOLD) {
       scored.push({ id, score });
     }

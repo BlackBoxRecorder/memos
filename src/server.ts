@@ -118,8 +118,8 @@ initDb();
 // 首次启动种子数据（内置 prompts + 示例 memos）
 initSeedData();
 
-// 初始化向量缓存
-initEmbeddingCache();
+// 初始化向量缓存（含历史 memo 嵌入向量生成）
+await initEmbeddingCache();
 
 // 启动服务器
 Bun.serve({

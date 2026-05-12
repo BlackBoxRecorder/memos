@@ -9,6 +9,7 @@ const maxColWidth = 400;
 const singleColumnMaxViewportWidth = 520;
 
 type Card = {
+  id: number;
   text: string;
   prepared: PreparedText;
 };
@@ -204,12 +205,30 @@ function getOrCreateCardNode(cardIndex: number): HTMLDivElement {
   const existingNode = domCache.cards[cardIndex];
   if (existingNode) return existingNode;
 
+  const card = st.cards[cardIndex]!;
   const node = document.createElement("div");
   node.className = "card";
-  node.textContent = st.cards[cardIndex]!.text;
+  node.dataset.memoId = String(card.id);
+  node.innerHTML = `
+    <div class="card-text">${escapeHtml(card.text)}</div>
+    <button class="card-similar-btn" title="Find similar memos" data-action="similar">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"></circle>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+    </button>
+  `;
   domCache.container.appendChild(node);
   domCache.cards[cardIndex] = node;
   return node;
+}
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 function clearAllCards(): void {
@@ -284,6 +303,135 @@ function render() {
   }
 }
 
+// --- similar memos modal ---
+
+let similarModalOverlay: HTMLDivElement | null = null;
+let similarModalContent: HTMLDivElement | null = null;
+let similarModalBody: HTMLDivElement | null = null;
+let similarModalTitle: HTMLHeadingElement | null = null;
+
+function ensureModalDom(): void {
+  if (similarModalOverlay) return;
+
+  similarModalOverlay = document.createElement("div");
+  similarModalOverlay.className = "modal-overlay";
+  similarModalOverlay.style.display = "none";
+  similarModalOverlay.addEventListener("click", (e) => {
+    if (e.target === similarModalOverlay) closeSimilarModal();
+  });
+
+  similarModalContent = document.createElement("div");
+  similarModalContent.className = "modal";
+
+  const header = document.createElement("div");
+  header.style.cssText =
+    "display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;";
+
+  similarModalTitle = document.createElement("h3");
+  similarModalTitle.style.margin = "0";
+  similarModalTitle.textContent = "Similar Memos";
+
+  const closeBtn = document.createElement("button");
+  closeBtn.className = "btn btn-outline btn-sm";
+  closeBtn.textContent = "\u2715";
+  closeBtn.addEventListener("click", closeSimilarModal);
+
+  header.appendChild(similarModalTitle);
+  header.appendChild(closeBtn);
+
+  similarModalBody = document.createElement("div");
+  similarModalBody.className = "similar-modal-body";
+
+  similarModalContent.appendChild(header);
+  similarModalContent.appendChild(similarModalBody);
+  similarModalOverlay.appendChild(similarModalContent);
+  document.body.appendChild(similarModalOverlay);
+}
+
+function showModalLoading(): void {
+  if (!similarModalBody) return;
+  similarModalBody.innerHTML = `<div class="similar-status">Searching for similar memos...</div>`;
+}
+
+function showModalError(msg: string): void {
+  if (!similarModalBody) return;
+  similarModalBody.innerHTML = `<div class="similar-status similar-error">${escapeHtml(msg)}</div>`;
+}
+
+function showModalEmpty(): void {
+  if (!similarModalBody) return;
+  similarModalBody.innerHTML = `<div class="similar-status">No similar memos found.</div>`;
+}
+
+function showModalResults(
+  memos: Array<{ id: number; content: string; tag: string }>,
+): void {
+  if (!similarModalBody || !similarModalTitle) return;
+  similarModalTitle.textContent = `Similar Memos (${memos.length})`;
+
+  const items = memos
+    .map(
+      (m) => `
+      <div class="similar-memo-item">
+        <div class="similar-memo-meta">
+          <span class="similar-memo-id">#${m.id}</span>
+          ${m.tag ? `<span class="similar-memo-tag">${escapeHtml(m.tag)}</span>` : ""}
+        </div>
+        <div class="similar-memo-text">${escapeHtml(m.content)}</div>
+      </div>
+    `,
+    )
+    .join("");
+
+  similarModalBody.innerHTML = items;
+}
+
+async function openSimilarModal(memoId: number): Promise<void> {
+  ensureModalDom();
+  if (!similarModalOverlay || !similarModalTitle) return;
+
+  similarModalTitle.textContent = "Similar Memos";
+  showModalLoading();
+  similarModalOverlay.style.display = "flex";
+  document.body.style.overflow = "hidden";
+
+  try {
+    const resp = await fetch(`/api/memos/${memoId}/similar`);
+    if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
+    const data: {
+      memos: Array<{ id: number; content: string; tag: string }>;
+    } = await resp.json();
+
+    if (data.memos.length === 0) {
+      showModalEmpty();
+    } else {
+      showModalResults(data.memos);
+    }
+  } catch (err) {
+    showModalError(
+      err instanceof Error ? err.message : "Failed to load similar memos",
+    );
+  }
+}
+
+function closeSimilarModal(): void {
+  if (similarModalOverlay) {
+    similarModalOverlay.style.display = "none";
+  }
+  document.body.style.overflow = "";
+}
+
+// --- event delegation for card buttons ---
+domCache.container.addEventListener("click", (e) => {
+  const target = e.target as HTMLElement;
+  const btn = target.closest("[data-action='similar']") as HTMLElement | null;
+  if (!btn) return;
+  e.stopPropagation();
+  const card = btn.closest(".card") as HTMLElement | null;
+  const memoId = card?.dataset.memoId;
+  if (memoId) openSimilarModal(Number(memoId));
+});
+
 // --- tag loading ---
 async function loadTags(): Promise<void> {
   try {
@@ -340,7 +488,7 @@ async function fetchAndRender(
 
     const resp = await fetch(url);
     if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
-    const data: { memos: { content: string }[]; hasMore: boolean } =
+    const data: { memos: { id: number; content: string }[]; hasMore: boolean } =
       await resp.json();
 
     hideStatus();
@@ -356,6 +504,7 @@ async function fetchAndRender(
     }
 
     const newCards = data.memos.map((m) => ({
+      id: m.id,
       text: m.content,
       prepared: getOrPrepare(m.content, font),
     }));

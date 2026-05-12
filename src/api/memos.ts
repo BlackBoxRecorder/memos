@@ -19,6 +19,7 @@ import {
   generateAndStoreEmbedding,
   deleteEmbeddingCache,
   getSemanticResults,
+  getSimilarMemoIds,
 } from "../ai/embeddings";
 
 export const memosApp = new Hono();
@@ -70,6 +71,22 @@ memosApp.get("/count", (c) => {
   const includePrivate = requireAuth(c.req.raw) === null;
   const count = countMemos({ includePrivate });
   return c.json({ count });
+});
+
+// GET /api/memos/:id/similar — semantic similarity search by memo ID
+memosApp.get("/:id/similar", (c) => {
+  const id = Number(c.req.param("id"));
+  if (isNaN(id) || id <= 0) {
+    return c.json({ error: "Invalid memo ID" }, 400);
+  }
+
+  const similarIds = getSimilarMemoIds(id);
+  if (similarIds.length === 0) {
+    return c.json({ memos: [] });
+  }
+
+  const memos = getMemos({ includePrivate: false, ids: similarIds });
+  return c.json({ memos });
 });
 
 // GET /api/memos/tags
