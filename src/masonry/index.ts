@@ -14,6 +14,7 @@ type Card = {
   id: number;
   text: string;
   prepared: PreparedText;
+  updatedAt: string;
 };
 
 type PositionedCard = {
@@ -117,7 +118,7 @@ function computeLayout(cardsArr: Card[], winWidth: number): LayoutState {
     }
 
     const { height } = layout(cardsArr[i]!.prepared, textWidth, lineHeight);
-    const buttonAreaHeight = 36;
+    const buttonAreaHeight = 28;
     const totalH = height + cardPadding * 2 + buttonAreaHeight;
 
     positionedCards.push({
@@ -202,7 +203,7 @@ async function fetchAndRender(pageNum: number = 0): Promise<void> {
     const resp = await fetch(url);
     if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
     const data: {
-      memos: { id: number; content: string }[];
+      memos: { id: number; content: string; updated_at: string }[];
       hasMore: boolean;
     } = await resp.json();
 
@@ -218,6 +219,7 @@ async function fetchAndRender(pageNum: number = 0): Promise<void> {
     const newCards: Card[] = data.memos.map((m) => ({
       id: m.id,
       text: m.content,
+      updatedAt: m.updated_at,
       prepared: getOrPrepare(truncateText(m.content).displayText, font),
     }));
 
@@ -269,13 +271,19 @@ function svgNode(str: string): HTMLElement {
 
 function svgSearchIcon(): HTMLElement {
   return svgNode(
-    `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>`,
+    `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>`,
   );
 }
 
 function svgChevronDown(): HTMLElement {
   return svgNode(
     `<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4.5l3 3 3-3"/></svg>`,
+  );
+}
+
+function svgEyeIcon(): HTMLElement {
+  return svgNode(
+    `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`,
   );
 }
 
@@ -405,6 +413,18 @@ function FilterBar() {
   );
 }
 
+function formatDate(isoStr: string): string {
+  try {
+    const d = new Date(isoStr);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  } catch {
+    return isoStr.slice(0, 10);
+  }
+}
+
 function MasonryCard(card: Card, index: number, layoutState: LayoutState) {
   const pos = layoutState.positionedCards[index]!;
   const { displayText, isTruncated } = truncateText(card.text);
@@ -416,26 +436,35 @@ function MasonryCard(card: Card, index: number, layoutState: LayoutState) {
       style: `left:${pos.x}px;top:${pos.y}px;width:${layoutState.colWidth}px;height:${pos.h}px`,
     },
     div({ class: "card-text" }, escapeHtml(displayText)),
-    () =>
-      isTruncated
-        ? button(
-            {
-              class: "card-readmore-btn",
-              onclick: () => openReadMore(card.text),
-            },
-            "Read more",
-          )
-        : "",
-    button(
-      {
-        class: "card-similar-btn",
-        title: "Find similar memos",
-        onclick: (e: Event) => {
-          e.stopPropagation();
-          openSimilarModal(card.id);
+    div(
+      { class: "card-info" },
+      span({}, `#${card.id}`),
+      span({}, formatDate(card.updatedAt)),
+    ),
+    div(
+      { class: "card-btn-group" },
+      () =>
+        isTruncated
+          ? button(
+              {
+                class: "card-readmore-btn",
+                title: "Read more",
+                onclick: () => openReadMore(card.text),
+              },
+              svgEyeIcon(),
+            )
+          : "",
+      button(
+        {
+          class: "card-similar-btn",
+          title: "Find similar memos",
+          onclick: (e: Event) => {
+            e.stopPropagation();
+            openSimilarModal(card.id);
+          },
         },
-      },
-      svgSearchIcon(),
+        svgSearchIcon(),
+      ),
     ),
   );
 }
