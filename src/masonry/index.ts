@@ -63,7 +63,7 @@ const preparedCache = new Map<string, PreparedText>();
 function getOrPrepare(text: string, f: string): PreparedText {
   const cached = preparedCache.get(text);
   if (cached) return cached;
-  const p = prepare(text, f);
+  const p = prepare(text, f, { whiteSpace: "pre-wrap" });
   preparedCache.set(text, p);
   return p;
 }
@@ -117,7 +117,8 @@ function computeLayout(cardsArr: Card[], winWidth: number): LayoutState {
     }
 
     const { height } = layout(cardsArr[i]!.prepared, textWidth, lineHeight);
-    const totalH = height + cardPadding * 2;
+    const buttonAreaHeight = 36;
+    const totalH = height + cardPadding * 2 + buttonAreaHeight;
 
     positionedCards.push({
       cardIndex: i,
