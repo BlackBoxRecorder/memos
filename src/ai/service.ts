@@ -8,7 +8,7 @@ import {
   getCreativePrompt,
 } from "./prompts";
 
-const AI_REQUEST_TIMEOUT_MS = 60_000; // 60s timeout for AI API requests
+const AI_REQUEST_TIMEOUT_MS = 120_000; // 60s timeout for AI API requests
 const CONFIG_PATH = join(import.meta.dir, "../../ai.config.json");
 
 // --- Config types & loading ---
@@ -341,38 +341,6 @@ export async function generateEmbedding(
     console.error("DashScope API call failed:", err);
     return null;
   }
-}
-
-// --- Creative Content Generation ---
-
-export async function generateCreativeContent(
-  promptContent: string,
-  extraPrompt: string,
-  contextMemos: string[],
-  providerId?: string,
-  model?: string,
-): Promise<string | null> {
-  const pid = providerId || getDefaultProviderId();
-  const mdl = model || getDefaultModel();
-  if (!resolveProvider(pid)) return null;
-
-  const contextText =
-    contextMemos.length > 0
-      ? `\n\n相关备忘录上下文：\n${contextMemos
-          .map((c, i) => `${i + 1}. ${c.slice(0, 500)}`)
-          .join("\n\n")}`
-      : "";
-
-  return chatCompletion(pid, mdl, [
-    {
-      role: "system",
-      content: getCreativePrompt(),
-    },
-    {
-      role: "user",
-      content: `创意任务：${promptContent}\n\n附加说明：${extraPrompt}${contextText}\n\n请根据以上所有内容生成创意输出。`,
-    },
-  ]);
 }
 
 // --- Creative Content Generation (Streaming) ---

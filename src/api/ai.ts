@@ -21,8 +21,8 @@ aiApp.get("/status", (c) => {
   return c.json(isAiAvailable());
 });
 
-// GET /api/ai/models — list available providers & models (no auth required)
-aiApp.get("/models", (c) => {
+// GET /api/ai/models — list available providers & models (auth required)
+aiApp.get("/models", authMiddleware, (c) => {
   return c.json(getAvailableModels());
 });
 

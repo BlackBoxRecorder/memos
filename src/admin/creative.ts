@@ -454,18 +454,31 @@ function TagCloud() {
 }
 
 function PreviewPanel() {
+  const hasData = previewFetched.val && !previewError.val;
+  const memoCount = previewMemos.val.length;
+
   return div(
-    {
-      style: "margin:10px 0;padding:10px;background:#f5f5f5;border-radius:6px;",
-    },
+    {},
+    // Compact toggle bar
     div(
       {
-        style:
-          "cursor:pointer;display:flex;align-items:center;gap:6px;font-size:13px;color:#555;",
+        class: "context-preview-bar",
         onclick: () => (previewOpen.val = !previewOpen.val),
       },
       () => (previewOpen.val ? "\u25BC" : "\u25B6"),
-      "Context preview",
+      "Context Preview",
+      () =>
+        hasData
+          ? span(
+              {
+                class:
+                  "context-preview-count" + (memoCount === 0 ? " empty" : ""),
+              },
+              memoCount === 0
+                ? "No results"
+                : memoCount + " memo" + (memoCount !== 1 ? "s" : ""),
+            )
+          : "",
       span(
         { style: "margin-left:auto;" },
         button(
@@ -487,6 +500,7 @@ function PreviewPanel() {
         ),
       ),
     ),
+    // Expanded body
     () => (previewOpen.val ? renderPreviewBody() : ""),
   );
 }
@@ -519,7 +533,12 @@ function renderPreviewBody() {
     );
   }
   return div(
-    { style: "margin-top:8px;display:flex;flex-direction:column;gap:6px;" },
+    {
+      class: "modal-scroll-area",
+      style:
+        "margin-top:8px;display:flex;flex-direction:column;gap:6px;" +
+        "max-height:180px;overflow-y:auto;",
+    },
     ...previewMemos.val.map((m) =>
       div(
         {
@@ -560,6 +579,8 @@ function closeGenerateModal(): void {
 
 function GenerateModal() {
   const selectedPrompt = prompts.val.find((p) => p.id === selectedPromptId.val);
+  const hasStarted = generating.val || !!streamContent.val || streamDone.val;
+
   return div(
     {
       class: "modal-overlay",
@@ -570,161 +591,233 @@ function GenerateModal() {
       },
     },
     div(
-      { class: "modal modal-flex" },
-      h3("Generate Creative Content"),
-      () =>
-        selectedPrompt
-          ? div(
-              { class: "selected-prompt-label" },
-              "Selected prompt: ",
-              span(
-                { style: "font-weight:500;color:#333" },
-                selectedPrompt.title,
-              ),
-            )
-          : "",
-      textarea({
-        placeholder: "Additional instructions for AI generation...",
-        value: extraPromptInput,
-        disabled: () => generating.val,
-        oninput: (e: Event) => {
-          extraPromptInput.val = (e.target as HTMLTextAreaElement).value;
-          resetPreview();
-        },
-      }),
-      // Context mode toggle
+      { class: "modal modal-flex", style: "max-width:600px;" },
+
+      // ═══ HEADER ═══
       div(
-        { class: "context-mode-toggle" },
-        span(
-          { style: "font-size:13px;color:#666;margin-right:8px;" },
-          "Context:",
-        ),
-        button(
+        { class: "modal-header" },
+        div(
           {
-            class: () =>
-              "mode-btn" + (generationMode.val === "auto" ? " active" : ""),
-            disabled: () => generating.val,
-            onclick: () => {
-              generationMode.val = "auto";
-              resetPreview();
-            },
-          },
-          "Auto Search",
-        ),
-        button(
-          {
-            class: () =>
-              "mode-btn" + (generationMode.val === "manual" ? " active" : ""),
-            disabled: () => generating.val,
-            onclick: () => {
-              generationMode.val = "manual";
-              resetPreview();
-            },
-          },
-          "Manual Select",
-        ),
-      ),
-      // Manual memo ID input (shown only in manual mode)
-      () =>
-        generationMode.val === "manual"
-          ? div(
-              { style: "margin-top:8px;" },
-              input({
-                type: "text",
-                placeholder: "Memo IDs (e.g. 1,3,5)",
-                value: manualMemoIds,
-                disabled: () => generating.val,
-                oninput: (e: Event) => {
-                  manualMemoIds.val = (e.target as HTMLInputElement).value;
-                  resetPreview();
-                },
-              }),
-              div(
-                {
-                  style: "font-size:11px;color:#999;margin-top:4px;",
-                },
-                "Enter memo IDs separated by commas. Find IDs on the Memos tab (#number).",
-              ),
-            )
-          : "",
-      // Context preview panel
-      PreviewPanel(),
-      div(
-        { class: "modal-actions" },
-        button(
-          {
-            class: "btn btn-outline btn-sm",
-            onclick: closeGenerateModal,
-          },
-          "Cancel",
-        ),
-        button(
-          {
-            class: "btn btn-primary btn-sm",
-            disabled: () => generating.val || streamDone.val,
-            onclick: handleGenerate,
-          },
-          () =>
-            generating.val
-              ? "Generating..."
-              : streamDone.val
-                ? "Done"
-                : "Generate",
-        ),
-      ),
-      () =>
-        generateError.val
-          ? div({ class: "form-error" }, generateError.val)
-          : "",
-      // Streaming output area
-      () => {
-        if (!streamContent.val && !generating.val) return "";
-        const done = streamDone.val;
-        const active = generating.val;
-        return div(
-          {
-            class: "hide-scrollbar",
             style:
-              "margin-top:14px;padding:12px;background:#f8f9fb;" +
-              "border-radius:6px;border:1px solid #e5e5e5;" +
-              "flex:1;min-height:0;overflow-y:auto;",
+              "display:flex;align-items:center;justify-content:space-between;",
+          },
+          h3({ style: "margin-bottom:0;" }, "Generate Creative Content"),
+          () =>
+            hasStarted
+              ? button(
+                  {
+                    class: "btn btn-outline btn-sm",
+                    onclick: closeGenerateModal,
+                  },
+                  "\u2715",
+                )
+              : "",
+        ),
+        // Compact summary during generation
+        () =>
+          hasStarted
+            ? div(
+                { class: "generation-summary" },
+                selectedPrompt ? selectedPrompt.title + " \u00B7 " : "",
+                truncate(extraPromptInput.val, 60),
+                generationMode.val === "manual" && manualMemoIds.val
+                  ? " \u00B7 IDs: " + manualMemoIds.val
+                  : "",
+              )
+            : "",
+      ),
+
+      // ═══ BODY ═══
+      div(
+        { class: "modal-body" },
+        // ── Setup phase: always in DOM, hidden via display:none during generation ──
+        div(
+          {
+            style: () => (hasStarted ? "display:none" : ""),
           },
           div(
-            {
-              style: "font-size:13px;color:#888;margin-bottom:6px;",
-            },
-            done ? "Generated content:" : "Generating...",
-          ),
-          div(
-            {
-              id: "stream-output",
-              style:
-                "font-size:14px;line-height:22px;white-space:pre-wrap;" +
-                "word-break:break-word;color:#333;",
-            },
-            streamContent,
+            { class: "modal-section" },
+            div({ class: "modal-section-title" }, "Configuration"),
             () =>
-              active
-                ? span(
-                    {
-                      style: "animation:blink 0.8s infinite;color:#3b82f6;",
-                    },
-                    "\u258B",
+              selectedPrompt
+                ? div(
+                    { class: "selected-prompt-label" },
+                    "Selected prompt: ",
+                    span(
+                      { style: "font-weight:500;color:#333" },
+                      selectedPrompt.title,
+                    ),
+                  )
+                : "",
+            textarea({
+              placeholder: "Additional instructions for AI generation...",
+              value: extraPromptInput.val,
+              disabled: () => generating.val,
+              oninput: (e: Event) => {
+                extraPromptInput.val = (e.target as HTMLTextAreaElement).value;
+                resetPreview();
+              },
+            }),
+            // Context mode toggle
+            div(
+              { class: "context-mode-toggle" },
+              span(
+                {
+                  style: "font-size:13px;color:#666;margin-right:8px;",
+                },
+                "Context:",
+              ),
+              button(
+                {
+                  class: () =>
+                    "mode-btn" +
+                    (generationMode.val === "auto" ? " active" : ""),
+                  disabled: () => generating.val,
+                  onclick: () => {
+                    generationMode.val = "auto";
+                    resetPreview();
+                  },
+                },
+                "Auto Search",
+              ),
+              button(
+                {
+                  class: () =>
+                    "mode-btn" +
+                    (generationMode.val === "manual" ? " active" : ""),
+                  disabled: () => generating.val,
+                  onclick: () => {
+                    generationMode.val = "manual";
+                    resetPreview();
+                  },
+                },
+                "Manual Select",
+              ),
+            ),
+            // Manual memo ID input
+            () =>
+              generationMode.val === "manual"
+                ? div(
+                    { style: "margin-top:8px;" },
+                    input({
+                      type: "text",
+                      placeholder: "Memo IDs (e.g. 1,3,5)",
+                      value: manualMemoIds.val,
+                      disabled: () => generating.val,
+                      oninput: (e: Event) => {
+                        manualMemoIds.val = (
+                          e.target as HTMLInputElement
+                        ).value;
+                        resetPreview();
+                      },
+                    }),
+                    div(
+                      {
+                        style: "font-size:11px;color:#999;margin-top:4px;",
+                      },
+                      "Enter memo IDs separated by commas. Find IDs on the Memos tab (#number).",
+                    ),
                   )
                 : "",
           ),
-          done
-            ? button(
+          // Context preview section
+          div(
+            { class: "modal-section" },
+            div({ class: "modal-section-title" }, "Context Preview"),
+            PreviewPanel(),
+          ),
+        ),
+        // ── Generation phase: output fills body ──
+        () =>
+          hasStarted
+            ? (() => {
+                if (!streamContent.val && !generating.val) return "";
+                const done = streamDone.val;
+                const active = generating.val;
+                return div(
+                  {
+                    class: "hide-scrollbar",
+                    style:
+                      "background:#f8f9fb;border-radius:6px;" +
+                      "border:1px solid #e5e5e5;padding:14px;" +
+                      "min-height:200px;display:flex;flex-direction:column;",
+                  },
+                  div(
+                    {
+                      style: "font-size:13px;color:#888;margin-bottom:8px;",
+                    },
+                    done ? "Generated content:" : "Generating...",
+                  ),
+                  div(
+                    {
+                      style:
+                        "font-size:14px;line-height:22px;" +
+                        "white-space:pre-wrap;word-break:break-word;" +
+                        "color:#333;flex:1;",
+                    },
+                    streamContent,
+                    () =>
+                      active
+                        ? span(
+                            {
+                              style:
+                                "animation:blink 0.8s infinite;color:#3b82f6;",
+                            },
+                            "\u258B",
+                          )
+                        : "",
+                  ),
+                );
+              })()
+            : "",
+      ),
+
+      // ═══ FOOTER ═══
+      div(
+        { class: "modal-footer" },
+        () =>
+          generateError.val
+            ? div(
                 {
-                  class: "btn btn-outline btn-sm",
-                  style: "margin-top:10px;",
-                  onclick: closeGenerateModal,
+                  class: "form-error",
+                  style: "margin-bottom:8px;",
                 },
-                "Close",
+                generateError.val,
               )
             : "",
-        );
-      },
+        () =>
+          hasStarted
+            ? div(
+                { class: "modal-actions", style: "margin-top:0;" },
+                button(
+                  {
+                    class: () =>
+                      "btn btn-sm " +
+                      (streamDone.val ? "btn-primary" : "btn-outline"),
+                    onclick: closeGenerateModal,
+                  },
+                  () => (streamDone.val ? "Close" : "Cancel"),
+                ),
+              )
+            : div(
+                { class: "modal-actions", style: "margin-top:0;" },
+                button(
+                  {
+                    class: "btn btn-outline btn-sm",
+                    onclick: closeGenerateModal,
+                  },
+                  "Cancel",
+                ),
+                button(
+                  {
+                    class: "btn btn-primary btn-sm",
+                    disabled: () => generating.val || streamDone.val,
+                    onclick: handleGenerate,
+                  },
+                  "Generate",
+                ),
+              ),
+      ),
     ),
   );
 }

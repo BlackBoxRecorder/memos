@@ -14,7 +14,6 @@ import {
 } from "../db";
 import {
   generateEmbedding,
-  generateCreativeContent,
   generateCreativeContentStream,
 } from "../ai/service";
 import { getSemanticResults } from "../ai/embeddings";
