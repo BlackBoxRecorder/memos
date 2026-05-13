@@ -96,6 +96,14 @@ app.get("/admin/index.html", (c) => serveHtml("/admin/index.html"));
 app.get("/index.ts", (c) => serveJs("/masonry/index.ts"));
 app.get("/index.js", (c) => serveJs("/masonry/index.ts"));
 
+// /favicon.svg
+app.get("/favicon.svg", (c) => {
+  const file = Bun.file(`${STATIC_BASE}/favicon.svg`);
+  return new Response(file, {
+    headers: { "Content-Type": "image/svg+xml" },
+  });
+});
+
 // / → masonry 首页
 app.get("/", (c) => serveHtml("/masonry/index.html"));
 app.get("/index.html", (c) => serveHtml("/masonry/index.html"));
