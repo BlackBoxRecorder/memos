@@ -471,8 +471,6 @@ function toggleYear(year: number): void {
   collapsedYears.val = current;
 }
 
-// ====== Helpers ======
-
 // ====== Components ======
 
 function ModelSelector() {

@@ -5,7 +5,7 @@ import {
   recordRateLimit,
   getClientIP,
   formatRateLimitError,
-} from "../config/rate-limit";
+} from "../helper/rate-limit";
 import {
   getMemos,
   getMemo,

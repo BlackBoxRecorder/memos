@@ -1,0 +1,16 @@
+{
+  "ai": {
+    "requestTimeoutMs": 120000,
+    "defaultMaxTokens": 2048,
+    "defaultTemperature": 0.7
+  },
+  "embeddings": {
+    "similarityThreshold": 0.5
+  },
+  "rateLimit": {
+    "memosPerHour": 50,
+    "memosPerDay": 200,
+    "aiPerHour": 30,
+    "aiPerDay": 100
+  }
+}

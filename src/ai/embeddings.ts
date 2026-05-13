@@ -8,8 +8,7 @@ import {
   getMemos,
 } from "../db";
 import { generateEmbedding, isAiAvailable } from "./service";
-
-const SIMILARITY_THRESHOLD = 0.5;
+import { getAppConfig } from "../config/app-config";
 
 // In-memory cache: memo_id → Float32Array
 const cache = new Map<number, Float32Array>();
@@ -106,7 +105,7 @@ export async function getSemanticResults(
 
   for (const [id, emb] of cache) {
     const score = cosineSimilarity(queryEmbedding, emb);
-    if (score >= SIMILARITY_THRESHOLD) {
+    if (score >= getAppConfig().embeddings.similarityThreshold) {
       scored.push({ id, score });
     }
   }
@@ -123,7 +122,7 @@ export function getSimilarMemoIds(memoId: number, limit = 5): number[] {
   for (const [id, emb] of cache) {
     if (id === memoId) continue;
     const score = cosineSimilarity(targetEmb, emb);
-    if (score >= SIMILARITY_THRESHOLD) {
+    if (score >= getAppConfig().embeddings.similarityThreshold) {
       scored.push({ id, score });
     }
   }

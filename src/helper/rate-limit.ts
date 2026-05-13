@@ -1,10 +1,9 @@
 // 速率限制 — IP 级别两层窗口（小时 + 天），支持 memo 和 AI 两类
-// 环境变量配置：
-//   RATE_LIMIT_MEMOS_PER_HOUR (默认 50)
-//   RATE_LIMIT_MEMOS_PER_DAY  (默认 200)
-//   RATE_LIMIT_AI_PER_HOUR    (默认 30)
-//   RATE_LIMIT_AI_PER_DAY     (默认 100)
+// 配置优先级：环境变量 > app.config.json > 硬编码默认值
+// 环境变量：RATE_LIMIT_MEMOS_PER_HOUR, RATE_LIMIT_MEMOS_PER_DAY, RATE_LIMIT_AI_PER_HOUR, RATE_LIMIT_AI_PER_DAY
+// 配置文件：app.config.json → rateLimit 节点
 import type { Context } from "hono";
+import { getAppConfig } from "../config/app-config";
 
 type RateLimitCategory = "memo" | "ai";
 
@@ -25,10 +24,19 @@ export interface RateLimitError {
 
 const rateLimitMap = new Map<string, RateLimitEntry>();
 
-const MEMOS_PER_HOUR = parseInt(process.env.RATE_LIMIT_MEMOS_PER_HOUR || "50");
-const MEMOS_PER_DAY = parseInt(process.env.RATE_LIMIT_MEMOS_PER_DAY || "200");
-const AI_PER_HOUR = parseInt(process.env.RATE_LIMIT_AI_PER_HOUR || "30");
-const AI_PER_DAY = parseInt(process.env.RATE_LIMIT_AI_PER_DAY || "100");
+const _rc = getAppConfig().rateLimit;
+const MEMOS_PER_HOUR = parseInt(
+  process.env.RATE_LIMIT_MEMOS_PER_HOUR || String(_rc.memosPerHour),
+);
+const MEMOS_PER_DAY = parseInt(
+  process.env.RATE_LIMIT_MEMOS_PER_DAY || String(_rc.memosPerDay),
+);
+const AI_PER_HOUR = parseInt(
+  process.env.RATE_LIMIT_AI_PER_HOUR || String(_rc.aiPerHour),
+);
+const AI_PER_DAY = parseInt(
+  process.env.RATE_LIMIT_AI_PER_DAY || String(_rc.aiPerDay),
+);
 
 function getLimitKey(ip: string, category: RateLimitCategory): string {
   return `${ip}:${category}`;

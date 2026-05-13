@@ -12,7 +12,7 @@ import {
   recordRateLimit,
   getClientIP,
   formatRateLimitError,
-} from "../config/rate-limit";
+} from "../helper/rate-limit";
 
 export const aiApp = new Hono();
 

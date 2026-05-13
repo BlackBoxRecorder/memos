@@ -7,8 +7,11 @@ import {
   getSuggestTagsPrompt,
   getCreativePrompt,
 } from "./prompts";
+import { getAppConfig } from "../config/app-config";
 
-const AI_REQUEST_TIMEOUT_MS = 120_000; // 60s timeout for AI API requests
+function aiTimeout(): number {
+  return getAppConfig().ai.requestTimeoutMs;
+}
 const CONFIG_PATH = join(import.meta.dir, "../../ai.config.json");
 
 // --- Config types & loading ---
@@ -144,10 +147,10 @@ async function chatCompletion(
       body: JSON.stringify({
         model,
         messages,
-        temperature: opts?.temperature ?? 0.7,
-        max_tokens: opts?.max_tokens ?? 2048,
+        temperature: opts?.temperature ?? getAppConfig().ai.defaultTemperature,
+        max_tokens: opts?.max_tokens ?? getAppConfig().ai.defaultMaxTokens,
       }),
-      signal: AbortSignal.timeout(AI_REQUEST_TIMEOUT_MS),
+      signal: AbortSignal.timeout(aiTimeout()),
     });
 
     if (!res.ok) {
@@ -189,11 +192,11 @@ async function* chatCompletionStream(
     body: JSON.stringify({
       model,
       messages,
-      temperature: opts?.temperature ?? 0.7,
-      max_tokens: opts?.max_tokens ?? 2048,
+      temperature: opts?.temperature ?? getAppConfig().ai.defaultTemperature,
+      max_tokens: opts?.max_tokens ?? getAppConfig().ai.defaultMaxTokens,
       stream: true,
     }),
-    signal: AbortSignal.timeout(AI_REQUEST_TIMEOUT_MS),
+    signal: AbortSignal.timeout(aiTimeout()),
   });
 
   if (!res.ok) {
@@ -325,7 +328,7 @@ export async function generateEmbedding(
         input: text,
         dimensions: 1024,
       }),
-      signal: AbortSignal.timeout(AI_REQUEST_TIMEOUT_MS),
+      signal: AbortSignal.timeout(aiTimeout()),
     });
 
     if (!res.ok) {
