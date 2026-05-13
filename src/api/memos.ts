@@ -74,13 +74,13 @@ memosApp.get("/count", (c) => {
 });
 
 // GET /api/memos/:id/similar — semantic similarity search by memo ID
-memosApp.get("/:id/similar", (c) => {
+memosApp.get("/:id/similar", async (c) => {
   const id = Number(c.req.param("id"));
   if (isNaN(id) || id <= 0) {
     return c.json({ error: "Invalid memo ID" }, 400);
   }
 
-  const similarIds = getSimilarMemoIds(id);
+  const similarIds = await getSimilarMemoIds(id);
   if (similarIds.length === 0) {
     return c.json({ memos: [] });
   }

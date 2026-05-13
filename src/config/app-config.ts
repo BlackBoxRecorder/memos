@@ -15,6 +15,11 @@ export interface AppConfig {
   embeddings: {
     similarityThreshold: number;
   };
+  rerank: {
+    enabled: boolean;
+    candidateTopN: number;
+    finalTopN: number;
+  };
   rateLimit: {
     memosPerHour: number;
     memosPerDay: number;
@@ -33,6 +38,11 @@ const FALLBACK: AppConfig = {
   },
   embeddings: {
     similarityThreshold: 0.5,
+  },
+  rerank: {
+    enabled: true,
+    candidateTopN: 30,
+    finalTopN: 10,
   },
   rateLimit: {
     memosPerHour: 50,
@@ -63,6 +73,12 @@ function loadConfig(): AppConfig {
           similarityThreshold:
             parsed.embeddings?.similarityThreshold ??
             FALLBACK.embeddings.similarityThreshold,
+        },
+        rerank: {
+          enabled: parsed.rerank?.enabled ?? FALLBACK.rerank.enabled,
+          candidateTopN:
+            parsed.rerank?.candidateTopN ?? FALLBACK.rerank.candidateTopN,
+          finalTopN: parsed.rerank?.finalTopN ?? FALLBACK.rerank.finalTopN,
         },
         rateLimit: {
           memosPerHour:

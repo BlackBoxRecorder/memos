@@ -7,7 +7,7 @@ import {
   deleteEmbedding,
   getMemos,
 } from "../db";
-import { generateEmbedding, isAiAvailable } from "./service";
+import { generateEmbedding, isAiAvailable, rerankDocuments } from "./service";
 import { getAppConfig } from "../config/app-config";
 
 // In-memory cache: memo_id → Float32Array
@@ -101,34 +101,117 @@ export async function getSemanticResults(
   const queryEmbedding = await generateEmbedding(query);
   if (!queryEmbedding) return [];
 
+  const config = getAppConfig();
   const scored: Array<{ id: number; score: number }> = [];
 
   for (const [id, emb] of cache) {
     const score = cosineSimilarity(queryEmbedding, emb);
-    if (score >= getAppConfig().embeddings.similarityThreshold) {
+    if (score >= config.embeddings.similarityThreshold) {
       scored.push({ id, score });
     }
   }
 
   scored.sort((a, b) => b.score - a.score);
-  return scored.slice(0, limit).map((s) => s.id);
+
+  // Step 1: Embedding-based recall (get more candidates for reranking)
+  const candidateTopN = config.rerank.enabled
+    ? Math.max(config.rerank.candidateTopN, limit)
+    : limit;
+  const candidates = scored.slice(0, candidateTopN);
+
+  // Step 2: Rerank with qwen3-rerank if enabled and multiple candidates
+  if (config.rerank.enabled && candidates.length > 1) {
+    try {
+      const candidateIds = candidates.map((c) => c.id);
+      const memos = getMemos({ includePrivate: true, ids: candidateIds });
+      const docMap = new Map(memos.map((m) => [m.id, m.content]));
+
+      // Preserve embedding order for consistent doc indexing
+      const documents = candidateIds
+        .map((id) => ({ id, text: docMap.get(id) || "" }))
+        .filter((d) => d.text.length > 0);
+
+      if (documents.length > 1) {
+        const reranked = await rerankDocuments(
+          query,
+          documents,
+          config.rerank.finalTopN,
+        );
+        if (reranked.length > 0) {
+          console.log(
+            `Rerank: ${candidates.length} candidates → ${reranked.length} results`,
+          );
+          return reranked.map((r) => r.id);
+        }
+      }
+    } catch (err) {
+      console.warn("Rerank failed, falling back to embedding ordering:", err);
+    }
+  }
+
+  // Fallback: use original embedding-based ordering
+  return candidates.slice(0, limit).map((s) => s.id);
 }
 
-export function getSimilarMemoIds(memoId: number, limit = 5): number[] {
+export async function getSimilarMemoIds(
+  memoId: number,
+  limit = 5,
+): Promise<number[]> {
   const targetEmb = cache.get(memoId);
   if (!targetEmb) return [];
 
+  const config = getAppConfig();
   const scored: Array<{ id: number; score: number }> = [];
   for (const [id, emb] of cache) {
     if (id === memoId) continue;
     const score = cosineSimilarity(targetEmb, emb);
-    if (score >= getAppConfig().embeddings.similarityThreshold) {
+    if (score >= config.embeddings.similarityThreshold) {
       scored.push({ id, score });
     }
   }
 
   scored.sort((a, b) => b.score - a.score);
-  return scored.slice(0, limit).map((s) => s.id);
+
+  // Step 1: Embedding-based recall (get more candidates for reranking)
+  const candidateTopN = config.rerank.enabled
+    ? Math.max(config.rerank.candidateTopN, limit)
+    : limit;
+  const candidates = scored.slice(0, candidateTopN);
+
+  // Step 2: Rerank with qwen3-rerank if enabled and multiple candidates
+  if (config.rerank.enabled && candidates.length > 1) {
+    try {
+      // Get source memo content as the rerank query
+      const sourceIds = [memoId, ...candidates.map((c) => c.id)];
+      const memos = getMemos({ includePrivate: true, ids: sourceIds });
+      const docMap = new Map(memos.map((m) => [m.id, m.content]));
+
+      const sourceContent = docMap.get(memoId) || "";
+      const candidateIds = candidates.map((c) => c.id);
+      const documents = candidateIds
+        .map((id) => ({ id, text: docMap.get(id) || "" }))
+        .filter((d) => d.text.length > 0);
+
+      if (sourceContent && documents.length > 1) {
+        const reranked = await rerankDocuments(
+          sourceContent,
+          documents,
+          config.rerank.finalTopN,
+        );
+        if (reranked.length > 0) {
+          console.log(
+            `Rerank (similar): ${candidates.length} candidates → ${reranked.length} results`,
+          );
+          return reranked.map((r) => r.id);
+        }
+      }
+    } catch (err) {
+      console.warn("Rerank failed, falling back to embedding ordering:", err);
+    }
+  }
+
+  // Fallback: use original embedding-based ordering
+  return candidates.slice(0, limit).map((s) => s.id);
 }
 
 export async function generateAndStoreEmbedding(

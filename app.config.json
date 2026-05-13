@@ -7,6 +7,11 @@
   "embeddings": {
     "similarityThreshold": 0.5
   },
+  "rerank": {
+    "enabled": true,
+    "candidateTopN": 30,
+    "finalTopN": 10
+  },
   "rateLimit": {
     "memosPerHour": 50,
     "memosPerDay": 200,

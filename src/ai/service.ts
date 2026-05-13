@@ -346,6 +346,69 @@ export async function generateEmbedding(
   }
 }
 
+// --- Rerank (DashScope qwen3-rerank) ---
+
+export async function rerankDocuments(
+  query: string,
+  documents: Array<{ id: number; text: string }>,
+  topN?: number,
+): Promise<Array<{ id: number; score: number }>> {
+  const baseUrl = dashscopeBaseUrl();
+  if (!baseUrl || documents.length === 0) return [];
+
+  const finalTopN = topN ?? getAppConfig().rerank.finalTopN;
+
+  try {
+    const docTexts = documents.map((d) => d.text);
+    const res = await fetch(
+      `${baseUrl}/api/v1/services/rerank/text-rerank/text-rerank`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env["DASHSCOPE_API_KEY"]}`,
+        },
+        body: JSON.stringify({
+          model: "qwen3-rerank",
+          input: {
+            query,
+            documents: docTexts,
+          },
+          parameters: {
+            return_documents: false,
+            top_n: finalTopN,
+          },
+        }),
+        signal: AbortSignal.timeout(aiTimeout()),
+      },
+    );
+
+    if (!res.ok) {
+      console.warn(`Rerank API error: ${res.status} ${res.statusText}`);
+      return [];
+    }
+
+    const data: any = await res.json();
+    const results: Array<{ index: number; relevance_score: number }> =
+      data?.output?.results;
+
+    if (!results || !Array.isArray(results) || results.length === 0) {
+      return [];
+    }
+
+    return results
+      .map((r) => ({
+        id: documents[r.index]?.id ?? -1,
+        score: r.relevance_score,
+      }))
+      .filter((r) => r.id >= 0)
+      .sort((a, b) => b.score - a.score);
+  } catch (err) {
+    console.warn("Rerank API call failed:", err);
+    return [];
+  }
+}
+
 // --- Creative Content Generation (Streaming) ---
 
 export async function* generateCreativeContentStream(
