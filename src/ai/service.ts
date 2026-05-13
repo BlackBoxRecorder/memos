@@ -304,32 +304,26 @@ export async function suggestTags(
 
 // --- DashScope Embeddings (unchanged) ---
 
-function dashscopeBaseUrl(): string | null {
-  const key = process.env["DASHSCOPE_API_KEY"];
-  if (!key) return null;
-  return "https://dashscope.aliyuncs.com/compatible-mode/v1";
-}
-
 export async function generateEmbedding(
   text: string,
 ): Promise<Float32Array | null> {
-  const baseUrl = dashscopeBaseUrl();
-  if (!baseUrl) return null;
-
   try {
-    const res = await fetch(`${baseUrl}/embeddings`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env["DASHSCOPE_API_KEY"]}`,
+    const res = await fetch(
+      `https://dashscope.aliyuncs.com/compatible-mode/v1/embeddings`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env["DASHSCOPE_API_KEY"]}`,
+        },
+        body: JSON.stringify({
+          model: "text-embedding-v3",
+          input: text,
+          dimensions: 1024,
+        }),
+        signal: AbortSignal.timeout(aiTimeout()),
       },
-      body: JSON.stringify({
-        model: "text-embedding-v3",
-        input: text,
-        dimensions: 1024,
-      }),
-      signal: AbortSignal.timeout(aiTimeout()),
-    });
+    );
 
     if (!res.ok) {
       console.error(`DashScope API error: ${res.status} ${res.statusText}`);
@@ -353,15 +347,12 @@ export async function rerankDocuments(
   documents: Array<{ id: number; text: string }>,
   topN?: number,
 ): Promise<Array<{ id: number; score: number }>> {
-  const baseUrl = dashscopeBaseUrl();
-  if (!baseUrl || documents.length === 0) return [];
-
   const finalTopN = topN ?? getAppConfig().rerank.finalTopN;
 
   try {
     const docTexts = documents.map((d) => d.text);
     const res = await fetch(
-      `${baseUrl}/api/v1/services/rerank/text-rerank/text-rerank`,
+      `https://dashscope.aliyuncs.com/compatible-api/v1/reranks`,
       {
         method: "POST",
         headers: {
@@ -370,16 +361,16 @@ export async function rerankDocuments(
         },
         body: JSON.stringify({
           model: "qwen3-rerank",
-          input: {
-            query,
-            documents: docTexts,
-          },
+
+          query,
+          documents: docTexts,
+
           parameters: {
             return_documents: false,
             top_n: finalTopN,
           },
         }),
-        signal: AbortSignal.timeout(aiTimeout()),
+        signal: AbortSignal.timeout(2000),
       },
     );
 

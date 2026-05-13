@@ -75,17 +75,17 @@ export function deleteEmbeddingCache(memoId: number): void {
 }
 
 function cosineSimilarity(a: Float32Array, b: Float32Array): number {
-  let dotProduct = 0;
-  let normA = 0;
-  let normB = 0;
+  let dotProduct = 0; // 向量点积
+  let normA = 0; // 向量 a 的模的平方
+  let normB = 0; // 向量 b 的模的平方
   const len = a.length;
 
   for (let i = 0; i < len; i++) {
-    const va = a[i]!;
-    const vb = b[i]!;
-    dotProduct += va * vb;
-    normA += va * va;
-    normB += vb * vb;
+    const va = a[i]!; // 向量 a 的第 i 维
+    const vb = b[i]!; // 向量 b 的第 i 维
+    dotProduct += va * vb; // 累加点积：Σ(ai × bi)
+    normA += va * va; // 累加 a 模的平方：Σ(ai²)
+    normB += vb * vb; // 累加 b 模的平方：Σ(bi²)
   }
 
   if (normA === 0 || normB === 0) return 0;
