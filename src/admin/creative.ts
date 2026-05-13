@@ -130,11 +130,11 @@ function closePromptForm(): void {
 /** Validate and save the prompt form (create or edit), then refresh the prompts list. */
 async function savePromptForm(): Promise<void> {
   if (!promptFormTitle.val.trim()) {
-    promptFormError.val = "Title is required";
+    promptFormError.val = "标题不能为空";
     return;
   }
   if (!promptFormContent.val.trim()) {
-    promptFormError.val = "Content is required";
+    promptFormError.val = "内容不能为空";
     return;
   }
   promptFormSaving.val = true;
@@ -185,13 +185,13 @@ async function selectPrompt(id: number): Promise<void> {
 /** Fetch context preview from server showing which memos will be used for generation. Supports both auto-search and manual memo ID modes. */
 async function loadPreviewContext(): Promise<void> {
   if (selectedPromptId.val === null) {
-    previewError.val = "Please select a prompt first";
+    previewError.val = "请先选择提示词";
     previewFetched.val = false;
     previewMemos.val = [];
     return;
   }
   if (!extraPromptInput.val.trim()) {
-    previewError.val = "Please enter additional instructions first";
+    previewError.val = "请先输入附加指令";
     previewFetched.val = false;
     previewMemos.val = [];
     return;
@@ -205,8 +205,7 @@ async function loadPreviewContext(): Promise<void> {
   if (generationMode.val === "manual") {
     const ids = parseManualIds();
     if (ids.length === 0) {
-      previewError.val =
-        "Invalid memo IDs. Please enter valid numeric IDs separated by commas.";
+      previewError.val = "无效的 Memo ID。请输入有效的数字 ID，用逗号分隔。";
       previewFetched.val = false;
       previewMemos.val = [];
       return;
@@ -235,15 +234,15 @@ async function loadPreviewContext(): Promise<void> {
 /** Main creative generation entry: validates inputs, builds request body, starts SSE stream and renders output in real-time. */
 async function handleGenerate(): Promise<void> {
   if (!extraPromptInput.val.trim()) {
-    generateError.val = "Please enter additional instructions";
+    generateError.val = "请输入附加指令";
     return;
   }
   if (selectedPromptId.val === null) {
-    generateError.val = "Please select a prompt first";
+    generateError.val = "请先选择提示词";
     return;
   }
   if (generationMode.val === "manual" && !manualMemoIds.val.trim()) {
-    generateError.val = "Please enter memo IDs (comma-separated)";
+    generateError.val = "请输入 Memo ID（用逗号分隔）";
     return;
   }
 
@@ -260,8 +259,7 @@ async function handleGenerate(): Promise<void> {
   if (generationMode.val === "manual") {
     const ids = parseManualIds();
     if (ids.length === 0) {
-      generateError.val =
-        "Invalid memo IDs. Please enter valid numeric IDs separated by commas.";
+      generateError.val = "无效的 Memo ID。请输入有效的数字 ID，用逗号分隔。";
       return;
     }
     body.memo_ids = ids;
@@ -288,8 +286,8 @@ async function handleGenerate(): Promise<void> {
     if (!resp.ok) {
       const err = await resp
         .json()
-        .catch(() => ({ error: `Request failed (${resp.status})` }));
-      throw new Error(err.error || "Request failed");
+        .catch(() => ({ error: `请求失败（${resp.status}）` }));
+      throw new Error(err.error || "请求失败");
     }
 
     const reader = resp.body!.getReader();
@@ -393,14 +391,14 @@ function PromptForm() {
 
         input({
           type: "text",
-          placeholder: "Prompt title",
+          placeholder: "提示词标题",
           value: promptFormTitle,
           disabled: () => promptFormSaving.val,
           oninput: (e: Event) =>
             (promptFormTitle.val = (e.target as HTMLInputElement).value),
         }),
         textarea({
-          placeholder: "Prompt content (instructions for AI)",
+          placeholder: "提示词内容（AI 指令）",
           style: "margin-top:10px;",
           value: promptFormContent,
           disabled: () => promptFormSaving.val,
@@ -412,7 +410,7 @@ function PromptForm() {
           div({ style: "flex:1" }),
           button(
             { class: "btn btn-outline btn-sm", onclick: closePromptForm },
-            "Cancel",
+            "取消",
           ),
           button(
             {
@@ -420,7 +418,7 @@ function PromptForm() {
               disabled: () => promptFormSaving.val,
               onclick: savePromptForm,
             },
-            () => (promptFormSaving.val ? "Saving..." : "Save"),
+            () => (promptFormSaving.val ? "保存中..." : "保存"),
           ),
         ),
         () =>
@@ -450,7 +448,7 @@ function TagCloud() {
           button(
             {
               class: "tag-action-btn",
-              title: "Edit",
+              title: "编辑",
               onclick: (e: Event) => {
                 e.stopPropagation();
                 openPromptEdit(prompt);
@@ -461,10 +459,10 @@ function TagCloud() {
           button(
             {
               class: "tag-action-btn",
-              title: "Delete",
+              title: "删除",
               onclick: (e: Event) => {
                 e.stopPropagation();
-                if (confirm(`Delete prompt "${prompt.title}"?`)) {
+                if (confirm(`确定要删除提示词「${prompt.title}」吗？`)) {
                   deletePrompt(prompt.id);
                 }
               },
@@ -488,7 +486,7 @@ function PreviewPanel() {
         onclick: () => (previewOpen.val = !previewOpen.val),
       },
       () => (previewOpen.val ? "\u25BC" : "\u25B6"),
-      "Context Preview",
+      "Memos 预览",
       () => {
         const hasData = previewFetched.val && !previewError.val;
         const memoCount = previewMemos.val.length;
@@ -498,9 +496,7 @@ function PreviewPanel() {
                 class:
                   "context-preview-count" + (memoCount === 0 ? " empty" : ""),
               },
-              memoCount === 0
-                ? "No results"
-                : memoCount + " memo" + (memoCount !== 1 ? "s" : ""),
+              memoCount === 0 ? "无结果" : memoCount + " 条 Memos",
             )
           : "";
       },
@@ -518,10 +514,10 @@ function PreviewPanel() {
           },
           () =>
             previewLoading.val
-              ? "Loading..."
+              ? "加载中..."
               : previewFetched.val
-                ? "Refresh"
-                : "Preview",
+                ? "刷新"
+                : "预览",
         ),
       ),
     ),
@@ -543,19 +539,19 @@ function renderPreviewBody() {
   if (previewLoading.val && !previewFetched.val) {
     return div(
       { style: "margin-top:8px;font-size:12px;color:#888;" },
-      "Loading context...",
+      "正在加载上下文...",
     );
   }
   if (!previewFetched.val) {
     return div(
       { style: "margin-top:8px;font-size:12px;color:#888;" },
-      'Click "Preview" to see which memos will be used as context.',
+      "点击「预览」查看将用作上下文的 Memos。",
     );
   }
   if (previewMemos.val.length === 0) {
     return div(
       { style: "margin-top:8px;font-size:12px;color:#888;" },
-      "No related memos found.",
+      "未找到相关 Memos。",
     );
   }
   return div(
@@ -650,7 +646,7 @@ function GenerateModal() {
                 selectedPrompt ? selectedPrompt.title + " \u00B7 " : "",
                 truncate(extraPromptInput.val, 60),
                 generationMode.val === "manual" && manualMemoIds.val
-                  ? " \u00B7 IDs: " + manualMemoIds.val
+                  ? " · ID：" + manualMemoIds.val
                   : "",
               )
             : "",
@@ -670,7 +666,7 @@ function GenerateModal() {
               selectedPrompt
                 ? div(
                     { class: "selected-prompt-label" },
-                    "Selected prompt: ",
+                    "已选提示词：",
                     span(
                       { style: "font-weight:500;color:#333" },
                       selectedPrompt.title,
@@ -678,7 +674,7 @@ function GenerateModal() {
                   )
                 : "",
             textarea({
-              placeholder: "Additional instructions for AI generation...",
+              placeholder: "AI 生成的附加指令...",
               value: extraPromptInput,
               disabled: () => generating.val,
               oninput: (e: Event) => {
@@ -729,7 +725,7 @@ function GenerateModal() {
                 {
                   style: "font-size:13px;color:#666;margin-right:8px;",
                 },
-                "Context:",
+                "上下文：",
               ),
               button(
                 {
@@ -742,7 +738,7 @@ function GenerateModal() {
                     resetPreview();
                   },
                 },
-                "Auto Search",
+                "自动匹配",
               ),
               button(
                 {
@@ -755,7 +751,7 @@ function GenerateModal() {
                     resetPreview();
                   },
                 },
-                "Manual Select",
+                "手动选择",
               ),
             ),
             // Manual memo ID input
@@ -765,7 +761,7 @@ function GenerateModal() {
                     { style: "margin-top:8px;" },
                     input({
                       type: "text",
-                      placeholder: "Memo IDs (e.g. 1,3,5)",
+                      placeholder: "Memo ID（例如 1,3,5）",
                       value: manualMemoIds,
                       disabled: () => generating.val,
                       oninput: (e: Event) => {
@@ -813,7 +809,7 @@ function GenerateModal() {
                       {
                         style: "font-size:11px;color:#999;margin-top:4px;",
                       },
-                      "Enter memo IDs separated by commas. Find IDs on the Memos tab (#number).",
+                      "输入 Memo ID，用逗号分隔。在备忘录标签页查看 ID（#编号）。",
                     ),
                   )
                 : "",
@@ -821,7 +817,7 @@ function GenerateModal() {
           // Context preview section
           div(
             { class: "modal-section" },
-            div({ class: "modal-section-title" }, "Context Preview"),
+            div({ class: "modal-section-title" }, "Memos 预览"),
             PreviewPanel(),
           ),
         ),
@@ -844,7 +840,7 @@ function GenerateModal() {
                     {
                       style: "font-size:13px;color:#888;margin-bottom:8px;",
                     },
-                    done ? "Generated content:" : "Generating...",
+                    done ? "生成的内容：" : "生成中...",
                   ),
                   div(
                     {
@@ -894,7 +890,7 @@ function GenerateModal() {
                       (streamDone.val ? "btn-primary" : "btn-outline"),
                     onclick: closeGenerateModal,
                   },
-                  () => (streamDone.val ? "Close" : "Cancel"),
+                  () => (streamDone.val ? "关闭" : "取消"),
                 ),
               )
             : div(
@@ -904,7 +900,7 @@ function GenerateModal() {
                     class: "btn btn-outline btn-sm",
                     onclick: closeGenerateModal,
                   },
-                  "Cancel",
+                  "取消",
                 ),
                 button(
                   {
@@ -912,7 +908,7 @@ function GenerateModal() {
                     disabled: () => generating.val || streamDone.val,
                     onclick: handleGenerate,
                   },
-                  "Generate",
+                  "生成",
                 ),
               ),
       ),
@@ -955,13 +951,13 @@ function ReadMoreModal() {
       item.extra_prompt
         ? div(
             { style: "margin-top:12px;font-size:12px;color:#999;" },
-            "Extra prompt: ",
+            "附加指令：",
             item.extra_prompt,
           )
         : "",
       div(
         { style: "margin-top:4px;font-size:12px;color:#999;" },
-        "Generated: ",
+        "创建于：",
         formatDate(item.created_at),
       ),
     ),
@@ -987,7 +983,7 @@ function CreativeCard(item: CreativeItem) {
               class: "read-more-btn",
               onclick: () => (readMoreItem.val = item),
             },
-            " Read more",
+            " 更多",
           )
         : "",
     ),
@@ -995,7 +991,7 @@ function CreativeCard(item: CreativeItem) {
       { class: "creative-meta" },
       prompt ? span({ class: "badge badge-tag" }, prompt.title) : "",
       item.extra_prompt
-        ? span({ class: "badge" }, "Extra: " + truncate(item.extra_prompt, 40))
+        ? span({ class: "badge" }, "附加：" + truncate(item.extra_prompt, 40))
         : "",
       span(formatDate(item.created_at)),
       span(
@@ -1003,7 +999,7 @@ function CreativeCard(item: CreativeItem) {
         button(
           {
             class: "creative-icon-btn delete",
-            title: "Delete",
+            title: "删除",
             onclick: () => (creativeDeleteId.val = item.id),
           },
           svgTrash(),
@@ -1014,21 +1010,21 @@ function CreativeCard(item: CreativeItem) {
       creativeDeleteId.val === item.id
         ? div(
             { class: "delete-confirm" },
-            span("Delete this creative item?"),
+            span("确定要删除这条创意内容吗？"),
             button(
               {
                 class: "btn btn-danger btn-sm",
                 disabled: () => creativeDeleting.val,
                 onclick: () => deleteCreativeItem(item.id),
               },
-              "Yes, delete",
+              "删除",
             ),
             button(
               {
                 class: "btn btn-outline btn-sm",
                 onclick: () => (creativeDeleteId.val = null),
               },
-              "Cancel",
+              "取消",
             ),
           )
         : "",
@@ -1056,11 +1052,9 @@ export function CreativeTab() {
           disabled: () => selectedPromptId.val === null,
           onclick: () => (generateModalOpen.val = true),
           title:
-            selectedPromptId.val === null
-              ? "Select a prompt first"
-              : "Generate creative content",
+            selectedPromptId.val === null ? "请先选择提示词" : "生成创意内容",
         },
-        "Generate",
+        "生成",
       ),
     ),
     // Generate modal
@@ -1070,18 +1064,15 @@ export function CreativeTab() {
     // Creative content list
     () => {
       if (prompts.val.length === 0) {
-        return div(
-          { class: "empty-state" },
-          "No prompts yet. Create a prompt to get started!",
-        );
+        return div({ class: "empty-state" }, "还没有提示词，创建一个开始吧！");
       }
       if (creativeLoading.val) {
-        return div({ class: "status-msg" }, "Loading...");
+        return div({ class: "status-msg" }, "加载中...");
       }
       if (creativeItems.val.length === 0) {
         return div(
           { class: "empty-state" },
-          "No creative content yet. Select a prompt above and click Generate.",
+          "还没有创意内容。请在上方选择提示词并点击生成。",
         );
       }
       return div(creativeItems.val.map(CreativeCard));

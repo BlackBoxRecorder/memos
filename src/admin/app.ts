@@ -41,7 +41,6 @@ const aiAvailable = van.state(false);
 const aiOptimizing = van.state(false);
 const aiSuggestedTags = van.state<string[]>([]);
 const aiSuggestingTags = van.state(false);
-let suggestTimer: ReturnType<typeof setTimeout> | null = null;
 let tagSuggestAbort: AbortController | null = null;
 const readMoreText = van.state<string | null>(null);
 
@@ -148,7 +147,7 @@ async function loadMemos(): Promise<void> {
 
 async function saveForm(): Promise<void> {
   if (!formContent.val.trim()) {
-    formError.val = "Content is required";
+    formError.val = "内容不能为空";
     return;
   }
   formSaving.val = true;
@@ -248,15 +247,13 @@ async function handleOptimize(): Promise<void> {
   const content = formContent.val.trim();
   if (!content || aiOptimizing.val) return;
 
-  if (content.length < 10) {
-    formError.val = "Content too short to optimize (minimum 10 characters)";
+  if (content.length < 20) {
+    formError.val = "内容太短，无法优化（至少需要 20 个字符）";
     return;
   }
-  if (content.length > 2000) {
+  if (content.length > 1000) {
     if (
-      !confirm(
-        "Content is very long (>2000 chars). Optimization may take longer. Continue?",
-      )
+      !confirm("内容很长（超过 1000 个字符）。优化可能需要更长时间。是否继续？")
     ) {
       return;
     }
@@ -314,13 +311,6 @@ async function suggestTagsForContent(): Promise<void> {
   }
 }
 
-function debouncedSuggestTags(): void {
-  if (suggestTimer) clearTimeout(suggestTimer);
-  suggestTimer = setTimeout(() => {
-    suggestTagsForContent();
-  }, 1000);
-}
-
 function openCreateForm(): void {
   formMode.val = { type: "create" };
   formContent.val = "";
@@ -337,8 +327,6 @@ function openEditForm(memo: Memo): void {
   formTag.val = memo.tag;
   formError.val = null;
   aiSuggestedTags.val = [];
-  if (suggestTimer) clearTimeout(suggestTimer);
-  suggestTimer = null;
   document.body.style.overflow = "hidden";
 }
 
@@ -349,8 +337,6 @@ function closeForm(): void {
   formTag.val = "";
   formError.val = null;
   aiSuggestedTags.val = [];
-  if (suggestTimer) clearTimeout(suggestTimer);
-  suggestTimer = null;
   document.body.style.overflow = "";
 }
 
@@ -494,7 +480,7 @@ function ModelSelector() {
       },
       span({ class: "model-select-label" }, () => {
         const prov = aiModels.val.find((p) => p.id === selectedProvider.val);
-        const name = prov ? `${prov.name}/${selectedModel.val}` : "No models";
+        const name = prov ? `${prov.name}/${selectedModel.val}` : "无可用模型";
         return name;
       }),
       span(
@@ -633,7 +619,7 @@ function LoginPage() {
   const keyInput = input({
     type: "password",
     id: "login-key",
-    placeholder: "Secret key",
+    placeholder: "密钥",
     autofocus: true,
     onkeydown: (e: KeyboardEvent) => {
       if (e.key === "Enter") login((keyInput as HTMLInputElement).value);
@@ -644,14 +630,14 @@ function LoginPage() {
     div(
       { class: "login-card" },
       h1("Memos Admin"),
-      div({ class: "sub" }, "Enter your secret key to continue"),
+      div({ class: "sub" }, "请输入密钥以继续"),
       keyInput,
       button(
         {
           id: "login-btn",
           onclick: () => login((keyInput as HTMLInputElement).value),
         },
-        "Sign In",
+        "登录",
       ),
       () => (globalError.val ? div({ class: "error" }, globalError.val) : ""),
     ),
@@ -660,7 +646,7 @@ function LoginPage() {
 
 function FormModal() {
   const isEdit = () => formMode.val.type === "edit";
-  const title = () => (isEdit() ? "Edit Memo" : "New Memo");
+  const title = () => (isEdit() ? "编辑备忘录" : "新建备忘录");
   return div(
     {
       class: "modal-overlay",
@@ -675,14 +661,15 @@ function FormModal() {
       h3(title),
       textarea({
         id: "form-content",
-        placeholder: "What's on your mind?",
+        placeholder: "在想些什么？",
         disabled: () => formSaving.val,
         value: formContent,
         style: "height: 240px; resize: none;",
         oninput: (e: Event) => {
           formContent.val = (e.target as HTMLTextAreaElement).value;
-          // Debounced tag suggestion
-          if (aiAvailable.val) debouncedSuggestTags();
+        },
+        onblur: () => {
+          if (aiAvailable.val) suggestTagsForContent();
         },
       }),
       // Tag input + AI optimize button in same row
@@ -691,12 +678,17 @@ function FormModal() {
         input({
           type: "text",
           id: "form-tag",
-          placeholder: "Tag (optional)",
+          placeholder: "标签（可选）",
           value: formTag,
           style: "height: 28px; resize: none; font-size: 12px;",
           disabled: () => formSaving.val,
           oninput: (e: Event) =>
             (formTag.val = (e.target as HTMLInputElement).value),
+          onfocus: () => {
+            if (aiAvailable.val && formContent.val.trim()) {
+              suggestTagsForContent();
+            }
+          },
         }),
         () =>
           aiAvailable.val
@@ -706,7 +698,7 @@ function FormModal() {
                     "ai-optimize-btn" + (aiOptimizing.val ? " loading" : ""),
                   disabled: () => aiOptimizing.val || formSaving.val,
                   onclick: handleOptimize,
-                  title: "AI optimize content",
+                  title: "AI 优化内容",
                 },
                 aiOptimizing.val ? svgSpinner() : svgSparkle(),
               )
@@ -740,13 +732,10 @@ function FormModal() {
             oninput: (e: Event) =>
               (formIsPublic.val = (e.target as HTMLInputElement).checked),
           }),
-          "Public",
+          "公开",
         ),
         div({ style: "flex:1" }),
-        button(
-          { class: "btn btn-outline btn-sm", onclick: closeForm },
-          "Cancel",
-        ),
+        button({ class: "btn btn-outline btn-sm", onclick: closeForm }, "取消"),
         button(
           {
             class: "btn btn-primary btn-sm",
@@ -754,7 +743,7 @@ function FormModal() {
             onclick: saveForm,
             disabled: () => formSaving.val,
           },
-          () => (formSaving.val ? "Saving..." : "Save"),
+          () => (formSaving.val ? "保存中..." : "保存"),
         ),
       ),
       () => (formError.val ? div({ class: "form-error" }, formError.val) : ""),
@@ -765,28 +754,28 @@ function FormModal() {
 function DeleteConfirm(id: number) {
   return div(
     { class: "delete-confirm" },
-    span("Are you sure you want to delete this memo?"),
+    span("确定要删除这条 Memo 吗？"),
     button(
       {
         class: "btn btn-danger btn-sm",
         disabled: () => deleteDeleting.val,
         onclick: () => deleteMemo(id),
       },
-      "Yes, delete",
+      "删除",
     ),
     button(
       {
         class: "btn btn-outline btn-sm",
         onclick: () => (deleteConfirmId.val = null),
       },
-      "Cancel",
+      "取消",
     ),
   );
 }
 
 function MemoCard(memo: Memo) {
   const badgeClass = memo.is_public ? "badge-public" : "badge-private";
-  const badgeText = memo.is_public ? "Public" : "Private";
+  const badgeText = memo.is_public ? "公开" : "私密";
 
   return div(
     { class: "memo-card", "data-memo-id": String(memo.id) },
@@ -797,7 +786,7 @@ function MemoCard(memo: Memo) {
               class: "read-more-btn",
               onclick: () => openReadMore(memo.content),
             },
-            "Read more",
+            "更多",
           )
         : "",
     ),
@@ -806,16 +795,16 @@ function MemoCard(memo: Memo) {
       span({ class: "memo-id" }, `#${memo.id}`),
       span({ class: `badge ${badgeClass}` }, badgeText),
       memo.tag ? span({ class: "badge badge-tag" }, memo.tag) : "",
-      span(`Created: ${formatDate(memo.created_at)}`),
+      span(`创建于：${formatDate(memo.created_at)}`),
       memo.updated_at !== memo.created_at
-        ? span(`Updated: ${formatDate(memo.updated_at)}`)
+        ? span(`更新于：${formatDate(memo.updated_at)}`)
         : "",
       span(
         { class: "memo-meta-icons" },
         button(
           {
             class: "memo-icon-btn",
-            title: memo.is_public ? "Make Private" : "Make Public",
+            title: memo.is_public ? "设为私密" : "设为公开",
             onclick: () => toggleVisibility(memo),
           },
           memo.is_public ? svgUnlock() : svgLock(),
@@ -823,7 +812,7 @@ function MemoCard(memo: Memo) {
         button(
           {
             class: "memo-icon-btn",
-            title: "Edit",
+            title: "编辑",
             onclick: () => openEditForm(memo),
           },
           svgEdit(),
@@ -831,7 +820,7 @@ function MemoCard(memo: Memo) {
         button(
           {
             class: "memo-icon-btn delete",
-            title: "Delete",
+            title: "删除",
             onclick: () => (deleteConfirmId.val = memo.id),
           },
           svgTrash(),
@@ -915,13 +904,13 @@ function AdminPage() {
                   svgPlus(),
                 ),
           a(
-            { href: "/", class: "btn btn-outline btn-sm", title: "View Site" },
+            { href: "/", class: "btn btn-outline btn-sm", title: "查看网站" },
             svgExternalLink(),
           ),
           button(
             {
               class: "btn btn-outline btn-sm",
-              title: "Logout",
+              title: "退出登录",
               onclick: logout,
             },
             svgLogout(),
@@ -950,7 +939,7 @@ function AdminPage() {
               class: () => "tab" + (activeTab.val === "memos" ? " active" : ""),
               onclick: () => (activeTab.val = "memos"),
             },
-            "Memos",
+            "Memo",
           ),
           button(
             {
@@ -973,7 +962,7 @@ function AdminPage() {
                     style: "margin-left:8px",
                     onclick: () => (globalError.val = null),
                   },
-                  "Dismiss",
+                  "关闭",
                 ),
               )
             : "",
@@ -986,7 +975,7 @@ function AdminPage() {
                 if (memos.val.length === 0 && formMode.val.type === "closed")
                   return div(
                     { class: "empty-state" },
-                    "No memos yet. Create your first memo!",
+                    "还没有 Memos，创建第一条吧！",
                   );
                 return div(memos.val.map(MemoCard));
               })

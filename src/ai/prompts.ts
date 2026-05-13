@@ -20,8 +20,6 @@ const FALLBACKS: Record<string, string> = {
   "suggest-tags": `你是一个标签建议助手。分析内容并推荐最合适的1-3个标签。
 {EXISTING_TAGS}优先复用现有标签（当它们适合时）。只有在没有合适标签时才建议新的简洁标签。
 只返回一个JSON字符串数组，如["标签1", "标签2"]。不要包含解释。`,
-
-  creative: `你是一个个人便签应用的创意助手。根据提供的指令生成经过深思熟虑、结构良好的内容。请使用中文输出。`,
 };
 
 // 记录已打印过警告的文件名，避免重复日志
@@ -72,9 +70,4 @@ export function getOptimizePrompt(): string {
 /** 获取标签建议 system prompt（含 {EXISTING_TAGS} 占位符） */
 export function getSuggestTagsPrompt(): string {
   return getPrompt("suggest-tags");
-}
-
-/** 获取创意生成 system prompt */
-export function getCreativePrompt(): string {
-  return getPrompt("creative");
 }

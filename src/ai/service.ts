@@ -2,11 +2,7 @@
 // All chat APIs use OpenAI-compatible format via standard fetch()
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import {
-  getOptimizePrompt,
-  getSuggestTagsPrompt,
-  getCreativePrompt,
-} from "./prompts";
+import { getOptimizePrompt, getSuggestTagsPrompt } from "./prompts";
 import { getAppConfig } from "../config/app-config";
 
 function aiTimeout(): number {
@@ -424,11 +420,11 @@ export async function* generateCreativeContentStream(
   yield* chatCompletionStream(pid, mdl, [
     {
       role: "system",
-      content: getCreativePrompt(),
+      content: promptContent,
     },
     {
       role: "user",
-      content: `创意任务：${promptContent}\n\n附加说明：${extraPrompt}${contextText}\n\n请根据以上所有内容生成创意输出。`,
+      content: `\n\n附加说明：${extraPrompt}${contextText}\n\n请根据以上所有内容生成创意输出。`,
     },
   ]);
 }
