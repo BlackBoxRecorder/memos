@@ -25,3 +25,9 @@ export interface CreativeItem {
   created_at: string;
   updated_at: string;
 }
+
+export interface MemoEmbedding {
+  memo_id: number;
+  embedding: Buffer | null;
+  updated_at: string;
+}

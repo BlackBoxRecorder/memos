@@ -1,5 +1,6 @@
 import van from "vanjs-core";
 import { prepare, layout, type PreparedText } from "@chenglou/pretext";
+import { svgSearchIcon, svgChevronDown, svgEyeIcon } from "../helper/svgHelper";
 
 // --- config ---
 const font = '15px "Helvetica Neue", Helvetica, Arial, sans-serif';
@@ -258,33 +259,6 @@ function debouncedSearch(): void {
   debounceTimer = setTimeout(() => {
     fetchAndRender(0);
   }, 2000);
-}
-
-// --- SVG helpers ---
-function svgNode(str: string): HTMLElement {
-  const el = document.createElement("span");
-  el.style.display = "inline-flex";
-  el.style.alignItems = "center";
-  el.innerHTML = str;
-  return el;
-}
-
-function svgSearchIcon(): HTMLElement {
-  return svgNode(
-    `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>`,
-  );
-}
-
-function svgChevronDown(): HTMLElement {
-  return svgNode(
-    `<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4.5l3 3 3-3"/></svg>`,
-  );
-}
-
-function svgEyeIcon(): HTMLElement {
-  return svgNode(
-    `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`,
-  );
 }
 
 // --- similar modal helpers ---

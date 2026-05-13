@@ -42,7 +42,7 @@ export function truncate(str: string, max: number): string {
 }
 
 /**
- * 计算文本包含的“字数”
+ * 计算文本包含的"字数"
  * - 汉字：每个汉字算 1 字（匹配基本汉字区和兼容汉字区）
  * - 英文单词：连续的字母序列（允许单词内部出现撇号、连字符，如 don't、high-level）
  * - 不统计标点、特殊符号、数字等
