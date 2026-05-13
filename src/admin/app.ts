@@ -1,7 +1,7 @@
 import van from "vanjs-core";
 import { CreativeTab, openPromptCreate, creativeItems } from "./creative";
 import { selectedProvider, selectedModel } from "./ai-state";
-import { api, formatDate, truncate } from "../util";
+import { api, formatDate, truncate, countWords } from "../util";
 import type { Memo, CreativeItem } from "../model";
 
 type FormMode =
@@ -511,6 +511,24 @@ function svgTrash(): HTMLElement {
   );
 }
 
+function svgPlus(): HTMLElement {
+  return htmlNode(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`,
+  );
+}
+
+function svgExternalLink(): HTMLElement {
+  return htmlNode(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>`,
+  );
+}
+
+function svgLogout(): HTMLElement {
+  return htmlNode(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>`,
+  );
+}
+
 // ====== Helpers ======
 
 // ====== Components ======
@@ -918,27 +936,53 @@ function AdminPage() {
       { class: "admin-topbar" },
       div(
         { class: "admin-topbar-inner" },
-        span({ class: "title" }, "Memos Admin"),
+        div(
+          { class: "topbar-left" },
+          span({ class: "title" }, "Memos Admin"),
+          () => {
+            const total = memos.val.length;
+            const totalWords = memos.val.reduce(
+              (sum, m) => sum + countWords(m.content),
+              0,
+            );
+            return span(
+              { class: "admin-stats" },
+              `${total} memos · ${totalWords.toLocaleString()} words`,
+            );
+          },
+        ),
         div(
           { class: "actions" },
           () => (aiModels.val.length > 0 ? ModelSelector() : ""),
           () =>
             activeTab.val === "memos"
               ? button(
-                  { class: "btn btn-primary btn-sm", onclick: openCreateForm },
-                  "+ New Memo",
+                  {
+                    class: "btn btn-primary btn-sm",
+                    title: "New Memo",
+                    onclick: openCreateForm,
+                  },
+                  svgPlus(),
                 )
               : button(
                   {
                     class: "btn btn-primary btn-sm",
+                    title: "New Prompt",
                     onclick: openPromptCreate,
                   },
-                  "+ New Prompt",
+                  svgPlus(),
                 ),
-          a({ href: "/", class: "btn btn-outline btn-sm" }, "View Site"),
+          a(
+            { href: "/", class: "btn btn-outline btn-sm", title: "View Site" },
+            svgExternalLink(),
+          ),
           button(
-            { class: "btn btn-outline btn-sm", onclick: logout },
-            "Logout",
+            {
+              class: "btn btn-outline btn-sm",
+              title: "Logout",
+              onclick: logout,
+            },
+            svgLogout(),
           ),
         ),
       ),
