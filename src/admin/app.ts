@@ -324,7 +324,7 @@ function debouncedSuggestTags(): void {
 function openCreateForm(): void {
   formMode.val = { type: "create" };
   formContent.val = "";
-  formIsPublic.val = true;
+  formIsPublic.val = false;
   formTag.val = "";
   formError.val = null;
   document.body.style.overflow = "hidden";

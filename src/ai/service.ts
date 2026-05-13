@@ -19,7 +19,7 @@ const CONFIG_PATH = join(import.meta.dir, "../../ai.config.json");
 interface AiProviderConfig {
   id: string;
   name: string;
-  baseUrl: string;
+  endpoint: string;
   apiKeyEnv: string;
   models: string[];
 }
@@ -54,7 +54,9 @@ function loadConfig(): AiConfig {
       {
         id: "deepseek",
         name: "DeepSeek",
-        baseUrl: process.env["DEEPSEEK_BASE_URL"] || "https://api.deepseek.com",
+        endpoint:
+          process.env["DEEPSEEK_BASE_URL"] ||
+          "https://api.deepseek.com/v1/chat/completions",
         apiKeyEnv: "DEEPSEEK_API_KEY",
         models: ["deepseek-v4-flash"],
       },
@@ -76,7 +78,7 @@ function resolveProvider(providerId: string): ResolvedProvider | null {
   if (!provider) return null;
   const apiKey = process.env[provider.apiKeyEnv];
   if (!apiKey) return null;
-  return { baseUrl: provider.baseUrl, apiKey };
+  return { baseUrl: provider.endpoint, apiKey };
 }
 
 function getDefaultProviderId(): string {
@@ -138,7 +140,7 @@ async function chatCompletion(
   }
 
   try {
-    const res = await fetch(`${resolved.baseUrl}/v1/chat/completions`, {
+    const res = await fetch(resolved.baseUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -183,7 +185,7 @@ async function* chatCompletionStream(
     );
   }
 
-  const res = await fetch(`${resolved.baseUrl}/v1/chat/completions`, {
+  const res = await fetch(resolved.baseUrl, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

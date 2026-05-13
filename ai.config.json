@@ -3,28 +3,28 @@
     {
       "id": "deepseek",
       "name": "DeepSeek",
-      "baseUrl": "https://api.deepseek.com",
+      "endpoint": "https://api.deepseek.com/v1/chat/completions",
       "apiKeyEnv": "DEEPSEEK_API_KEY",
       "models": ["deepseek-v4-pro", "deepseek-v4-flash"]
     },
     {
       "id": "kimi",
       "name": "Kimi",
-      "baseUrl": "https://api.moonshot.cn",
+      "endpoint": "https://api.moonshot.cn/v1/chat/completions",
       "apiKeyEnv": "KIMI_API_KEY",
       "models": ["kimi-k2.5", "kimi-k2.6"]
     },
     {
       "id": "glm",
       "name": "GLM",
-      "baseUrl": "https://open.bigmodel.cn/api/paas/v4",
+      "endpoint": "https://open.bigmodel.cn/api/paas/v4/chat/completions",
       "apiKeyEnv": "GLM_API_KEY",
       "models": ["glm-4.7", "glm-4.7-flash", "glm-5"]
     },
     {
       "id": "dashscope",
       "name": "DashScope",
-      "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode",
+      "endpoint": "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
       "apiKeyEnv": "DASHSCOPE_API_KEY",
       "models": [
         "deepseek-v4-pro",
