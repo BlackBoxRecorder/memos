@@ -685,12 +685,22 @@ function FormModal() {
           if (aiAvailable.val) debouncedSuggestTags();
         },
       }),
-      // AI Optimize toolbar (between textarea and tag input)
-      () =>
-        aiAvailable.val
-          ? div(
-              { class: "ai-toolbar" },
-              button(
+      // Tag input + AI optimize button in same row
+      div(
+        { class: "tag-input-row" },
+        input({
+          type: "text",
+          id: "form-tag",
+          placeholder: "Tag (optional)",
+          value: formTag,
+          style: "height: 28px; resize: none; font-size: 12px;",
+          disabled: () => formSaving.val,
+          oninput: (e: Event) =>
+            (formTag.val = (e.target as HTMLInputElement).value),
+        }),
+        () =>
+          aiAvailable.val
+            ? button(
                 {
                   class: () =>
                     "ai-optimize-btn" + (aiOptimizing.val ? " loading" : ""),
@@ -699,18 +709,9 @@ function FormModal() {
                   title: "AI optimize content",
                 },
                 aiOptimizing.val ? svgSpinner() : svgSparkle(),
-              ),
-            )
-          : "",
-      input({
-        type: "text",
-        id: "form-tag",
-        placeholder: "Tag (optional)",
-        value: formTag,
-        disabled: () => formSaving.val,
-        oninput: (e: Event) =>
-          (formTag.val = (e.target as HTMLInputElement).value),
-      }),
+              )
+            : "",
+      ),
       // AI Tag suggestions (below tag input)
       () =>
         aiSuggestedTags.val.length > 0
