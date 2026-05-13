@@ -678,6 +678,7 @@ function FormModal() {
         placeholder: "What's on your mind?",
         disabled: () => formSaving.val,
         value: formContent,
+        style: "height: 240px; resize: none;",
         oninput: (e: Event) => {
           formContent.val = (e.target as HTMLTextAreaElement).value;
           // Debounced tag suggestion

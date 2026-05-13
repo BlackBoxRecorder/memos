@@ -945,10 +945,13 @@ function ReadMoreModal() {
             class: "btn btn-outline btn-sm",
             onclick: () => (readMoreItem.val = null),
           },
-          "Close",
+          "\u2715",
         ),
       ),
-      div({ class: "read-more-content" }, item.content),
+      div(
+        { class: "read-more-content", style: "padding-right:16px;" },
+        item.content,
+      ),
       item.extra_prompt
         ? div(
             { style: "margin-top:12px;font-size:12px;color:#999;" },
