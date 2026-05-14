@@ -46,6 +46,9 @@ const aiSuggestingTags = van.state(false);
 let tagSuggestAbort: AbortController | null = null;
 const readMoreText = van.state<string | null>(null);
 
+// 从 <base> 标签获取站点根路径，支持 MEMOS_BASE_PATH 反向代理场景
+const siteUrl = document.querySelector("base")?.getAttribute("href") || "/";
+
 // Import/export state
 const importExportOpen = van.state(false);
 const importExportTab = van.state<"export" | "import">("export");
@@ -1181,7 +1184,7 @@ function AdminPage() {
           ),
           a(
             {
-              href: "/" + process.env.MEMOS_BASE_PATH,
+              href: siteUrl,
               class: "btn btn-outline btn-sm",
               title: "查看网站",
             },
