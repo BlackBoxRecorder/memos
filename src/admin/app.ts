@@ -108,7 +108,7 @@ function loadModelSelection(): { provider: string; model: string } | null {
 // ====== Actions ======
 async function checkAuth(): Promise<void> {
   try {
-    const data = await api<{ authenticated: boolean }>("/api/auth/check");
+    const data = await api<{ authenticated: boolean }>("api/auth/check");
     authenticated.val = data.authenticated;
     if (data.authenticated) {
       await loadMemos();
@@ -122,7 +122,7 @@ async function checkAuth(): Promise<void> {
 
 async function login(key: string): Promise<void> {
   try {
-    await api("/api/auth/login", {
+    await api("api/auth/login", {
       method: "POST",
       body: JSON.stringify({ key }),
     });
@@ -137,7 +137,7 @@ async function login(key: string): Promise<void> {
 }
 
 async function logout(): Promise<void> {
-  await api("/api/auth/logout", { method: "POST" });
+  await api("api/auth/logout", { method: "POST" });
   authenticated.val = false;
   memos.val = [];
   formMode.val = { type: "closed" };
@@ -147,7 +147,7 @@ async function logout(): Promise<void> {
 async function loadMemos(): Promise<void> {
   loading.val = true;
   try {
-    const data = await api<{ memos: Memo[] }>("/api/memos?all=true");
+    const data = await api<{ memos: Memo[] }>("api/memos?all=true");
     memos.val = data.memos;
     globalError.val = null;
   } catch (err) {
@@ -171,9 +171,9 @@ async function saveForm(): Promise<void> {
       tag: formTag.val.trim(),
     });
     if (formMode.val.type === "create") {
-      await api("/api/memos", { method: "POST", body });
+      await api("api/memos", { method: "POST", body });
     } else if (formMode.val.type === "edit") {
-      await api(`/api/memos/${formMode.val.id}`, { method: "PUT", body });
+      await api(`api/memos/${formMode.val.id}`, { method: "PUT", body });
     }
     closeForm();
     await loadMemos();
@@ -186,7 +186,7 @@ async function saveForm(): Promise<void> {
 
 async function toggleVisibility(memo: Memo): Promise<void> {
   try {
-    await api(`/api/memos/${memo.id}`, {
+    await api(`api/memos/${memo.id}`, {
       method: "PUT",
       body: JSON.stringify({ is_public: !memo.is_public }),
     });
@@ -199,7 +199,7 @@ async function toggleVisibility(memo: Memo): Promise<void> {
 async function deleteMemo(id: number): Promise<void> {
   deleteDeleting.val = true;
   try {
-    await api(`/api/memos/${id}`, { method: "DELETE" });
+    await api(`api/memos/${id}`, { method: "DELETE" });
     deleteConfirmId.val = null;
     await loadMemos();
   } catch (err) {
@@ -213,7 +213,7 @@ async function deleteMemo(id: number): Promise<void> {
 
 async function checkAiStatus(): Promise<void> {
   try {
-    const data = await api<{ optimize: boolean }>("/api/ai/status");
+    const data = await api<{ optimize: boolean }>("api/ai/status");
     aiAvailable.val = data.optimize || false;
   } catch {
     aiAvailable.val = false;
@@ -225,7 +225,7 @@ async function loadAiModels(): Promise<void> {
     const data = await api<{
       providers: Array<{ id: string; name: string; models: string[] }>;
       default: { provider: string; model: string };
-    }>("/api/ai/models");
+    }>("api/ai/models");
     aiModels.val = data.providers;
 
     // Try to restore saved selection
@@ -274,7 +274,7 @@ async function handleOptimize(): Promise<void> {
   aiOptimizing.val = true;
   formError.val = null;
   try {
-    const data = await api<{ content: string }>("/api/ai/optimize", {
+    const data = await api<{ content: string }>("api/ai/optimize", {
       method: "POST",
       body: JSON.stringify({
         content,
@@ -303,7 +303,7 @@ async function suggestTagsForContent(): Promise<void> {
 
   aiSuggestingTags.val = true;
   try {
-    const data = await api<{ tags: string[] }>("/api/ai/suggest-tags", {
+    const data = await api<{ tags: string[] }>("api/ai/suggest-tags", {
       method: "POST",
       body: JSON.stringify({
         content,
@@ -382,7 +382,7 @@ function closeImportExport(): void {
 async function handleExport(): Promise<void> {
   exportLoading.val = true;
   try {
-    const resp = await fetch("/api/export", { credentials: "same-origin" });
+    const resp = await fetch("api/export", { credentials: "same-origin" });
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({ error: "Export failed" }));
       throw new Error(err.error || `Export failed (${resp.status})`);
@@ -411,7 +411,7 @@ async function handleImportFile(file: File): Promise<void> {
   try {
     const formData = new FormData();
     formData.append("file", file);
-    const resp = await fetch("/api/import", {
+    const resp = await fetch("api/import", {
       method: "POST",
       credentials: "same-origin",
       body: formData,
@@ -1180,7 +1180,7 @@ function AdminPage() {
             svgUpload(),
           ),
           a(
-            { href: "/", class: "btn btn-outline btn-sm", title: "查看网站" },
+            { href: "../", class: "btn btn-outline btn-sm", title: "查看网站" },
             svgExternalLink(),
           ),
           button(

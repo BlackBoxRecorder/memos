@@ -9,6 +9,7 @@ import { initEmbeddingCache } from "./ai/embeddings";
 import { initSeedData } from "./init/seed";
 
 const PORT = parseInt(process.env.PORT || "3020");
+const MEMOS_BASE_PATH = process.env.MEMOS_BASE_PATH || "";
 const STATIC_BASE = import.meta.dir;
 
 // 客户端 TS 打包（含 import 解析）+ mtime 缓存
@@ -52,10 +53,18 @@ async function buildClientJs(srcPath: string): Promise<string | null> {
   }
 }
 
-function serveHtml(path: string): Response {
+async function serveHtml(path: string): Promise<Response> {
   try {
     const file = Bun.file(`${STATIC_BASE}${path}`);
-    return new Response(file, {
+    let html = await file.text();
+    if (MEMOS_BASE_PATH) {
+      // 注入 <base> 标签，让所有相对路径 URL 自动基于 MEMOS_BASE_PATH/
+      html = html.replace(
+        /<body>/i,
+        `<base href="${MEMOS_BASE_PATH}/">\n<body>`,
+      );
+    }
+    return new Response(html, {
       headers: { "Content-Type": "text/html; charset=utf-8" },
     });
   } catch {
@@ -73,7 +82,7 @@ async function serveJs(path: string): Promise<Response> {
   });
 }
 
-const app = new Hono();
+const app = new Hono({ strict: false }).basePath(MEMOS_BASE_PATH);
 
 // API 路由 — 子应用挂载
 app.route("/api/auth", authApp);
@@ -88,11 +97,11 @@ app.get("/admin/app.ts", (c) => serveJs("/admin/app.ts"));
 app.get("/admin/app.js", (c) => serveJs("/admin/app.ts"));
 
 // /admin → 重定向到 /admin/
-app.get("/admin", (c) => c.redirect("/admin/"));
+app.get("/admin", (c) => c.redirect(MEMOS_BASE_PATH + "/admin/"));
 
 // /admin/ → admin SPA
-app.get("/admin/", (c) => serveHtml("/admin/index.html"));
-app.get("/admin/index.html", (c) => serveHtml("/admin/index.html"));
+app.get("/admin/", async (c) => serveHtml("/admin/index.html"));
+app.get("/admin/index.html", async (c) => serveHtml("/admin/index.html"));
 
 // /index.ts → 转译 JS
 app.get("/index.ts", (c) => serveJs("/masonry/index.ts"));
@@ -107,11 +116,11 @@ app.get("/favicon.svg", (c) => {
 });
 
 // / → masonry 首页
-app.get("/", (c) => serveHtml("/masonry/index.html"));
-app.get("/index.html", (c) => serveHtml("/masonry/index.html"));
+app.get("/", async (c) => serveHtml("/masonry/index.html"));
+app.get("/index.html", async (c) => serveHtml("/masonry/index.html"));
 
 // admin SPA 深层链接 + 其他 .ts 文件
-app.notFound((c) => {
+app.notFound(async (c) => {
   const path = c.req.path;
   if (path.startsWith("/admin/")) {
     return serveHtml("/admin/index.html");
@@ -138,3 +147,4 @@ Bun.serve({
 });
 
 console.log(`Memos server running at http://localhost:${PORT}`);
+console.log(`MEMOS_BASE_PATH: ${MEMOS_BASE_PATH || "(none)"}`);

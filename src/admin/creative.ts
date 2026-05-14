@@ -76,7 +76,7 @@ function parseManualIds(): number[] {
 /** Fetch all creative prompts from server. Auto-selects the first prompt if none is currently selected. */
 export async function loadPrompts(): Promise<void> {
   try {
-    const data = await api<{ prompts: Prompt[] }>("/api/creative/prompts");
+    const data = await api<{ prompts: Prompt[] }>("api/creative/prompts");
     prompts.val = data.prompts;
     // Auto-select first prompt if none selected
     if (selectedPromptId.val === null && data.prompts.length > 0) {
@@ -94,7 +94,7 @@ async function loadCreativeItems(promptId?: number): Promise<void> {
   creativeLoading.val = true;
   try {
     const query = promptId !== undefined ? `?prompt_id=${promptId}` : "";
-    const data = await api<{ items: CreativeItem[] }>(`/api/creative${query}`);
+    const data = await api<{ items: CreativeItem[] }>(`api/creative${query}`);
     creativeItems.val = data.items;
   } catch {
     creativeItems.val = [];
@@ -145,9 +145,9 @@ async function savePromptForm(): Promise<void> {
       content: promptFormContent.val.trim(),
     });
     if (promptFormMode.val.type === "create") {
-      await api("/api/creative/prompts", { method: "POST", body });
+      await api("api/creative/prompts", { method: "POST", body });
     } else if (promptFormMode.val.type === "edit") {
-      await api(`/api/creative/prompts/${promptFormMode.val.id}`, {
+      await api(`api/creative/prompts/${promptFormMode.val.id}`, {
         method: "PUT",
         body,
       });
@@ -164,7 +164,7 @@ async function savePromptForm(): Promise<void> {
 /** Delete a prompt by ID. Clears selected state and creative items if the deleted prompt was active. */
 async function deletePrompt(id: number): Promise<void> {
   try {
-    await api(`/api/creative/prompts/${id}`, { method: "DELETE" });
+    await api(`api/creative/prompts/${id}`, { method: "DELETE" });
     // If deleted prompt was selected, clear selection
     if (selectedPromptId.val === id) {
       selectedPromptId.val = null;
@@ -217,7 +217,7 @@ async function loadPreviewContext(): Promise<void> {
   previewError.val = null;
   try {
     const data = await api<{ memos: PreviewMemo[] }>(
-      "/api/creative/preview-context",
+      "api/creative/preview-context",
       { method: "POST", body: JSON.stringify(body) },
     );
     previewMemos.val = data.memos;
@@ -275,7 +275,7 @@ async function handleGenerate(): Promise<void> {
   streamAbort = new AbortController();
 
   try {
-    const resp = await fetch("/api/creative/generate", {
+    const resp = await fetch("api/creative/generate", {
       method: "POST",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
@@ -360,7 +360,7 @@ async function handleGenerate(): Promise<void> {
 async function deleteCreativeItem(id: number): Promise<void> {
   creativeDeleting.val = true;
   try {
-    await api(`/api/creative/${id}`, { method: "DELETE" });
+    await api(`api/creative/${id}`, { method: "DELETE" });
     creativeDeleteId.val = null;
     await loadCreativeItems(selectedPromptId.val ?? undefined);
   } catch {
