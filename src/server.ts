@@ -9,7 +9,7 @@ import { initEmbeddingCache } from "./ai/embeddings";
 import { initSeedData } from "./init/seed";
 
 const PORT = parseInt(process.env.PORT || "3020");
-const MEMOS_BASE_PATH = process.env.MEMOS_BASE_PATH || "/memos";
+const MEMOS_BASE_PATH = process.env.MEMOS_BASE_PATH || "";
 const STATIC_BASE = import.meta.dir;
 
 // 客户端 TS 打包（含 import 解析）+ mtime 缓存
@@ -63,13 +63,6 @@ async function serveHtml(path: string): Promise<Response> {
         /<body>/i,
         `<base href="${MEMOS_BASE_PATH}/">\n<body>`,
       );
-      // admin 页面的 script src 需要带 /admin/ 子目录
-      if (path.startsWith("/admin/")) {
-        html = html.replace(
-          'src="./app.ts"',
-          `src="${MEMOS_BASE_PATH}/admin/app.ts"`,
-        );
-      }
     }
     return new Response(html, {
       headers: { "Content-Type": "text/html; charset=utf-8" },
