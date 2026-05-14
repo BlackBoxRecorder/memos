@@ -58,11 +58,18 @@ async function serveHtml(path: string): Promise<Response> {
     const file = Bun.file(`${STATIC_BASE}${path}`);
     let html = await file.text();
     if (MEMOS_BASE_PATH) {
-      // 注入 <base> 标签，让所有相对路径 URL 自动基于 MEMOS_BASE_PATH/
+      // 注入 <base> 标签，让所有相对路径 URL 自动基于 /memos/
       html = html.replace(
         /<body>/i,
         `<base href="${MEMOS_BASE_PATH}/">\n<body>`,
       );
+      // admin 页面的 script src 需要带 /admin/ 子目录
+      if (path.startsWith("/admin/")) {
+        html = html.replace(
+          'src="./app.ts"',
+          `src="${MEMOS_BASE_PATH}/admin/app.ts"`,
+        );
+      }
     }
     return new Response(html, {
       headers: { "Content-Type": "text/html; charset=utf-8" },
@@ -84,7 +91,7 @@ async function serveJs(path: string): Promise<Response> {
 }
 
 // nginx 反向代理已剥离前缀，Hono 不需要 basePath
-const app = new Hono({ strict: false });
+const app = new Hono({ strict: false }).basePath(MEMOS_BASE_PATH);
 
 // API 路由 — 子应用挂载
 app.route("/api/auth", authApp);
@@ -98,10 +105,8 @@ app.route("/api", exportImportApp);
 app.get("/admin/app.ts", (c) => serveJs("/admin/app.ts"));
 app.get("/admin/app.js", (c) => serveJs("/admin/app.ts"));
 
-// /admin → 重定向到 /admin/
-app.get("/admin", (c) => c.redirect(MEMOS_BASE_PATH + "/admin/"));
-
-// /admin/ → admin SPA
+// /admin 与 /admin/ → admin SPA（<base> 标签保证资源路径正确）
+app.get("/admin", async (c) => serveHtml("/admin/index.html"));
 app.get("/admin/", async (c) => serveHtml("/admin/index.html"));
 app.get("/admin/index.html", async (c) => serveHtml("/admin/index.html"));
 
