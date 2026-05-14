@@ -346,3 +346,81 @@ export function deleteCreativeItem(id: number): boolean {
   const result = d.run("DELETE FROM creative WHERE id = ?", [id]);
   return result.changes > 0;
 }
+
+// --- Import helpers (with custom dates) ---
+
+/** Insert a memo with an explicit created_at timestamp. Returns the newly created memo. */
+export function importMemo(fields: {
+  content: string;
+  tag: string;
+  is_public: boolean;
+  created_at: string;
+}): Memo {
+  const d = getDb();
+  const result = d.run(
+    "INSERT INTO memos (content, tag, is_public, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+    [
+      fields.content,
+      fields.tag,
+      fields.is_public ? 1 : 0,
+      fields.created_at,
+      fields.created_at,
+    ],
+  );
+  return getMemo(Number(result.lastInsertRowid))!;
+}
+
+/** Insert a creative item with an explicit created_at timestamp. Returns the newly created item. */
+export function importCreativeItem(fields: {
+  prompt_id: number;
+  content: string;
+  created_at: string;
+}): CreativeItem {
+  const d = getDb();
+  const result = d.run(
+    "INSERT INTO creative (prompt_id, extra_prompt, content, context_memo_ids, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+    [
+      fields.prompt_id,
+      "",
+      fields.content,
+      "",
+      fields.created_at,
+      fields.created_at,
+    ],
+  );
+  return getCreativeItem(Number(result.lastInsertRowid))!;
+}
+
+/** Ensure at least one prompt exists for creative items imported without a prompt_id. Returns the first prompt or creates a default one. */
+export function ensureDefaultPrompt(): Prompt {
+  const existing = getAllPrompts();
+  if (existing.length > 0) return existing[0]!;
+  return createPrompt("默认", "默认提示词");
+}
+
+/** Check if a memo with the exact same content already exists in the database. */
+export function memoContentExists(content: string): boolean {
+  const d = getDb();
+  const row = d
+    .query("SELECT 1 FROM memos WHERE content = ? LIMIT 1")
+    .get(content) as { 1: number } | undefined;
+  return row !== undefined;
+}
+
+/** Check if a creative item with the exact same content already exists in the database. */
+export function creativeContentExists(content: string): boolean {
+  const d = getDb();
+  const row = d
+    .query("SELECT 1 FROM creative WHERE content = ? LIMIT 1")
+    .get(content) as { 1: number } | undefined;
+  return row !== undefined;
+}
+
+/** Get all creative items without any filter (for export). */
+export function getAllCreativeItems(): CreativeItem[] {
+  const d = getDb();
+  const rows = d
+    .query("SELECT * FROM creative ORDER BY created_at ASC")
+    .all() as CreativeRow[];
+  return rows.map(rowToCreative);
+}

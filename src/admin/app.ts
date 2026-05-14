@@ -13,6 +13,8 @@ import {
   svgPlus,
   svgExternalLink,
   svgLogout,
+  svgDownload,
+  svgUpload,
 } from "../helper/svgHelper";
 import type { Memo, CreativeItem } from "../model";
 
@@ -43,6 +45,16 @@ const aiSuggestedTags = van.state<string[]>([]);
 const aiSuggestingTags = van.state(false);
 let tagSuggestAbort: AbortController | null = null;
 const readMoreText = van.state<string | null>(null);
+
+// Import/export state
+const importExportOpen = van.state(false);
+const importExportTab = van.state<"export" | "import">("export");
+const exportLoading = van.state(false);
+const importLoading = van.state(false);
+const importResult = van.state<string | null>(null);
+const importError = van.state<string | null>(null);
+const dragOver = van.state(false);
+let fileInputRef: HTMLInputElement | null = null;
 
 // Timeline state
 const selectedMonth = van.state<string | null>(null);
@@ -350,6 +362,262 @@ function openReadMore(text: string): void {
 function closeReadMore(): void {
   readMoreText.val = null;
   document.body.style.overflow = "";
+}
+
+// ====== Import/Export Actions ======
+
+function openImportExport(): void {
+  importExportTab.val = "export";
+  importResult.val = null;
+  importError.val = null;
+  importExportOpen.val = true;
+}
+
+function closeImportExport(): void {
+  importExportOpen.val = false;
+  importResult.val = null;
+  importError.val = null;
+}
+
+async function handleExport(): Promise<void> {
+  exportLoading.val = true;
+  try {
+    const resp = await fetch("/api/export", { credentials: "same-origin" });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ error: "Export failed" }));
+      throw new Error(err.error || `Export failed (${resp.status})`);
+    }
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download =
+      "memos-export-" + new Date().toISOString().slice(0, 10) + ".txt";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    importError.val = (err as Error).message;
+  } finally {
+    exportLoading.val = false;
+  }
+}
+
+async function handleImportFile(file: File): Promise<void> {
+  importLoading.val = true;
+  importResult.val = null;
+  importError.val = null;
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+    const resp = await fetch("/api/import", {
+      method: "POST",
+      credentials: "same-origin",
+      body: formData,
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      throw new Error(data.error || "Import failed");
+    }
+    importResult.val = data.message || `Imported ${data.imported} record(s).`;
+    // Reload memos to reflect new data
+    loadMemos();
+  } catch (err) {
+    importError.val = (err as Error).message;
+  } finally {
+    importLoading.val = false;
+  }
+}
+
+// ====== Import/Export Modal ======
+
+function ImportExportModal() {
+  const { span: s, button: btn, input: inp } = van.tags;
+
+  const handleDrop = (e: DragEvent) => {
+    e.preventDefault();
+    dragOver.val = false;
+    const file = e.dataTransfer?.files?.[0];
+    if (file) handleImportFile(file);
+  };
+
+  const handleFileChange = (e: Event) => {
+    const target = e.target as HTMLInputElement;
+    const file = target.files?.[0];
+    if (file) handleImportFile(file);
+    target.value = "";
+  };
+
+  return div(
+    {
+      class: "modal-overlay",
+      style: () => (importExportOpen.val ? "display:flex" : "display:none"),
+      onclick: (e: Event) => {
+        if (e.target === e.currentTarget) closeImportExport();
+      },
+    },
+    div(
+      { class: "modal" },
+      // Header with close button
+      div(
+        {
+          style:
+            "display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;",
+        },
+        h3({ style: "margin:0" }, "数据导入/导出"),
+        button(
+          {
+            class: "btn btn-outline btn-sm",
+            onclick: closeImportExport,
+          },
+          "\u2715",
+        ),
+      ),
+      // Tab bar
+      div(
+        { class: "tab-bar" },
+        button(
+          {
+            class: () =>
+              "tab" + (importExportTab.val === "export" ? " active" : ""),
+            onclick: () => {
+              importExportTab.val = "export";
+              importResult.val = null;
+              importError.val = null;
+            },
+          },
+          "导出",
+        ),
+        button(
+          {
+            class: () =>
+              "tab" + (importExportTab.val === "import" ? " active" : ""),
+            onclick: () => {
+              importExportTab.val = "import";
+              importResult.val = null;
+              importError.val = null;
+            },
+          },
+          "导入",
+        ),
+      ),
+      // Tab content
+      () => {
+        if (importExportTab.val === "export") {
+          return div(
+            { style: "padding:20px 0;text-align:center;" },
+            s(
+              {
+                style:
+                  "display:block;font-size:14px;color:#666;margin-bottom:20px;",
+              },
+              "将所有备忘录和创意内容导出为文本文件",
+            ),
+            button(
+              {
+                class: "btn btn-primary",
+                disabled: () => exportLoading.val,
+                onclick: handleExport,
+              },
+              () => (exportLoading.val ? "导出中..." : "导出所有数据"),
+            ),
+            () =>
+              importError.val
+                ? div(
+                    {
+                      class: "form-error",
+                      style: "margin-top:12px;",
+                    },
+                    importError.val,
+                  )
+                : "",
+          );
+        }
+
+        // Import tab
+        return div(
+          { style: "padding:20px 0;" },
+          () =>
+            importResult.val
+              ? div(
+                  {
+                    class: "import-export-result success",
+                    style:
+                      "background:#dcfce7;color:#166534;padding:12px;border-radius:6px;margin-bottom:16px;font-size:13px;",
+                  },
+                  importResult.val,
+                )
+              : "",
+          () =>
+            importError.val
+              ? div(
+                  {
+                    class: "import-export-result error",
+                    style:
+                      "background:#fef2f2;color:#c00;padding:12px;border-radius:6px;margin-bottom:16px;font-size:13px;",
+                  },
+                  importError.val,
+                )
+              : "",
+          // Drag & drop area
+          div(
+            {
+              class: () =>
+                "import-export-area" +
+                (dragOver.val ? " drag-over" : "") +
+                (importLoading.val ? " loading" : ""),
+              ondragover: (e: DragEvent) => {
+                e.preventDefault();
+                dragOver.val = true;
+              },
+              ondragleave: () => (dragOver.val = false),
+              ondrop: handleDrop,
+              onclick: () => fileInputRef?.click(),
+            },
+            () =>
+              importLoading.val
+                ? div(
+                    {
+                      style:
+                        "display:flex;flex-direction:column;align-items:center;gap:8px;color:#888;",
+                    },
+                    "导入中...",
+                  )
+                : div(
+                    {
+                      style:
+                        "display:flex;flex-direction:column;align-items:center;gap:8px;color:#888;",
+                    },
+                    span(
+                      {
+                        style: "font-size:28px;",
+                      },
+                      "\u21E7",
+                    ),
+                    span(
+                      { style: "font-size:14px;" },
+                      "拖拽文件到此处，或点击选择文件",
+                    ),
+                    span(
+                      { style: "font-size:12px;color:#bbb;" },
+                      "支持 .txt 文本文件",
+                    ),
+                  ),
+            inp({
+              type: "file",
+              accept: ".txt",
+              style: "display:none;",
+              onchange: handleFileChange,
+              oncreate: (el: HTMLInputElement) => {
+                fileInputRef = el;
+              },
+            }),
+          ),
+        );
+      },
+    ),
+  );
 }
 
 // ====== Timeline Helpers ======
@@ -903,6 +1171,14 @@ function AdminPage() {
                   },
                   svgPlus(),
                 ),
+          button(
+            {
+              class: "btn btn-outline btn-sm",
+              title: "导入/导出",
+              onclick: openImportExport,
+            },
+            svgUpload(),
+          ),
           a(
             { href: "/", class: "btn btn-outline btn-sm", title: "查看网站" },
             svgExternalLink(),
@@ -984,6 +1260,7 @@ function AdminPage() {
     ),
     () => (formMode.val.type !== "closed" ? FormModal() : ""),
     () => (readMoreText.val != null ? ReadMoreModal() : ""),
+    () => (importExportOpen.val ? ImportExportModal() : ""),
   );
 }
 

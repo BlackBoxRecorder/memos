@@ -4,6 +4,7 @@ import { authApp } from "./api/auth";
 import { memosApp } from "./api/memos";
 import { aiApp } from "./api/ai";
 import { creativeApp } from "./api/creative";
+import { exportImportApp } from "./api/export-import";
 import { initEmbeddingCache } from "./ai/embeddings";
 import { initSeedData } from "./init/seed";
 
@@ -79,6 +80,7 @@ app.route("/api/auth", authApp);
 app.route("/api/ai", aiApp);
 app.route("/api/memos", memosApp);
 app.route("/api/creative", creativeApp);
+app.route("/api", exportImportApp);
 
 // 静态文件 + 页面路由
 // /admin/app.ts → 转译 JS
