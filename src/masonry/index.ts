@@ -258,7 +258,7 @@ function debouncedSearch(): void {
   if (debounceTimer) clearTimeout(debounceTimer);
   debounceTimer = setTimeout(() => {
     fetchAndRender(0);
-  }, 2000);
+  }, 1000);
 }
 
 // --- similar modal helpers ---
