@@ -1180,7 +1180,7 @@ function AdminPage() {
             svgUpload(),
           ),
           a(
-            { href: "../", class: "btn btn-outline btn-sm", title: "查看网站" },
+            { href: "/", class: "btn btn-outline btn-sm", title: "查看网站" },
             svgExternalLink(),
           ),
           button(
