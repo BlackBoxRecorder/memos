@@ -58,10 +58,11 @@ async function serveHtml(path: string): Promise<Response> {
     const file = Bun.file(`${STATIC_BASE}${path}`);
     let html = await file.text();
     if (MEMOS_BASE_PATH) {
-      // 注入 <base> 标签，让所有相对路径 URL 自动基于 /memos/
+      // 注入 <base> 标签到 <meta charset> 之后（位于 <head> 区域），
+      // 让所有相对路径 URL（包括 favicon）自动基于 /memos/
       html = html.replace(
-        /<body>/i,
-        `<base href="${MEMOS_BASE_PATH}/">\n<body>`,
+        /(<meta charset="utf-8"\s*\/?>)/i,
+        `$1\n<base href="${MEMOS_BASE_PATH}/">`,
       );
     }
     return new Response(html, {
