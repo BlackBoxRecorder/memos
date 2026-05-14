@@ -83,7 +83,8 @@ async function serveJs(path: string): Promise<Response> {
   });
 }
 
-const app = new Hono({ strict: false }).basePath(MEMOS_BASE_PATH);
+// nginx 反向代理已剥离前缀，Hono 不需要 basePath
+const app = new Hono({ strict: false });
 
 // API 路由 — 子应用挂载
 app.route("/api/auth", authApp);
