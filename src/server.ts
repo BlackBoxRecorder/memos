@@ -9,7 +9,7 @@ import { initEmbeddingCache } from "./ai/embeddings";
 import { initSeedData } from "./init/seed";
 
 const PORT = parseInt(process.env.PORT || "3020");
-const MEMOS_BASE_PATH = process.env.MEMOS_BASE_PATH || "";
+const MEMOS_BASE_PATH = process.env.MEMOS_BASE_PATH || "/memos";
 const STATIC_BASE = import.meta.dir;
 
 // 客户端 TS 打包（含 import 解析）+ mtime 缓存
@@ -67,8 +67,9 @@ async function serveHtml(path: string): Promise<Response> {
     return new Response(html, {
       headers: { "Content-Type": "text/html; charset=utf-8" },
     });
-  } catch {
-    return new Response("Not Found", { status: 404 });
+  } catch (e) {
+    console.error(`[serveHtml] Failed to serve ${path}:`, e);
+    return new Response(`Not Found: ${path}`, { status: 404 });
   }
 }
 
