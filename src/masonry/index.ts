@@ -1,6 +1,12 @@
 import van from "vanjs-core";
 import { prepare, layout, type PreparedText } from "@chenglou/pretext";
-import { svgSearchIcon, svgChevronDown, svgEyeIcon } from "../helper/svgHelper";
+import {
+  svgSearchIcon,
+  svgChevronDown,
+  svgEyeIcon,
+  svgCopy,
+  svgCheck,
+} from "../helper/svgHelper";
 import { apiUrl } from "../helper/util";
 
 // --- config ---
@@ -58,6 +64,7 @@ const similarMemos = van.state<SimilarMemo[]>([]);
 const similarLoading = van.state(false);
 const similarError = van.state<string | null>(null);
 const readMoreText = van.state<string | null>(null);
+const copiedCardId = van.state<number | null>(null);
 const windowWidth = van.state(0);
 
 // --- prepared text cache ---
@@ -252,6 +259,31 @@ async function fetchAndRender(pageNum: number = 0): Promise<void> {
   }
 }
 
+async function copyToClipboard(card: Card): Promise<void> {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(card.text);
+    } else {
+      // Fallback for older browsers or non-secure contexts
+      const textarea = document.createElement("textarea");
+      textarea.value = card.text;
+      textarea.style.position = "fixed";
+      textarea.style.left = "-9999px";
+      textarea.style.top = "-9999px";
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+    }
+    copiedCardId.val = card.id;
+    setTimeout(() => {
+      copiedCardId.val = null;
+    }, 1500);
+  } catch {
+    // Silently fail — clipboard may be unavailable
+  }
+}
+
 // --- debounced search ---
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -439,6 +471,18 @@ function MasonryCard(card: Card, index: number, layoutState: LayoutState) {
           },
         },
         svgSearchIcon(),
+      ),
+      button(
+        {
+          class: () =>
+            "card-copy-btn" + (copiedCardId.val === card.id ? " copied" : ""),
+          title: "Copy full text",
+          onclick: (e: Event) => {
+            e.stopPropagation();
+            copyToClipboard(card);
+          },
+        },
+        () => (copiedCardId.val === card.id ? svgCheck() : svgCopy()),
       ),
     ),
   );
