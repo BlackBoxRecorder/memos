@@ -58,11 +58,22 @@ async function serveHtml(path: string): Promise<Response> {
     const file = Bun.file(`${STATIC_BASE}${path}`);
     let html = await file.text();
     if (MEMOS_BASE_PATH) {
+      // 计算页面目录路径，用于将相对脚本 src 转为绝对路径
+      // e.g. "/masonry/index.html" → "/", "/admin/index.html" → "/admin/"
+      const pageDir = path.replace(/\/[^/]+\.html$/, "/");
+
       // 注入 MEMOS_BASE_PATH 到 <meta charset> 之后，
       // 前端 JS 通过 window.MEMOS_BASE_PATH 读取，用于构造 API 请求绝对路径
       html = html.replace(
         /(<meta charset="utf-8"\s*\/?>)/i,
         `$1\n<script>window.MEMOS_BASE_PATH="${MEMOS_BASE_PATH}"</script>`,
+      );
+
+      // 将相对脚本 src（如 index.ts、app.ts）转为带 base path 和页面目录的绝对路径
+      // 解决浏览器无尾部斜杠 URL 下相对路径解析错误的问题
+      html = html.replace(
+        /(<script\s[^>]*?\bsrc=")([^/"][^"]*)(")/gi,
+        `$1${MEMOS_BASE_PATH}${pageDir}$2$3`,
       );
     }
     return new Response(html, {
