@@ -40,7 +40,7 @@ const creativeDeleteId = van.state<number | null>(null);
 const creativeDeleting = van.state(false);
 
 // Context preview state
-type PreviewMemo = Pick<Memo, "id" | "content" | "tag" | "created_at">;
+type PreviewMemo = Pick<Memo, "id" | "content" | "tags" | "created_at">;
 const previewOpen = van.state(false);
 const previewMemos = van.state<PreviewMemo[]>([]);
 const previewLoading = van.state(false);
@@ -571,7 +571,7 @@ function renderPreviewBody() {
         div(
           { class: "creative-meta", style: "margin-bottom:4px;" },
           span({ class: "badge" }, "#" + String(m.id)),
-          m.tag ? span({ class: "badge badge-tag" }, m.tag) : "",
+          ...m.tags.map((tag) => span({ class: "badge badge-tag" }, tag)),
           span(formatDate(m.created_at)),
         ),
         div(

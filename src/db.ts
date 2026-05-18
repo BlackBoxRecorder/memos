@@ -14,11 +14,29 @@ export function getDb(): Database {
 
 export function initDb(): void {
   const d = getDb();
+
+  // Migration: rename old 'tag' column to 'tags' and convert data to JSON arrays
+  const colInfo = d
+    .query("PRAGMA table_info(memos)")
+    .all() as Array<{ name: string }>;
+  const hasTagColumn = colInfo.some((c) => c.name === "tag");
+  const hasTagsColumn = colInfo.some((c) => c.name === "tags");
+  if (hasTagColumn && !hasTagsColumn) {
+    // Rename the column
+    d.run("ALTER TABLE memos RENAME COLUMN tag TO tags");
+    // Convert existing string tags to JSON array format
+    d.run(
+      "UPDATE memos SET tags = json_array(tags) WHERE tags != '' AND tags NOT LIKE '[%'",
+    );
+    d.run("UPDATE memos SET tags = '[]' WHERE tags = ''");
+    console.log("[db] Migrated tag column to tags (JSON array)");
+  }
+
   d.run(`
     CREATE TABLE IF NOT EXISTS memos (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
       content     TEXT    NOT NULL,
-      tag         TEXT    NOT NULL DEFAULT '',
+      tags        TEXT    NOT NULL DEFAULT '[]',
       is_public   INTEGER NOT NULL DEFAULT 1,
       created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
       updated_at  TEXT    NOT NULL DEFAULT (datetime('now'))
@@ -60,7 +78,7 @@ export function initDb(): void {
 interface MemoRow {
   id: number;
   content: string;
-  tag: string;
+  tags: string;
   is_public: number;
   created_at: string;
   updated_at: string;
@@ -85,11 +103,28 @@ interface CreativeRow {
   updated_at: string;
 }
 
+function parseTags(raw: string): string[] {
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed.filter(
+        (t: unknown): t is string => typeof t === "string" && t.length > 0,
+      );
+    }
+  } catch {
+    // legacy: if old data has a plain string tag, wrap it
+    if (typeof raw === "string" && raw.length > 0) {
+      return [raw];
+    }
+  }
+  return [];
+}
+
 function rowToMemo(row: MemoRow): Memo {
   return {
     id: row.id,
     content: row.content,
-    tag: row.tag || "",
+    tags: parseTags(row.tags),
     is_public: row.is_public === 1,
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -119,8 +154,18 @@ export function getMemos(opts: {
     params.push(`%${opts.search}%`);
   }
   if (opts.tag) {
-    conditions.push("tag = ?");
-    params.push(opts.tag);
+    // Support comma-separated multiple tags: any matching tag → include memo
+    const tagList = opts.tag
+      .split(",")
+      .map((t) => t.trim())
+      .filter((t) => t.length > 0);
+    if (tagList.length > 0) {
+      const placeholders = tagList.map(() => "?").join(", ");
+      conditions.push(
+        `EXISTS (SELECT 1 FROM json_each(memos.tags) WHERE value IN (${placeholders}))`,
+      );
+      params.push(...tagList);
+    }
   }
 
   const where =
@@ -133,9 +178,11 @@ export function getMemos(opts: {
 export function getAllTags(): string[] {
   const d = getDb();
   const rows = d
-    .query("SELECT DISTINCT tag FROM memos WHERE tag != '' ORDER BY tag")
-    .all() as { tag: string }[];
-  return rows.map((r) => r.tag);
+    .query(
+      "SELECT DISTINCT value FROM memos, json_each(memos.tags) WHERE value != '' ORDER BY value",
+    )
+    .all() as { value: string }[];
+  return rows.map((r) => r.value);
 }
 
 export function countMemos(opts: { includePrivate: boolean }): number {
@@ -158,19 +205,22 @@ export function getMemo(id: number): Memo | null {
 export function createMemo(
   content: string,
   isPublic: boolean,
-  tag?: string,
+  tags?: string[],
 ): Memo {
   const d = getDb();
+  const tagsJson = JSON.stringify(
+    tags && tags.length > 0 ? tags.filter((t) => t.length > 0) : [],
+  );
   const result = d.run(
-    "INSERT INTO memos (content, is_public, tag) VALUES (?, ?, ?)",
-    [content, isPublic ? 1 : 0, tag || ""],
+    "INSERT INTO memos (content, is_public, tags) VALUES (?, ?, ?)",
+    [content, isPublic ? 1 : 0, tagsJson],
   );
   return getMemo(Number(result.lastInsertRowid))!;
 }
 
 export function updateMemo(
   id: number,
-  fields: { content?: string; is_public?: boolean; tag?: string },
+  fields: { content?: string; is_public?: boolean; tags?: string[] },
 ): Memo | null {
   const d = getDb();
   const existing = getMemo(id);
@@ -179,11 +229,12 @@ export function updateMemo(
   const content = fields.content ?? existing.content;
   const isPublic =
     fields.is_public !== undefined ? fields.is_public : existing.is_public;
-  const tag = fields.tag !== undefined ? fields.tag : existing.tag;
+  const tags = fields.tags !== undefined ? fields.tags : existing.tags;
+  const tagsJson = JSON.stringify(tags.filter((t) => t.length > 0));
 
   d.run(
-    "UPDATE memos SET content = ?, is_public = ?, tag = ?, updated_at = datetime('now') WHERE id = ?",
-    [content, isPublic ? 1 : 0, tag, id],
+    "UPDATE memos SET content = ?, is_public = ?, tags = ?, updated_at = datetime('now') WHERE id = ?",
+    [content, isPublic ? 1 : 0, tagsJson, id],
   );
   return getMemo(id);
 }
@@ -352,16 +403,19 @@ export function deleteCreativeItem(id: number): boolean {
 /** Insert a memo with an explicit created_at timestamp. Returns the newly created memo. */
 export function importMemo(fields: {
   content: string;
-  tag: string;
+  tags: string[];
   is_public: boolean;
   created_at: string;
 }): Memo {
   const d = getDb();
+  const tagsJson = JSON.stringify(
+    fields.tags.filter((t) => t.length > 0),
+  );
   const result = d.run(
-    "INSERT INTO memos (content, tag, is_public, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+    "INSERT INTO memos (content, tags, is_public, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
     [
       fields.content,
-      fields.tag,
+      tagsJson,
       fields.is_public ? 1 : 0,
       fields.created_at,
       fields.created_at,

@@ -41,7 +41,7 @@ type LayoutState = {
 type SimilarMemo = {
   id: number;
   content: string;
-  tag: string;
+  tags: string[];
 };
 
 // --- VanJS tags ---
@@ -555,9 +555,9 @@ function SimilarModal() {
               div(
                 { class: "similar-memo-meta" },
                 span({ class: "similar-memo-id" }, `#${m.id}`),
-                m.tag
-                  ? span({ class: "similar-memo-tag" }, escapeHtml(m.tag))
-                  : "",
+                ...m.tags.map((t) =>
+                  span({ class: "similar-memo-tag" }, escapeHtml(t)),
+                ),
               ),
               div({ class: "similar-memo-text" }, escapeHtml(m.content)),
             ),

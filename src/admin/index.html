@@ -773,6 +773,60 @@
             color: #3b82f6;
         }
 
+        .tag-chip.active {
+            background: #ede9fe;
+            border-color: #7c5ce7;
+            color: #5a3f8a;
+            padding-right: 8px;
+        }
+
+        .tag-chip.active:hover {
+            background: #f5d0d0;
+            border-color: #e74c3c;
+            color: #c0392b;
+        }
+
+        .tag-chip:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        /* Tag display area */
+        .tag-display-area {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            margin-top: 10px;
+            min-height: 28px;
+        }
+
+        .tag-count-label {
+            font-size: 11px;
+            color: #999;
+            line-height: 24px;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .tag-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            flex: 1;
+        }
+
+        .tag-placeholder {
+            font-size: 11px;
+            color: #aaa;
+            line-height: 24px;
+        }
+
+        #form-tag:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+            outline: none;
+        }
+
         /* Tab bar */
         .tab-bar {
             display: flex;

@@ -48,7 +48,7 @@ function formatExportData(
       buildRecord(
         {
           date: formatExportDate(m.created_at),
-          tag: m.tag || "",
+          tags: m.tags.join(","),
           isPrivate: m.is_public ? "false" : "true",
           type: "memo",
         },
@@ -77,7 +77,7 @@ function formatExportData(
 interface ParsedRecord {
   type: "memo" | "creative";
   date: string;
-  tag?: string;
+  tags: string[];
   isPrivate?: boolean;
   content: string;
 }
@@ -133,11 +133,17 @@ function parseRecord(block: string): ParsedRecord | null {
   const record: ParsedRecord = {
     type: type as "memo" | "creative",
     date: metadata["date"] || "",
+    tags: [],
     content,
   };
 
   if (type === "memo") {
-    record.tag = metadata["tag"] || "";
+    // Parse tags: comma-separated string or legacy single tag field
+    const tagsRaw = metadata["tags"] || metadata["tag"] || "";
+    record.tags = tagsRaw
+      .split(",")
+      .map((t) => t.trim())
+      .filter((t) => t.length > 0);
     record.isPrivate = metadata["isPrivate"] === "true";
   }
 
@@ -229,7 +235,7 @@ exportImportApp.post("/import", authMiddleware, async (c) => {
         }
         importMemo({
           content: record.content,
-          tag: record.tag || "",
+          tags: record.tags,
           is_public: !record.isPrivate,
           created_at:
             record.date ||

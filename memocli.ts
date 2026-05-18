@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 // memocli — 命令行工具，通过 HTTP API 创建 memo
-// 用法: memocli -c "内容" [-t "标签"] [-p]
+// 用法: memocli -c "内容" [-t "标签1,标签2"] [-p]
 // 需要设置环境变量 MEMOS_API_URL 和 MEMOS_SECRET_KEY
 
 const BASE_URL =
@@ -12,7 +12,7 @@ const SECRET_KEY = process.env.MEMOS_SECRET_KEY;
 
 interface Options {
   content: string | null;
-  tag: string | null;
+  tags: string[];
   isPublic: boolean;
   showHelp: boolean;
 }
@@ -20,7 +20,7 @@ interface Options {
 function parseArgs(args: string[]): Options {
   const opts: Options = {
     content: null,
-    tag: null,
+    tags: [],
     isPublic: false,
     showHelp: false,
   };
@@ -33,9 +33,16 @@ function parseArgs(args: string[]): Options {
         opts.content = args[++i] ?? null;
         break;
       case "-t":
-      case "--tag":
-        opts.tag = args[++i] ?? null;
+      case "--tag": {
+        const raw = args[++i];
+        if (raw) {
+          opts.tags = raw
+            .split(",")
+            .map((t) => t.trim())
+            .filter((t) => t.length > 0);
+        }
         break;
+      }
       case "-p":
       case "--public":
         opts.isPublic = true;
@@ -62,7 +69,7 @@ memo — 命令行备忘录创建工具
 
 选项:
   -c, --content <text>   备忘录内容（必需）
-  -t, --tag <tag>        标签（可选）
+  -t, --tag <tags>       标签（可选，多个用逗号分隔，例如 "技术,笔记"）
   -p, --public           设为公开
   --private              设为私有（默认）
   -h, --help             显示帮助信息
@@ -73,7 +80,7 @@ memo — 命令行备忘录创建工具
 
 示例:
   memocli -c "今天学习了 Bun"
-  memocli -c "部署笔记" -t "tech" --private
+  memocli -c "部署笔记" -t "技术,部署" --private
 `);
 }
 
@@ -89,13 +96,13 @@ async function main(): Promise<void> {
 
   // 校验密钥
   if (!SECRET_KEY) {
-    console.error("❌ 错误: 未设置 MEMOS_SECRET_KEY 环境变量");
+    console.error("\u274C 错误: 未设置 MEMOS_SECRET_KEY 环境变量");
     process.exit(1);
   }
 
   // 校验内容
   if (!opts.content || opts.content.trim().length === 0) {
-    console.error("❌ 错误: 请使用 -c 或 --content 提供备忘录内容");
+    console.error("\u274C 错误: 请使用 -c 或 --content 提供备忘录内容");
     console.error("   使用 -h 查看帮助");
     process.exit(1);
   }
@@ -105,7 +112,7 @@ async function main(): Promise<void> {
     content: opts.content.trim(),
     is_public: opts.isPublic,
   };
-  if (opts.tag) body.tag = opts.tag;
+  if (opts.tags.length > 0) body.tags = opts.tags;
 
   // 发送请求
   try {
@@ -122,13 +129,14 @@ async function main(): Promise<void> {
 
     if (resp.ok) {
       const memo = data.memo;
-      console.log(`✅ 备忘录创建成功 (ID: ${memo.id})`);
+      console.log(`\u2705 备忘录创建成功 (ID: ${memo.id})`);
       console.log(`   内容: ${memo.content}`);
-      if (memo.tag) console.log(`   标签: ${memo.tag}`);
+      if (memo.tags && memo.tags.length > 0)
+        console.log(`   标签: ${memo.tags.join(", ")}`);
       console.log(`   可见性: ${memo.is_public ? "公开" : "私有"}`);
     } else {
       const errorMsg = data.error || `HTTP ${resp.status}`;
-      console.error(`❌ 请求失败: ${errorMsg}`);
+      console.error(`\u274C 请求失败: ${errorMsg}`);
       if (resp.status === 401) {
         console.error("   请检查 MEMOS_SECRET_KEY 是否正确");
       }
@@ -139,7 +147,7 @@ async function main(): Promise<void> {
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error(`❌ 请求错误: ${message}`);
+    console.error(`\u274C 请求错误: ${message}`);
     if (
       message.includes("ECONNREFUSED") ||
       message.includes("ConnectionRefused")

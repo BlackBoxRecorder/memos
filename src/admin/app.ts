@@ -31,7 +31,8 @@ const memos = van.state<Memo[]>([]);
 const formMode = van.state<FormMode>({ type: "closed" });
 const formContent = van.state("");
 const formIsPublic = van.state(false);
-const formTag = van.state("");
+const formTags = van.state<string[]>([]);
+const formTagInput = van.state("");
 const formError = van.state<string | null>(null);
 const formSaving = van.state(false);
 const deleteConfirmId = van.state<number | null>(null);
@@ -170,7 +171,7 @@ async function saveForm(): Promise<void> {
     const body = JSON.stringify({
       content: formContent.val.trim(),
       is_public: formIsPublic.val,
-      tag: formTag.val.trim(),
+      tags: formTags.val,
     });
     if (formMode.val.type === "create") {
       await api("api/memos", { method: "POST", body });
@@ -325,11 +326,24 @@ async function suggestTagsForContent(): Promise<void> {
   }
 }
 
+function addTag(tag: string): boolean {
+  const trimmed = tag.trim();
+  if (trimmed.length === 0) return false;
+  if (formTags.val.includes(trimmed)) return false;
+  formTags.val = [...formTags.val, trimmed];
+  return true;
+}
+
+function removeTag(tag: string): void {
+  formTags.val = formTags.val.filter((t) => t !== tag);
+}
+
 function openCreateForm(): void {
   formMode.val = { type: "create" };
   formContent.val = "";
   formIsPublic.val = false;
-  formTag.val = "";
+  formTags.val = [];
+  formTagInput.val = "";
   formError.val = null;
   document.body.style.overflow = "hidden";
 }
@@ -338,7 +352,8 @@ function openEditForm(memo: Memo): void {
   formMode.val = { type: "edit", id: memo.id };
   formContent.val = memo.content;
   formIsPublic.val = memo.is_public;
-  formTag.val = memo.tag;
+  formTags.val = [...memo.tags];
+  formTagInput.val = "";
   formError.val = null;
   aiSuggestedTags.val = [];
   document.body.style.overflow = "hidden";
@@ -348,7 +363,8 @@ function closeForm(): void {
   formMode.val = { type: "closed" };
   formContent.val = "";
   formIsPublic.val = true;
-  formTag.val = "";
+  formTags.val = [];
+  formTagInput.val = "";
   formError.val = null;
   aiSuggestedTags.val = [];
   document.body.style.overflow = "";
@@ -944,18 +960,56 @@ function FormModal() {
           if (aiAvailable.val) suggestTagsForContent();
         },
       }),
+      // Current tags display area (shown above input)
+      div(
+        { class: "tag-display-area" },
+        span(
+          { class: "tag-count-label" },
+          () => `标签 (${formTags.val.length})`,
+        ),
+        () =>
+          formTags.val.length > 0
+            ? div(
+                { class: "tag-chips" },
+                ...formTags.val.map((tag) =>
+                  button(
+                    {
+                      class: "tag-chip active",
+                      disabled: () => formSaving.val,
+                      onclick: () => removeTag(tag),
+                      title: "点击移除",
+                    },
+                    tag + " \u00D7",
+                  ),
+                ),
+              )
+            : span(
+                {
+                  class: "tag-placeholder",
+                },
+                "暂无标签，在下方输入后按回车添加",
+              ),
+      ),
       // Tag input + AI optimize button in same row
       div(
         { class: "tag-input-row" },
         input({
           type: "text",
           id: "form-tag",
-          placeholder: "标签（可选）",
-          value: formTag,
+          placeholder: "输入标签名称，按回车添加",
+          value: formTagInput,
           style: "height: 28px; resize: none; font-size: 12px;",
           disabled: () => formSaving.val,
-          oninput: (e: Event) =>
-            (formTag.val = (e.target as HTMLInputElement).value),
+          oninput: (e: Event) => {
+            formTagInput.val = (e.target as HTMLInputElement).value;
+          },
+          onkeydown: (e: KeyboardEvent) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              const added = addTag(formTagInput.val);
+              if (added) formTagInput.val = "";
+            }
+          },
           onfocus: () => {
             if (aiAvailable.val && formContent.val.trim()) {
               suggestTagsForContent();
@@ -976,20 +1030,31 @@ function FormModal() {
               )
             : "",
       ),
-      // AI Tag suggestions (below tag input)
+      // AI Tag suggestions
       () =>
         aiSuggestedTags.val.length > 0
           ? div(
               { class: "ai-tag-suggestions" },
-              ...aiSuggestedTags.val.map((tag) =>
-                button(
-                  {
-                    class: "tag-chip",
-                    onclick: () => (formTag.val = tag),
-                  },
-                  tag,
-                ),
+              span(
+                {
+                  style:
+                    "font-size:11px;color:#999;margin-right:4px;line-height:24px;",
+                },
+                "AI\u5EFA\u8BAE:",
               ),
+              ...aiSuggestedTags.val
+                .filter((tag) => !formTags.val.includes(tag))
+                .map((tag) =>
+                  button(
+                    {
+                      class: "tag-chip",
+                      onclick: () => {
+                        addTag(tag);
+                      },
+                    },
+                    "+" + tag,
+                  ),
+                ),
             )
           : "",
       div(
@@ -1066,7 +1131,7 @@ function MemoCard(memo: Memo) {
       { class: "memo-meta" },
       span({ class: "memo-id" }, `#${memo.id}`),
       span({ class: `badge ${badgeClass}` }, badgeText),
-      memo.tag ? span({ class: "badge badge-tag" }, memo.tag) : "",
+      ...memo.tags.map((tag) => span({ class: "badge badge-tag" }, tag)),
       span(`创建于：${formatDate(memo.created_at)}`),
       memo.updated_at !== memo.created_at
         ? span(`更新于：${formatDate(memo.updated_at)}`)

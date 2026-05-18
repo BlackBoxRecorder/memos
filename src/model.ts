@@ -1,7 +1,7 @@
 export interface Memo {
   id: number;
   content: string;
-  tag: string;
+  tags: string[];
   is_public: boolean;
   created_at: string;
   updated_at: string;

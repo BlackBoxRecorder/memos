@@ -97,7 +97,7 @@ memosApp.get("/tags", (c) => {
 
 // POST /api/memos — 创建
 memosApp.post("/", authMiddleware, async (c) => {
-  let body: { content?: string; is_public?: boolean; tag?: string };
+  let body: { content?: string; is_public?: boolean; tags?: string[] };
   try {
     body = await c.req.json();
   } catch {
@@ -118,10 +118,14 @@ memosApp.post("/", authMiddleware, async (c) => {
     return c.json({ error: formatRateLimitError("memo", rateError) }, 429);
   }
 
+  const tags = Array.isArray(body.tags)
+    ? body.tags.filter((t): t is string => typeof t === "string" && t.trim().length > 0).map((t) => t.trim())
+    : [];
+
   const memo = createMemo(
     body.content.trim(),
     body.is_public !== false,
-    body.tag,
+    tags,
   );
 
   recordRateLimit(ip, "memo");
@@ -137,7 +141,7 @@ memosApp.post("/", authMiddleware, async (c) => {
 // PUT /api/memos/:id — 更新
 memosApp.put("/:id", authMiddleware, async (c) => {
   const id = Number(c.req.param("id"));
-  let body: { content?: string; is_public?: boolean; tag?: string };
+  let body: { content?: string; is_public?: boolean; tags?: string[] };
   try {
     body = await c.req.json();
   } catch {
@@ -151,10 +155,14 @@ memosApp.put("/:id", authMiddleware, async (c) => {
     return c.json({ error: "Content cannot be empty" }, 400);
   }
 
-  const fields: { content?: string; is_public?: boolean; tag?: string } = {};
+  const fields: { content?: string; is_public?: boolean; tags?: string[] } = {};
   if (body.content !== undefined) fields.content = body.content.trim();
   if (body.is_public !== undefined) fields.is_public = body.is_public;
-  if (body.tag !== undefined) fields.tag = body.tag;
+  if (body.tags !== undefined) {
+    fields.tags = Array.isArray(body.tags)
+      ? body.tags.filter((t): t is string => typeof t === "string" && t.trim().length > 0).map((t) => t.trim())
+      : [];
+  }
 
   const memo = updateMemo(id, fields);
   if (!memo) return c.json({ error: "Memo not found" }, 404);
