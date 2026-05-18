@@ -1,7 +1,7 @@
 import van from "vanjs-core";
 import { CreativeTab, openPromptCreate, creativeItems } from "./creative";
 import { selectedProvider, selectedModel } from "./ai-state";
-import { api, formatDate, truncate, countWords } from "../helper/util";
+import { api, formatDate, truncate, countWords, apiUrl } from "../helper/util";
 import {
   svgSparkle,
   svgSpinner,
@@ -46,8 +46,8 @@ const aiSuggestingTags = van.state(false);
 let tagSuggestAbort: AbortController | null = null;
 const readMoreText = van.state<string | null>(null);
 
-// 从 <base> 标签获取站点根路径，支持 MEMOS_BASE_PATH 反向代理场景
-const siteUrl = document.querySelector("base")?.getAttribute("href") || "/";
+// 从服务端注入的 window.MEMOS_BASE_PATH 获取站点根路径
+const siteUrl = (window as any).MEMOS_BASE_PATH || "/";
 
 // Import/export state
 const importExportOpen = van.state(false);
@@ -385,7 +385,9 @@ function closeImportExport(): void {
 async function handleExport(): Promise<void> {
   exportLoading.val = true;
   try {
-    const resp = await fetch("api/export", { credentials: "same-origin" });
+    const resp = await fetch(apiUrl("api/export"), {
+      credentials: "same-origin",
+    });
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({ error: "Export failed" }));
       throw new Error(err.error || `Export failed (${resp.status})`);
@@ -414,7 +416,7 @@ async function handleImportFile(file: File): Promise<void> {
   try {
     const formData = new FormData();
     formData.append("file", file);
-    const resp = await fetch("api/import", {
+    const resp = await fetch(apiUrl("api/import"), {
       method: "POST",
       credentials: "same-origin",
       body: formData,

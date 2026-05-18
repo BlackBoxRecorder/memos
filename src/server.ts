@@ -58,11 +58,11 @@ async function serveHtml(path: string): Promise<Response> {
     const file = Bun.file(`${STATIC_BASE}${path}`);
     let html = await file.text();
     if (MEMOS_BASE_PATH) {
-      // 注入 <base> 标签到 <meta charset> 之后（位于 <head> 区域），
-      // 让所有相对路径 URL（包括 favicon）自动基于 /memos/
+      // 注入 MEMOS_BASE_PATH 到 <meta charset> 之后，
+      // 前端 JS 通过 window.MEMOS_BASE_PATH 读取，用于构造 API 请求绝对路径
       html = html.replace(
         /(<meta charset="utf-8"\s*\/?>)/i,
-        `$1\n<base href="${MEMOS_BASE_PATH}/">`,
+        `$1\n<script>window.MEMOS_BASE_PATH="${MEMOS_BASE_PATH}"</script>`,
       );
     }
     return new Response(html, {
@@ -85,7 +85,8 @@ async function serveJs(path: string): Promise<Response> {
 }
 
 // nginx 反向代理已剥离前缀，Hono 不需要 basePath
-const app = new Hono({ strict: false }).basePath(MEMOS_BASE_PATH);
+// MEMOS_BASE_PATH 仅通过 JS 全局变量传给前端，用于构造 API 请求路径
+const app = new Hono({ strict: false });
 
 // API 路由 — 子应用挂载
 app.route("/api/auth", authApp);
@@ -95,11 +96,22 @@ app.route("/api/creative", creativeApp);
 app.route("/api", exportImportApp);
 
 // 静态文件 + 页面路由
+// 静态资源：favicon（首页和 admin 均支持）
+function serveFavicon(): Response {
+  const file = Bun.file(`${STATIC_BASE}/favicon.svg`);
+  return new Response(file, {
+    headers: { "Content-Type": "image/svg+xml" },
+  });
+}
+
+app.get("/favicon.svg", serveFavicon);
+app.get("/admin/favicon.svg", serveFavicon);
+
 // /admin/app.ts → 转译 JS
 app.get("/admin/app.ts", (c) => serveJs("/admin/app.ts"));
 app.get("/admin/app.js", (c) => serveJs("/admin/app.ts"));
 
-// /admin 与 /admin/ → admin SPA（<base> 标签保证资源路径正确）
+// /admin 与 /admin/ → admin SPA
 app.get("/admin", async (c) => serveHtml("/admin/index.html"));
 app.get("/admin/", async (c) => serveHtml("/admin/index.html"));
 app.get("/admin/index.html", async (c) => serveHtml("/admin/index.html"));
@@ -107,14 +119,6 @@ app.get("/admin/index.html", async (c) => serveHtml("/admin/index.html"));
 // /index.ts → 转译 JS
 app.get("/index.ts", (c) => serveJs("/masonry/index.ts"));
 app.get("/index.js", (c) => serveJs("/masonry/index.ts"));
-
-// /favicon.svg
-app.get("/favicon.svg", (c) => {
-  const file = Bun.file(`${STATIC_BASE}/favicon.svg`);
-  return new Response(file, {
-    headers: { "Content-Type": "image/svg+xml" },
-  });
-});
 
 // / → masonry 首页
 app.get("/", async (c) => serveHtml("/masonry/index.html"));

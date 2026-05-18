@@ -1,6 +1,7 @@
 import van from "vanjs-core";
 import { prepare, layout, type PreparedText } from "@chenglou/pretext";
 import { svgSearchIcon, svgChevronDown, svgEyeIcon } from "../helper/svgHelper";
+import { apiUrl } from "../helper/util";
 
 // --- config ---
 const font = '15px "Helvetica Neue", Helvetica, Arial, sans-serif';
@@ -162,7 +163,7 @@ function getLayout(): LayoutState {
 // --- data loading ---
 async function loadTags(): Promise<void> {
   try {
-    const resp = await fetch("api/memos/tags");
+    const resp = await fetch(apiUrl("api/memos/tags"));
     if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
     const data: { tags: string[] } = await resp.json();
     tags.val = data.tags;
@@ -173,7 +174,7 @@ async function loadTags(): Promise<void> {
 
 async function loadCount(): Promise<void> {
   try {
-    const resp = await fetch("api/memos/count");
+    const resp = await fetch(apiUrl("api/memos/count"));
     if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
     const data: { count: number } = await resp.json();
     memoCount.val = data.count;
@@ -199,7 +200,7 @@ async function fetchAndRender(pageNum: number = 0): Promise<void> {
     if (currentTag) params.set("tag", currentTag);
     params.set("page", String(pageNum));
     params.set("limit", "50");
-    const url = `api/memos?${params.toString()}`;
+    const url = apiUrl(`api/memos?${params.toString()}`);
 
     const resp = await fetch(url);
     if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
@@ -270,7 +271,7 @@ async function openSimilarModal(memoId: number): Promise<void> {
   document.body.style.overflow = "hidden";
 
   try {
-    const resp = await fetch(`api/memos/${memoId}/similar`);
+    const resp = await fetch(apiUrl(`api/memos/${memoId}/similar`));
     if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
     const data: { memos: SimilarMemo[] } = await resp.json();
     similarMemos.val = data.memos;

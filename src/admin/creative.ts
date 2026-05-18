@@ -1,5 +1,5 @@
 import van from "vanjs-core";
-import { api, formatDate, truncate } from "../helper/util";
+import { api, formatDate, truncate, apiUrl } from "../helper/util";
 import { getSelectedAiModel } from "./ai-state";
 import type { Prompt, CreativeItem, Memo } from "../model";
 import { svgTrash } from "../helper/svgHelper";
@@ -275,7 +275,7 @@ async function handleGenerate(): Promise<void> {
   streamAbort = new AbortController();
 
   try {
-    const resp = await fetch("api/creative/generate", {
+    const resp = await fetch(apiUrl("api/creative/generate"), {
       method: "POST",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json" },

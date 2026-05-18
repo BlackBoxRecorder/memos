@@ -6,9 +6,26 @@ export function json(data: unknown, status = 200): Response {
   });
 }
 
+// ====== API Base Path ======
+/** 读取服务端注入的 MEMOS_BASE_PATH，用于构造 API 请求绝对路径 */
+function getApiBasePath(): string {
+  try {
+    return (window as any).MEMOS_BASE_PATH || "";
+  } catch {
+    return "";
+  }
+}
+
+/** 将相对 API 路径（如 api/auth/check）转换为绝对路径（如 /memos/api/auth/check） */
+export function apiUrl(path: string): string {
+  const base = getApiBasePath();
+  const cleanPath = path.replace(/^\//, "");
+  return base ? `/${base}/${cleanPath}` : `/${cleanPath}`;
+}
+
 // ====== HTTP Client Helper ======
 export async function api<T>(path: string, options?: RequestInit): Promise<T> {
-  const resp = await fetch(path, {
+  const resp = await fetch(apiUrl(path), {
     credentials: "same-origin",
     headers: { "Content-Type": "application/json" },
     ...options,
