@@ -53,15 +53,14 @@ async function buildClientJs(srcPath: string): Promise<string | null> {
   }
 }
 
-async function serveHtml(path: string): Promise<Response> {
+async function serveHtml(
+  filePath: string,
+  urlDir: string = "/",
+): Promise<Response> {
   try {
-    const file = Bun.file(`${STATIC_BASE}${path}`);
+    const file = Bun.file(`${STATIC_BASE}${filePath}`);
     let html = await file.text();
     if (MEMOS_BASE_PATH) {
-      // 计算页面目录路径，用于将相对脚本 src 转为绝对路径
-      // e.g. "/masonry/index.html" → "/", "/admin/index.html" → "/admin/"
-      const pageDir = path.replace(/\/[^/]+\.html$/, "/");
-
       // 注入 MEMOS_BASE_PATH 到 <meta charset> 之后，
       // 前端 JS 通过 window.MEMOS_BASE_PATH 读取，用于构造 API 请求绝对路径
       html = html.replace(
@@ -69,19 +68,21 @@ async function serveHtml(path: string): Promise<Response> {
         `$1\n<script>window.MEMOS_BASE_PATH="${MEMOS_BASE_PATH}"</script>`,
       );
 
-      // 将相对脚本 src（如 index.ts、app.ts）转为带 base path 和页面目录的绝对路径
-      // 解决浏览器无尾部斜杠 URL 下相对路径解析错误的问题
+      // 将相对脚本 src 转为带 base path 和页面 URL 目录的绝对路径
+      // urlDir 为页面在浏览器中的目录路径（如 "/" 或 "/admin/"）
+      // e.g. src="index.ts" → src="/memos/index.ts"
+      // e.g. src="app.ts"  → src="/memos/admin/app.ts"
       html = html.replace(
         /(<script\s[^>]*?\bsrc=")([^/"][^"]*)(")/gi,
-        `$1${MEMOS_BASE_PATH}${pageDir}$2$3`,
+        `$1${MEMOS_BASE_PATH}${urlDir}$2$3`,
       );
     }
     return new Response(html, {
       headers: { "Content-Type": "text/html; charset=utf-8" },
     });
   } catch (e) {
-    console.error(`[serveHtml] Failed to serve ${path}:`, e);
-    return new Response(`Not Found: ${path}`, { status: 404 });
+    console.error(`[serveHtml] Failed to serve ${filePath}:`, e);
+    return new Response(`Not Found: ${filePath}`, { status: 404 });
   }
 }
 
@@ -95,8 +96,8 @@ async function serveJs(path: string): Promise<Response> {
   });
 }
 
-// nginx 反向代理已剥离前缀，Hono 不需要 basePath
-// MEMOS_BASE_PATH 仅通过 JS 全局变量传给前端，用于构造 API 请求路径
+// MEMOS_BASE_PATH 仅用于前端 JS 全局变量和 HTML 脚本 src 重写
+// Hono 路由通过双挂载（根路径 + MEMOS_BASE_PATH）兼容 nginx 剥离/不剥离前缀两种情况
 const app = new Hono({ strict: false });
 
 // API 路由 — 子应用挂载
@@ -122,30 +123,39 @@ app.get("/admin/favicon.svg", serveFavicon);
 app.get("/admin/app.ts", (c) => serveJs("/admin/app.ts"));
 app.get("/admin/app.js", (c) => serveJs("/admin/app.ts"));
 
-// /admin 与 /admin/ → admin SPA
-app.get("/admin", async (c) => serveHtml("/admin/index.html"));
-app.get("/admin/", async (c) => serveHtml("/admin/index.html"));
-app.get("/admin/index.html", async (c) => serveHtml("/admin/index.html"));
+// /admin 与 /admin/ → admin SPA（urlDir="/admin/" 确保脚本 src 解析正确）
+app.get("/admin", async (c) => serveHtml("/admin/index.html", "/admin/"));
+app.get("/admin/", async (c) => serveHtml("/admin/index.html", "/admin/"));
+app.get("/admin/index.html", async (c) =>
+  serveHtml("/admin/index.html", "/admin/"),
+);
 
 // /index.ts → 转译 JS
 app.get("/index.ts", (c) => serveJs("/masonry/index.ts"));
 app.get("/index.js", (c) => serveJs("/masonry/index.ts"));
 
-// / → masonry 首页
-app.get("/", async (c) => serveHtml("/masonry/index.html"));
-app.get("/index.html", async (c) => serveHtml("/masonry/index.html"));
+// / → masonry 首页（urlDir="/" 确保脚本 src 解析正确）
+app.get("/", async (c) => serveHtml("/masonry/index.html", "/"));
+app.get("/index.html", async (c) => serveHtml("/masonry/index.html", "/"));
 
 // admin SPA 深层链接 + 其他 .ts 文件
 app.notFound(async (c) => {
   const path = c.req.path;
   if (path.startsWith("/admin/")) {
-    return serveHtml("/admin/index.html");
+    return serveHtml("/admin/index.html", "/admin/");
   }
   if (path.endsWith(".ts")) {
     return serveJs(`/masonry${path}`);
   }
   return c.json({ error: "Not Found" }, 404);
 });
+
+// 双挂载：根路径（兼容 nginx 剥离前缀）+ MEMOS_BASE_PATH（兼容 nginx 不剥离前缀）
+const serveApp = new Hono({ strict: false });
+serveApp.route("/", app);
+if (MEMOS_BASE_PATH) {
+  serveApp.route(MEMOS_BASE_PATH, app);
+}
 
 // 初始化数据库
 initDb();
@@ -159,7 +169,7 @@ await initEmbeddingCache();
 // 启动服务器
 Bun.serve({
   port: PORT,
-  fetch: app.fetch,
+  fetch: serveApp.fetch,
 });
 
 console.log(`Memos server running at http://localhost:${PORT}`);

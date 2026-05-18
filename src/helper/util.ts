@@ -20,7 +20,7 @@ function getApiBasePath(): string {
 export function apiUrl(path: string): string {
   const base = getApiBasePath();
   const cleanPath = path.replace(/^\//, "");
-  return base ? `/${base}/${cleanPath}` : `/${cleanPath}`;
+  return base ? `${base}/${cleanPath}` : `/${cleanPath}`;
 }
 
 // ====== HTTP Client Helper ======
