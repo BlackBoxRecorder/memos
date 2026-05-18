@@ -306,7 +306,7 @@ async function openSimilarModal(memoId: number): Promise<void> {
     const resp = await fetch(apiUrl(`api/memos/${memoId}/similar`));
     if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
     const data: { memos: SimilarMemo[] } = await resp.json();
-    similarMemos.val = data.memos;
+    similarMemos.val = data.memos.filter((m) => m.id !== memoId);
   } catch (err) {
     similarError.val =
       err instanceof Error ? err.message : "Failed to load similar memos";

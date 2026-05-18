@@ -85,7 +85,9 @@ memosApp.get("/:id/similar", async (c) => {
     return c.json({ memos: [] });
   }
 
-  const memos = getMemos({ includePrivate: false, ids: similarIds });
+  const memos = getMemos({ includePrivate: false, ids: similarIds }).filter(
+    (m) => m.id !== id,
+  );
   return c.json({ memos });
 });
 
@@ -119,14 +121,14 @@ memosApp.post("/", authMiddleware, async (c) => {
   }
 
   const tags = Array.isArray(body.tags)
-    ? body.tags.filter((t): t is string => typeof t === "string" && t.trim().length > 0).map((t) => t.trim())
+    ? body.tags
+        .filter(
+          (t): t is string => typeof t === "string" && t.trim().length > 0,
+        )
+        .map((t) => t.trim())
     : [];
 
-  const memo = createMemo(
-    body.content.trim(),
-    body.is_public !== false,
-    tags,
-  );
+  const memo = createMemo(body.content.trim(), body.is_public !== false, tags);
 
   recordRateLimit(ip, "memo");
 
@@ -160,7 +162,11 @@ memosApp.put("/:id", authMiddleware, async (c) => {
   if (body.is_public !== undefined) fields.is_public = body.is_public;
   if (body.tags !== undefined) {
     fields.tags = Array.isArray(body.tags)
-      ? body.tags.filter((t): t is string => typeof t === "string" && t.trim().length > 0).map((t) => t.trim())
+      ? body.tags
+          .filter(
+            (t): t is string => typeof t === "string" && t.trim().length > 0,
+          )
+          .map((t) => t.trim())
       : [];
   }
 
