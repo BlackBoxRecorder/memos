@@ -46,8 +46,7 @@ const aiSuggestingTags = van.state(false);
 let tagSuggestAbort: AbortController | null = null;
 const readMoreText = van.state<string | null>(null);
 
-// 从服务端注入的 window.MEMOS_BASE_PATH 获取站点根路径
-const siteUrl = (window as any).MEMOS_BASE_PATH || "/";
+const siteUrl = "/";
 
 // Import/export state
 const importExportOpen = van.state(false);

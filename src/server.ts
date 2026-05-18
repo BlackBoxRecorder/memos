@@ -9,7 +9,6 @@ import { initEmbeddingCache } from "./ai/embeddings";
 import { initSeedData } from "./init/seed";
 
 const PORT = parseInt(process.env.PORT || "3020");
-const MEMOS_BASE_PATH = process.env.MEMOS_BASE_PATH || "";
 const STATIC_BASE = import.meta.dir;
 
 // 客户端 TS 打包（含 import 解析）+ mtime 缓存
@@ -59,24 +58,7 @@ async function serveHtml(
 ): Promise<Response> {
   try {
     const file = Bun.file(`${STATIC_BASE}${filePath}`);
-    let html = await file.text();
-    if (MEMOS_BASE_PATH) {
-      // 注入 MEMOS_BASE_PATH 到 <meta charset> 之后，
-      // 前端 JS 通过 window.MEMOS_BASE_PATH 读取，用于构造 API 请求绝对路径
-      html = html.replace(
-        /(<meta charset="utf-8"\s*\/?>)/i,
-        `$1\n<script>window.MEMOS_BASE_PATH="${MEMOS_BASE_PATH}"</script>`,
-      );
-
-      // 将相对脚本 src 转为带 base path 和页面 URL 目录的绝对路径
-      // urlDir 为页面在浏览器中的目录路径（如 "/" 或 "/admin/"）
-      // e.g. src="index.ts" → src="/memos/index.ts"
-      // e.g. src="app.ts"  → src="/memos/admin/app.ts"
-      html = html.replace(
-        /(<script\s[^>]*?\bsrc=")([^/"][^"]*)(")/gi,
-        `$1${MEMOS_BASE_PATH}${urlDir}$2$3`,
-      );
-    }
+    const html = await file.text();
     return new Response(html, {
       headers: { "Content-Type": "text/html; charset=utf-8" },
     });
@@ -96,8 +78,6 @@ async function serveJs(path: string): Promise<Response> {
   });
 }
 
-// MEMOS_BASE_PATH 仅用于前端 JS 全局变量和 HTML 脚本 src 重写
-// Hono 路由通过双挂载（根路径 + MEMOS_BASE_PATH）兼容 nginx 剥离/不剥离前缀两种情况
 const app = new Hono({ strict: false });
 
 // API 路由 — 子应用挂载
@@ -150,13 +130,6 @@ app.notFound(async (c) => {
   return c.json({ error: "Not Found" }, 404);
 });
 
-// 双挂载：根路径（兼容 nginx 剥离前缀）+ MEMOS_BASE_PATH（兼容 nginx 不剥离前缀）
-const serveApp = new Hono({ strict: false });
-serveApp.route("/", app);
-if (MEMOS_BASE_PATH) {
-  serveApp.route(MEMOS_BASE_PATH, app);
-}
-
 // 初始化数据库
 initDb();
 
@@ -169,8 +142,7 @@ await initEmbeddingCache();
 // 启动服务器
 Bun.serve({
   port: PORT,
-  fetch: serveApp.fetch,
+  fetch: app.fetch,
 });
 
 console.log(`Memos server running at http://localhost:${PORT}`);
-console.log(`MEMOS_BASE_PATH: ${MEMOS_BASE_PATH || "(none)"}`);
