@@ -39,6 +39,18 @@ let streamAbort: AbortController | null = null;
 const creativeDeleteId = van.state<number | null>(null);
 const creativeDeleting = van.state(false);
 
+// ====== Chat state (Phase 2) ======
+const creativeView = van.state<"list" | "chat">("list");
+interface ChatMsg {
+  role: "user" | "assistant";
+  content: string;
+}
+const chatMessages = van.state<ChatMsg[]>([]);
+const chatInput = van.state("");
+const chatStreaming = van.state(false);
+const chatContextCount = van.state(0);
+let chatAbort: AbortController | null = null;
+
 // Context preview state
 type PreviewMemo = Pick<Memo, "id" | "content" | "tags" | "created_at">;
 const previewOpen = van.state(false);
@@ -368,6 +380,143 @@ async function deleteCreativeItem(id: number): Promise<void> {
   } finally {
     creativeDeleting.val = false;
   }
+}
+
+// ====== Chat Actions ======
+
+/** Send a chat message to the AI workspace and handle SSE streaming. */
+async function sendChatMessage(): Promise<void> {
+  const msg = chatInput.val.trim();
+  if (!msg || chatStreaming.val) return;
+
+  chatInput.val = "";
+  chatStreaming.val = true;
+  chatContextCount.val = 0;
+
+  // Add user message
+  chatMessages.val = [...chatMessages.val, { role: "user", content: msg }];
+  // Add placeholder for assistant response
+  const aiIdx = chatMessages.val.length;
+  chatMessages.val = [...chatMessages.val, { role: "assistant", content: "" }];
+
+  if (chatAbort) chatAbort.abort();
+  chatAbort = new AbortController();
+
+  try {
+    const body: Record<string, unknown> = {
+      message: msg,
+      history: chatMessages.val.slice(0, aiIdx).map((m) => ({
+        role: m.role,
+        content: m.content,
+      })),
+    };
+    const selected = getSelectedAiModel();
+    if (selected) {
+      body.provider = selected.provider;
+      body.model = selected.model;
+    }
+
+    const resp = await fetch(apiUrl("api/ai/chat"), {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: chatAbort.signal,
+    });
+
+    if (!resp.ok) {
+      const err = await resp
+        .json()
+        .catch(() => ({ error: `请求失败（${resp.status}）` }));
+      throw new Error(err.error || "请求失败");
+    }
+
+    const reader = resp.body!.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let aiContent = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith("data: ")) continue;
+
+        try {
+          const evt = JSON.parse(trimmed.slice(6));
+          if (evt.type === "content") {
+            aiContent += evt.content;
+            const msgs = [...chatMessages.val];
+            msgs[aiIdx] = { role: "assistant", content: aiContent };
+            chatMessages.val = msgs;
+          } else if (evt.type === "done") {
+            chatContextCount.val = evt.contextCount ?? 0;
+          } else if (evt.type === "error") {
+            throw new Error(evt.error);
+          }
+        } catch (err) {
+          if ((err as Error).name === "SyntaxError") {
+            buffer = line + "\n" + buffer;
+            continue;
+          }
+          throw err;
+        }
+      }
+    }
+  } catch (err) {
+    if ((err as Error).name === "AbortError") return;
+    const msgs = [...chatMessages.val];
+    msgs[aiIdx] = {
+      role: "assistant",
+      content: `错误: ${(err as Error).message}`,
+    };
+    chatMessages.val = msgs;
+  } finally {
+    chatStreaming.val = false;
+    chatAbort = null;
+  }
+}
+
+/** Save the current conversation as a creative item. */
+async function saveChatAsCreative(): Promise<void> {
+  if (chatMessages.val.length === 0) return;
+  const content = chatMessages.val
+    .map((m) => `**${m.role === "user" ? "用户" : "AI"}：**\n${m.content}`)
+    .join("\n\n---\n\n");
+  try {
+    // Ensure we have a prompt; auto-select or create default
+    const data = await api<{ prompts: Prompt[] }>("api/creative/prompts");
+    if (data.prompts.length === 0) {
+      await api("api/creative/prompts", {
+        method: "POST",
+        body: JSON.stringify({ title: "对话记录", content: "对话记录" }),
+      });
+    }
+    const pdata = await api<{ prompts: Prompt[] }>("api/creative/prompts");
+    const promptId = pdata.prompts[0]?.id ?? 1;
+    const item = await api<{ item: CreativeItem }>("api/creative", {
+      method: "POST",
+      body: JSON.stringify({ prompt_id: promptId, content, extra_prompt: "" }),
+    });
+    creativeItems.val = [item.item, ...creativeItems.val];
+  } catch {
+    // silently fail
+  }
+}
+
+/** Clear the current conversation. */
+function newChat(): void {
+  if (chatAbort) chatAbort.abort();
+  chatMessages.val = [];
+  chatInput.val = "";
+  chatStreaming.val = false;
+  chatContextCount.val = 0;
 }
 
 // ====== Components ======
@@ -1034,6 +1183,177 @@ function CreativeCard(item: CreativeItem) {
 // ====== Main Creative Tab Component ======
 
 /** Root component of the Creative tab: tag cloud, generate button, modals, and conditional content list. */
+// ====== ChatPanel Component ======
+
+function ChatPanel() {
+  const { span, button, textarea, form } = van.tags;
+
+  const handleKeydown = (e: KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendChatMessage();
+    }
+  };
+
+  const handleSubmit = (e: Event) => {
+    e.preventDefault();
+    sendChatMessage();
+  };
+
+  return div(
+    {},
+    // Conversation area
+    div(
+      {
+        style:
+          "max-height:60vh;overflow-y:auto;margin-bottom:12px;padding:12px;background:var(--bg-secondary);border-radius:8px;border:1px solid var(--border-color);",
+      },
+      () =>
+        chatMessages.val.length === 0
+          ? div(
+              {
+                style:
+                  "text-align:center;color:var(--text-muted);padding:40px 20px;",
+              },
+              "开始与 AI 对话，探索你的笔记库。",
+            )
+          : div(
+              chatMessages.val.map((msg, i) =>
+                div(
+                  {
+                    style: () => {
+                      const isUser = chatMessages.val[i]?.role === "user";
+                      return (
+                        "margin-bottom:12px;padding:8px 12px;border-radius:8px;max-width:85%;" +
+                        (isUser
+                          ? "margin-left:auto;background:var(--primary-light);color:var(--primary-text);"
+                          : "margin-right:auto;background:var(--bg-primary);border:1px solid var(--border-color);")
+                      );
+                    },
+                  },
+                  div(
+                    {
+                      style:
+                        "font-size:11px;font-weight:600;margin-bottom:4px;color:var(--text-muted);",
+                    },
+                    msg.role === "user" ? "你" : "AI 助手",
+                  ),
+                  div(
+                    {
+                      style:
+                        "white-space:pre-wrap;word-break:break-word;font-size:14px;line-height:1.6;",
+                    },
+                    msg.content ||
+                      (chatStreaming.val && i === chatMessages.val.length - 1
+                        ? div(
+                            { style: "color:var(--text-muted);" },
+                            "思考中...",
+                          )
+                        : ""),
+                  ),
+                ),
+              ),
+            ),
+    ),
+    // Status bar
+    () =>
+      chatContextCount.val > 0
+        ? div(
+            {
+              style:
+                "font-size:12px;color:var(--text-muted);margin-bottom:8px;",
+            },
+            `已检索 ${chatContextCount.val} 条相关备忘录作为上下文`,
+          )
+        : "",
+    // Input area
+    () =>
+      form(
+        {
+          onsubmit: handleSubmit,
+          style: "display:flex;gap:8px;align-items:flex-end;",
+        },
+        textarea({
+          class: "form-input",
+          placeholder: "输入消息探索你的笔记...",
+          disabled: chatStreaming.val,
+          oninput: (e: InputEvent) =>
+            (chatInput.val = (e.target as HTMLTextAreaElement).value),
+          onkeydown: handleKeydown,
+          value: chatInput.val,
+          rows: 2,
+          style:
+            "flex:1;resize:none;min-height:44px;padding:8px;border-radius:8px;border:1px solid var(--border-color);font-size:14px;background:var(--bg-primary);color:var(--text-primary);",
+        }),
+        button(
+          {
+            class: () =>
+              "btn btn-sm " +
+              (chatStreaming.val ? "btn-outline" : "btn-primary"),
+            disabled: () => chatStreaming.val || !chatInput.val.trim(),
+            type: "submit",
+            style: "flex-shrink:0;",
+          },
+          () => (chatStreaming.val ? "..." : "发送"),
+        ),
+      ),
+    // Action buttons
+    div(
+      { style: "margin-top:12px;display:flex;gap:8px;" },
+      button(
+        {
+          class: "btn btn-sm",
+          disabled: () => chatMessages.val.length === 0,
+          onclick: saveChatAsCreative,
+          style: "font-size:12px;",
+        },
+        "保存对话",
+      ),
+      button(
+        {
+          class: "btn btn-sm btn-outline",
+          disabled: () => chatMessages.val.length === 0,
+          onclick: newChat,
+          style: "font-size:12px;",
+        },
+        "新对话",
+      ),
+      // Prompt launcher (Task 5): show available prompts as quick-start chips
+      () =>
+        prompts.val.length > 0
+          ? div(
+              {
+                style: "display:flex;gap:6px;flex-wrap:wrap;margin-left:auto;",
+              },
+              prompts.val.slice(0, 5).map((p) =>
+                button(
+                  {
+                    class: "tag-btn",
+                    style: "font-size:11px;padding:2px 8px;",
+                    title: p.content,
+                    onclick: () => {
+                      chatMessages.val = [
+                        ...chatMessages.val,
+                        {
+                          role: "user",
+                          content: `使用提示词「${p.title}」：\n${p.content}`,
+                        },
+                      ];
+                      // Auto-scroll and focus
+                      setTimeout(() => sendChatMessage(), 100);
+                    },
+                  },
+                  p.title,
+                ),
+              ),
+            )
+          : "",
+    ),
+  );
+}
+
+// ====== CreativeTab ======
+
 export function CreativeTab() {
   // Load data on first render
   if (prompts.val.length === 0) {
@@ -1041,43 +1361,100 @@ export function CreativeTab() {
   }
 
   return div(
-    // Tag cloud
-    () => (prompts.val.length > 0 ? TagCloud() : ""),
-    // Generate button (below tag cloud)
+    // Sub-tab bar
     div(
-      { style: "margin-bottom:16px;" },
+      {
+        style:
+          "display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid var(--border-color);",
+      },
       button(
         {
-          class: "btn btn-primary btn-sm",
-          disabled: () => selectedPromptId.val === null,
-          onclick: () => (generateModalOpen.val = true),
-          title:
-            selectedPromptId.val === null ? "请先选择提示词" : "生成创意内容",
+          class: () =>
+            "tab-btn " + (creativeView.val === "list" ? "active" : ""),
+          style: () =>
+            "padding:8px 20px;font-size:14px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid " +
+            (creativeView.val === "list"
+              ? "var(--primary-color)"
+              : "transparent") +
+            ";color:" +
+            (creativeView.val === "list"
+              ? "var(--primary-color)"
+              : "var(--text-muted)") +
+            ";margin-bottom:-2px;",
+          onclick: () => {
+            creativeView.val = "list";
+          },
         },
-        "生成",
+        "列表视图",
+      ),
+      button(
+        {
+          class: () =>
+            "tab-btn " + (creativeView.val === "chat" ? "active" : ""),
+          style: () =>
+            "padding:8px 20px;font-size:14px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid " +
+            (creativeView.val === "chat"
+              ? "var(--primary-color)"
+              : "transparent") +
+            ";color:" +
+            (creativeView.val === "chat"
+              ? "var(--primary-color)"
+              : "var(--text-muted)") +
+            ";margin-bottom:-2px;",
+          onclick: () => {
+            creativeView.val = "chat";
+          },
+        },
+        "对话模式",
       ),
     ),
-    // Generate modal
-    () => (generateModalOpen.val ? GenerateModal() : ""),
-    // Prompt form modal
-    () => (promptFormMode.val.type !== "closed" ? PromptForm() : ""),
-    // Creative content list
-    () => {
-      if (prompts.val.length === 0) {
-        return div({ class: "empty-state" }, "还没有提示词，创建一个开始吧！");
-      }
-      if (creativeLoading.val) {
-        return div({ class: "status-msg" }, "加载中...");
-      }
-      if (creativeItems.val.length === 0) {
-        return div(
-          { class: "empty-state" },
-          "还没有创意内容。请在上方选择提示词并点击生成。",
-        );
-      }
-      return div(creativeItems.val.map(CreativeCard));
-    },
-    // Read more modal
-    () => (readMoreItem.val ? ReadMoreModal() : ""),
+    () =>
+      creativeView.val === "chat"
+        ? ChatPanel()
+        : div(
+            // Tag cloud (list view only)
+            () => (prompts.val.length > 0 ? TagCloud() : ""),
+            // Generate button (below tag cloud)
+            div(
+              { style: "margin-bottom:16px;" },
+              button(
+                {
+                  class: "btn btn-primary btn-sm",
+                  disabled: () => selectedPromptId.val === null,
+                  onclick: () => (generateModalOpen.val = true),
+                  title:
+                    selectedPromptId.val === null
+                      ? "请先选择提示词"
+                      : "生成创意内容",
+                },
+                "生成",
+              ),
+            ),
+            // Generate modal
+            () => (generateModalOpen.val ? GenerateModal() : ""),
+            // Prompt form modal
+            () => (promptFormMode.val.type !== "closed" ? PromptForm() : ""),
+            // Creative content list
+            () => {
+              if (prompts.val.length === 0) {
+                return div(
+                  { class: "empty-state" },
+                  "还没有提示词，创建一个开始吧！",
+                );
+              }
+              if (creativeLoading.val) {
+                return div({ class: "status-msg" }, "加载中...");
+              }
+              if (creativeItems.val.length === 0) {
+                return div(
+                  { class: "empty-state" },
+                  "还没有创意内容。请在上方选择提示词并点击生成。",
+                );
+              }
+              return div(creativeItems.val.map(CreativeCard));
+            },
+            // Read more modal
+            () => (readMoreItem.val ? ReadMoreModal() : ""),
+          ),
   );
 }

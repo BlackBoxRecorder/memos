@@ -7,7 +7,10 @@ import {
   suggestTags,
   getAvailableModels,
   executeAction,
+  chatStream,
 } from "../ai/service";
+import { getSemanticResults } from "../ai/embeddings";
+import { getMemos } from "../db";
 import {
   checkRateLimit,
   recordRateLimit,
@@ -187,4 +190,107 @@ aiApp.post("/action", authMiddleware, async (c) => {
   recordRateLimit(ip, "ai");
 
   return c.json({ result });
+});
+
+// POST /api/ai/chat — 对话式 AI 工作台 (SSE, auth required)
+interface ChatMessage {
+  role: string;
+  content: string;
+}
+
+aiApp.post("/chat", authMiddleware, async (c) => {
+  let body: {
+    message?: string;
+    history?: ChatMessage[];
+    provider?: string;
+    model?: string;
+  };
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON" }, 400);
+  }
+
+  if (
+    !body.message ||
+    typeof body.message !== "string" ||
+    body.message.trim().length === 0
+  ) {
+    return c.json({ error: "Message is required" }, 400);
+  }
+
+  if (!isAiAvailable().optimize) {
+    return c.json({ error: "AI chat is not configured" }, 503);
+  }
+
+  const ip = getClientIP(c);
+  const rateError = checkRateLimit(ip, "ai");
+  if (rateError) {
+    return c.json({ error: formatRateLimitError("ai", rateError) }, 429);
+  }
+
+  recordRateLimit(ip, "ai");
+
+  const message = body.message.trim();
+  const history: ChatMessage[] = Array.isArray(body.history)
+    ? body.history.filter(
+        (h) => h && typeof h.role === "string" && typeof h.content === "string",
+      )
+    : [];
+
+  // Semantic search for relevant memo context
+  let contextMemos: string[] = [];
+  try {
+    const semanticIds = await getSemanticResults(message, 5);
+    if (semanticIds.length > 0) {
+      const memos = getMemos({ includePrivate: true, ids: semanticIds });
+      contextMemos = memos.map((m) => m.content);
+    }
+  } catch {
+    // Semantic search failed, continue without context
+  }
+
+  // Build SSE stream
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      try {
+        const gen = chatStream(
+          message,
+          history,
+          contextMemos,
+          body.provider,
+          body.model,
+        );
+
+        for await (const chunk of gen) {
+          const data = JSON.stringify({ type: "content", content: chunk });
+          controller.enqueue(encoder.encode(`data: ${data}\n\n`));
+        }
+
+        controller.enqueue(
+          encoder.encode(
+            `data: ${JSON.stringify({ type: "done", contextCount: contextMemos.length })}\n\n`,
+          ),
+        );
+        controller.close();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        controller.enqueue(
+          encoder.encode(
+            `data: ${JSON.stringify({ type: "error", error: msg })}\n\n`,
+          ),
+        );
+        controller.close();
+      }
+    },
+  });
+
+  return c.body(stream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    },
+  });
 });

@@ -474,3 +474,33 @@ export async function* generateCreativeContentStream(
     },
   ]);
 }
+
+// --- Chat Workspace (Phase 2) ---
+
+export async function* chatStream(
+  message: string,
+  history: Array<{ role: string; content: string }>,
+  contextMemos: string[],
+  providerId?: string,
+  model?: string,
+): AsyncGenerator<string> {
+  const pid = providerId || getDefaultProviderId();
+  const mdl = model || getDefaultModel();
+
+  const contextText =
+    contextMemos.length > 0
+      ? `\n\n以下为用户笔记库中与当前话题相关的内容，可作为参考：\n${contextMemos
+          .map((c, i) => `${i + 1}. ${c.slice(0, 500)}`)
+          .join("\n\n")}`
+      : "";
+
+  const systemPrompt = `你是用户的个人笔记助手，可以帮助用户回顾、总结、分析和探讨他们的笔记内容。${contextText}`;
+
+  const messages: Array<{ role: string; content: string }> = [
+    { role: "system", content: systemPrompt },
+    ...history.slice(-20), // Limit history to last 20 messages
+    { role: "user", content: message },
+  ];
+
+  yield* chatCompletionStream(pid, mdl, messages);
+}
