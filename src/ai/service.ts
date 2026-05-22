@@ -2,7 +2,15 @@
 // All chat APIs use OpenAI-compatible format via standard fetch()
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { getOptimizePrompt, getSuggestTagsPrompt } from "./prompts";
+import {
+  getOptimizePrompt,
+  getSuggestTagsPrompt,
+  getSummarizePrompt,
+  getRewritePrompt,
+  getExpandPrompt,
+  getKeypointsPrompt,
+  getPolishPrompt,
+} from "./prompts";
 import { getAppConfig } from "../config/app-config";
 
 function aiTimeout(): number {
@@ -298,6 +306,44 @@ export async function suggestTags(
       .filter((s) => s.length > 0)
       .slice(0, 5);
   }
+}
+
+// --- AI 写作工具箱：统一操作执行 ---
+
+export async function executeAction(
+  content: string,
+  action: "summarize" | "rewrite" | "expand" | "extract-keypoints" | "polish",
+  style?: "professional" | "casual" | "minimal" | "academic",
+  providerId?: string,
+  model?: string,
+): Promise<string | null> {
+  const pid = providerId || getDefaultProviderId();
+  const mdl = model || getDefaultModel();
+  if (!resolveProvider(pid)) return null;
+
+  let systemPrompt: string;
+  switch (action) {
+    case "summarize":
+      systemPrompt = getSummarizePrompt();
+      break;
+    case "rewrite":
+      systemPrompt = getRewritePrompt(style || "professional");
+      break;
+    case "expand":
+      systemPrompt = getExpandPrompt();
+      break;
+    case "extract-keypoints":
+      systemPrompt = getKeypointsPrompt();
+      break;
+    case "polish":
+      systemPrompt = getPolishPrompt();
+      break;
+  }
+
+  return chatCompletion(pid, mdl, [
+    { role: "system", content: systemPrompt },
+    { role: "user", content },
+  ]);
 }
 
 // --- DashScope Embeddings (unchanged) ---

@@ -6,6 +6,7 @@ import {
   optimizeContent,
   suggestTags,
   getAvailableModels,
+  executeAction,
 } from "../ai/service";
 import {
   checkRateLimit,
@@ -105,4 +106,85 @@ aiApp.post("/suggest-tags", authMiddleware, async (c) => {
   recordRateLimit(ip2, "ai");
 
   return c.json({ tags });
+});
+
+// POST /api/ai/action — 统一 AI 写作操作（auth required）
+const VALID_ACTIONS = [
+  "summarize",
+  "rewrite",
+  "expand",
+  "extract-keypoints",
+  "polish",
+] as const;
+const VALID_STYLES = ["professional", "casual", "minimal", "academic"];
+
+aiApp.post("/action", authMiddleware, async (c) => {
+  let body: {
+    content?: string;
+    action?: string;
+    style?: string;
+    provider?: string;
+    model?: string;
+  };
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON" }, 400);
+  }
+
+  if (
+    !body.content ||
+    typeof body.content !== "string" ||
+    body.content.trim().length === 0
+  ) {
+    return c.json({ error: "Content is required" }, 400);
+  }
+
+  if (
+    !body.action ||
+    !VALID_ACTIONS.includes(body.action as (typeof VALID_ACTIONS)[number])
+  ) {
+    return c.json(
+      { error: `Invalid action. Must be one of: ${VALID_ACTIONS.join(", ")}` },
+      400,
+    );
+  }
+
+  const action = body.action as (typeof VALID_ACTIONS)[number];
+
+  // 改写操作支持 style 参数
+  let style: "professional" | "casual" | "minimal" | "academic" | undefined;
+  if (action === "rewrite") {
+    if (
+      body.style &&
+      (VALID_STYLES as readonly string[]).includes(body.style)
+    ) {
+      style = body.style as "professional" | "casual" | "minimal" | "academic";
+    }
+  }
+
+  if (!isAiAvailable().optimize) {
+    return c.json({ error: "AI is not configured" }, 503);
+  }
+
+  const ip = getClientIP(c);
+  const rateError = checkRateLimit(ip, "ai");
+  if (rateError) {
+    return c.json({ error: formatRateLimitError("ai", rateError) }, 429);
+  }
+
+  const result = await executeAction(
+    body.content.trim(),
+    action,
+    style,
+    body.provider,
+    body.model,
+  );
+  if (result === null) {
+    return c.json({ error: "AI service temporarily unavailable" }, 500);
+  }
+
+  recordRateLimit(ip, "ai");
+
+  return c.json({ result });
 });
