@@ -79,6 +79,18 @@ export async function toggleVisibility(memo: Memo): Promise<void> {
   }
 }
 
+export async function togglePin(memo: Memo): Promise<void> {
+  try {
+    await api(`api/memos/${memo.id}/pin`, {
+      method: "PUT",
+      body: JSON.stringify({ pinned: !memo.pinned_at }),
+    });
+    await loadMemos();
+  } catch (err) {
+    globalError.val = (err as Error).message;
+  }
+}
+
 export async function deleteMemo(id: number): Promise<void> {
   deleteDeleting.val = true;
   try {

@@ -16,9 +16,9 @@ export function initDb(): void {
   const d = getDb();
 
   // Migration: rename old 'tag' column to 'tags' and convert data to JSON arrays
-  const colInfo = d
-    .query("PRAGMA table_info(memos)")
-    .all() as Array<{ name: string }>;
+  const colInfo = d.query("PRAGMA table_info(memos)").all() as Array<{
+    name: string;
+  }>;
   const hasTagColumn = colInfo.some((c) => c.name === "tag");
   const hasTagsColumn = colInfo.some((c) => c.name === "tags");
   if (hasTagColumn && !hasTagsColumn) {
@@ -38,10 +38,22 @@ export function initDb(): void {
       content     TEXT    NOT NULL,
       tags        TEXT    NOT NULL DEFAULT '[]',
       is_public   INTEGER NOT NULL DEFAULT 1,
+      pinned_at   TEXT,
       created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
       updated_at  TEXT    NOT NULL DEFAULT (datetime('now'))
     )
   `);
+
+  // Migration: add pinned_at column if not exists (for existing databases)
+  const memoCols = d.query("PRAGMA table_info(memos)").all() as Array<{
+    name: string;
+  }>;
+  if (memoCols.length > 0 && !memoCols.some((c) => c.name === "pinned_at")) {
+    d.run("ALTER TABLE memos ADD COLUMN pinned_at TEXT");
+    console.log("[db] Added pinned_at column to memos");
+  }
+
+  d.run("CREATE INDEX IF NOT EXISTS idx_memos_pinned_at ON memos(pinned_at)");
   d.run(`
     CREATE TABLE IF NOT EXISTS memo_embeddings (
       memo_id    INTEGER PRIMARY KEY,
@@ -80,6 +92,7 @@ interface MemoRow {
   content: string;
   tags: string;
   is_public: number;
+  pinned_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -126,6 +139,7 @@ function rowToMemo(row: MemoRow): Memo {
     content: row.content,
     tags: parseTags(row.tags),
     is_public: row.is_public === 1,
+    pinned_at: row.pinned_at || null,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -170,7 +184,7 @@ export function getMemos(opts: {
 
   const where =
     conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-  const sql = `SELECT * FROM memos ${where} ORDER BY created_at DESC`;
+  const sql = `SELECT * FROM memos ${where} ORDER BY pinned_at IS NOT NULL DESC, pinned_at DESC, created_at DESC`;
   const rows = d.query(sql).all(...params) as MemoRow[];
   return rows.map(rowToMemo);
 }
@@ -243,6 +257,16 @@ export function deleteMemo(id: number): boolean {
   const d = getDb();
   const result = d.run("DELETE FROM memos WHERE id = ?", [id]);
   return result.changes > 0;
+}
+
+export function pinMemo(id: number, pin: boolean): Memo | null {
+  const d = getDb();
+  if (pin) {
+    d.run("UPDATE memos SET pinned_at = datetime('now') WHERE id = ?", [id]);
+  } else {
+    d.run("UPDATE memos SET pinned_at = NULL WHERE id = ?", [id]);
+  }
+  return getMemo(id);
 }
 
 // --- Embedding helpers ---
@@ -405,18 +429,18 @@ export function importMemo(fields: {
   content: string;
   tags: string[];
   is_public: boolean;
+  pinned_at?: string;
   created_at: string;
 }): Memo {
   const d = getDb();
-  const tagsJson = JSON.stringify(
-    fields.tags.filter((t) => t.length > 0),
-  );
+  const tagsJson = JSON.stringify(fields.tags.filter((t) => t.length > 0));
   const result = d.run(
-    "INSERT INTO memos (content, tags, is_public, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+    "INSERT INTO memos (content, tags, is_public, pinned_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
     [
       fields.content,
       tagsJson,
       fields.is_public ? 1 : 0,
+      fields.pinned_at || null,
       fields.created_at,
       fields.created_at,
     ],

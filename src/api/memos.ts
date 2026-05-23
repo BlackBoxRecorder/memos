@@ -12,6 +12,7 @@ import {
   createMemo,
   updateMemo,
   deleteMemo,
+  pinMemo,
   getAllTags,
   countMemos,
 } from "../db";
@@ -41,7 +42,9 @@ memosApp.get("/", async (c) => {
         const existingIds = new Set(result.map((m) => m.id));
         const extraIds = semanticIds.filter((id) => !existingIds.has(id));
         if (extraIds.length > 0) {
-          const extraMemos = getMemos({ includePrivate, ids: extraIds });
+          const extraMemos = getMemos({ includePrivate, ids: extraIds }).sort(
+            (a, b) => extraIds.indexOf(a.id) - extraIds.indexOf(b.id),
+          );
           result.push(...extraMemos);
         }
       }
@@ -85,9 +88,9 @@ memosApp.get("/:id/similar", async (c) => {
     return c.json({ memos: [] });
   }
 
-  const memos = getMemos({ includePrivate: false, ids: similarIds }).filter(
-    (m) => m.id !== id,
-  );
+  const memos = getMemos({ includePrivate: false, ids: similarIds })
+    .filter((m) => m.id !== id)
+    .sort((a, b) => similarIds.indexOf(a.id) - similarIds.indexOf(b.id));
   return c.json({ memos });
 });
 
@@ -193,4 +196,24 @@ memosApp.delete("/:id", authMiddleware, (c) => {
   deleteEmbeddingCache(id);
 
   return c.json({ ok: true });
+});
+
+// PUT /api/memos/:id/pin — 置顶/取消置顶
+memosApp.put("/:id/pin", authMiddleware, async (c) => {
+  const id = Number(c.req.param("id"));
+  let body: { pinned?: boolean };
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON" }, 400);
+  }
+
+  if (typeof body.pinned !== "boolean") {
+    return c.json({ error: "pinned must be a boolean" }, 400);
+  }
+
+  const memo = pinMemo(id, body.pinned);
+  if (!memo) return c.json({ error: "Memo not found" }, 404);
+
+  return c.json({ memo });
 });

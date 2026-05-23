@@ -23,6 +23,7 @@ type Card = {
   text: string;
   prepared: PreparedText;
   updatedAt: string;
+  pinnedAt: string | null;
 };
 
 type PositionedCard = {
@@ -127,8 +128,9 @@ function computeLayout(cardsArr: Card[], winWidth: number): LayoutState {
     }
 
     const { height } = layout(cardsArr[i]!.prepared, textWidth, lineHeight);
+    const pinBadgeHeight = cardsArr[i]!.pinnedAt ? 18 : 0;
     const buttonAreaHeight = 28;
-    const totalH = height + cardPadding * 2 + buttonAreaHeight;
+    const totalH = height + cardPadding * 2 + buttonAreaHeight + pinBadgeHeight;
 
     positionedCards.push({
       cardIndex: i,
@@ -212,7 +214,12 @@ async function fetchAndRender(pageNum: number = 0): Promise<void> {
     const resp = await fetch(url);
     if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
     const data: {
-      memos: { id: number; content: string; updated_at: string }[];
+      memos: {
+        id: number;
+        content: string;
+        updated_at: string;
+        pinned_at: string | null;
+      }[];
       hasMore: boolean;
     } = await resp.json();
 
@@ -229,6 +236,7 @@ async function fetchAndRender(pageNum: number = 0): Promise<void> {
       id: m.id,
       text: m.content,
       updatedAt: m.updated_at,
+      pinnedAt: m.pinned_at || null,
       prepared: getOrPrepare(truncateText(m.content).displayText, font),
     }));
 
@@ -442,6 +450,16 @@ function MasonryCard(card: Card, index: number, layoutState: LayoutState) {
       "data-memo-id": String(card.id),
       style: `left:${pos.x}px;top:${pos.y}px;width:${layoutState.colWidth}px;height:${pos.h}px`,
     },
+    () =>
+      card.pinnedAt
+        ? div(
+            {
+              style:
+                "font-size:12px;color:#e67e22;padding:0 0 4px 0;display:flex;align-items:center;gap:2px;",
+            },
+            "📌 已置顶",
+          )
+        : "",
     div({ class: "card-text" }, escapeHtml(displayText)),
     div(
       { class: "card-info" },

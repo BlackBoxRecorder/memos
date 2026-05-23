@@ -3,6 +3,7 @@ export interface Memo {
   content: string;
   tags: string[];
   is_public: boolean;
+  pinned_at: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -51,6 +51,7 @@ function formatExportData(
           tags: m.tags.join(","),
           isPrivate: m.is_public ? "false" : "true",
           type: "memo",
+          ...(m.pinned_at ? { pinned: m.pinned_at } : {}),
         },
         m.content,
       ),
@@ -79,6 +80,7 @@ interface ParsedRecord {
   date: string;
   tags: string[];
   isPrivate?: boolean;
+  pinnedAt?: string | null;
   content: string;
 }
 
@@ -145,6 +147,7 @@ function parseRecord(block: string): ParsedRecord | null {
       .map((t) => t.trim())
       .filter((t) => t.length > 0);
     record.isPrivate = metadata["isPrivate"] === "true";
+    record.pinnedAt = metadata["pinned"] || null;
   }
 
   return record;
@@ -237,6 +240,7 @@ exportImportApp.post("/import", authMiddleware, async (c) => {
           content: record.content,
           tags: record.tags,
           is_public: !record.isPrivate,
+          pinned_at: record.pinnedAt || undefined,
           created_at:
             record.date ||
             new Date().toISOString().replace("T", " ").slice(0, 19),

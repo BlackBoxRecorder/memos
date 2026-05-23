@@ -7,6 +7,7 @@ import {
   svgEdit,
   svgTrash,
   svgSparkle,
+  svgPin,
 } from "../../helper/svgHelper";
 import type { Memo } from "../../model";
 import {
@@ -21,6 +22,7 @@ import {
 } from "../state";
 import {
   toggleVisibility,
+  togglePin,
   deleteMemo,
   openEditForm,
   openReadMore,
@@ -72,6 +74,16 @@ export function MemoCard(memo: Memo) {
 
   return div(
     { class: "memo-card", "data-memo-id": String(memo.id) },
+    () =>
+      memo.pinned_at
+        ? div(
+            {
+              style:
+                "font-size:12px;color:#e67e22;padding:0 0 4px 0;display:flex;align-items:center;gap:2px;",
+            },
+            "📌 已置顶",
+          )
+        : "",
     div({ class: "memo-content" }, truncate(memo.content, 200), () =>
       memo.content.length > 200
         ? button(
@@ -93,6 +105,14 @@ export function MemoCard(memo: Memo) {
         : span(`\u521B\u5EFA\u4E8E\uFF1A${formatDate(memo.created_at)}`),
       span(
         { class: "memo-meta-icons" },
+        button(
+          {
+            class: () => "memo-icon-btn" + (memo.pinned_at ? " pinned" : ""),
+            title: memo.pinned_at ? "\u53D6\u6D88\u7F6E\u9876" : "\u7F6E\u9876",
+            onclick: () => togglePin(memo),
+          },
+          svgPin(),
+        ),
         button(
           {
             class: "memo-icon-btn",

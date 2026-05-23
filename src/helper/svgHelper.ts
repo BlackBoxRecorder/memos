@@ -45,6 +45,12 @@ export function svgUnlock(): HTMLElement {
   );
 }
 
+export function svgPin(): HTMLElement {
+  return svgNode(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.92V6h1.03a2 2 0 0 0 2-2.08c-.04-.95-.83-1.75-1.78-1.84-1.16-.12-2.25.78-2.25 1.96V6h-1.03a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V17z"/></svg>`,
+  );
+}
+
 export function svgEdit(): HTMLElement {
   return svgNode(
     `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>`,
