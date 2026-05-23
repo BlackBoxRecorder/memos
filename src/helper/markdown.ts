@@ -131,3 +131,17 @@ function removeAfterNode(node: Node): void {
     current = current.parentNode;
   }
 }
+
+/**
+ * 检测文本是否包含 markdown 语法标记。
+ * 使用两段式正则：快速预检字符集 + 精确语法匹配，
+ * 避免误判普通文本中的 `-`、`#` 等字符。
+ */
+export function hasMarkdown(text: string): boolean {
+  return (
+    /[#*_~`>\[\]!|-]/.test(text) &&
+    /^#{1,6}\s|[*_~`]|\[.*\]\(.*\)|!\[.*\]\(.*\)|^\s*[-*+]\s|^\s*>\s|^\s*\d+\.\s/m.test(
+      text,
+    )
+  );
+}

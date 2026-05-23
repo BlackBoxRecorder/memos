@@ -8,6 +8,7 @@ import {
   svgCheck,
 } from "../helper/svgHelper";
 import { apiUrl } from "../helper/util";
+import { renderMarkdown, stripHtmlTags, hasMarkdown } from "../helper/markdown";
 
 // --- config ---
 const font = '15px "Helvetica Neue", Helvetica, Arial, sans-serif';
@@ -232,13 +233,18 @@ async function fetchAndRender(pageNum: number = 0): Promise<void> {
       return;
     }
 
-    const newCards: Card[] = data.memos.map((m) => ({
-      id: m.id,
-      text: m.content,
-      updatedAt: m.updated_at,
-      pinnedAt: m.pinned_at || null,
-      prepared: getOrPrepare(truncateText(m.content).displayText, font),
-    }));
+    const newCards: Card[] = data.memos.map((m) => {
+      const plainText = hasMarkdown(m.content)
+        ? stripHtmlTags(renderMarkdown(m.content))
+        : m.content;
+      return {
+        id: m.id,
+        text: plainText,
+        updatedAt: m.updated_at,
+        pinnedAt: m.pinned_at || null,
+        prepared: getOrPrepare(truncateText(plainText).displayText, font),
+      };
+    });
 
     if (pageNum === 0) {
       cards.val = newCards;
@@ -613,8 +619,8 @@ function ReadMoreModal() {
       ),
       div(
         { class: "readmore-modal-body" },
-        div({ class: "readmore-modal-text" }, () =>
-          escapeHtml(readMoreText.val || ""),
+        div({ class: "readmore-modal-text md-content" }, () =>
+          span({ innerHTML: renderMarkdown(readMoreText.val || "") }),
         ),
       ),
     ),
