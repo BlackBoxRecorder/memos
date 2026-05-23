@@ -54,7 +54,7 @@ function SearchInput() {
     id: "search-input",
     type: "search",
     placeholder: "Search memos...",
-    value: search.val,
+    value: search,
     oninput: (e: Event) => {
       search.val = (e.target as HTMLInputElement).value;
       debouncedSearch();

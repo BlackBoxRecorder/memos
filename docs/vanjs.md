@@ -168,26 +168,33 @@ button({
 
 ### 3.1 oninput 与状态同步
 
-VanJS 中表单输入的标准模式是：**`oninput` 事件中手动将 DOM 值同步到 State**。
+VanJS 中表单的 `value` 有**三种绑定模式**，分属不同的响应式类别（来自 VanJS 官方定义）：
+
+| 写法 | 分类 | 行为 |
+|---|---|---|
+| `value: state` | **State-typed property** | 建立订阅，State 变化时外科手术式更新 DOM property，保留元素身份 |
+| `value: () => state.val` | **State-derived property** | 追踪依赖，每次变化重新执行函数并更新属性 |
+| `value: state.val` | **静态原始值** | 一次性初始化赋值，无订阅，无追踪 |
+
+**标准推荐（State-typed）**：
 
 ```typescript
 textarea({
   placeholder: "What's on your mind?",
-  value: formContent,          // 绑定 State 对象（不是 .val）
+  value: formContent,          // State-typed：绑定 State 对象
   oninput: (e: Event) => {
     formContent.val = (e.target as HTMLTextAreaElement).value;
   },
 })
 
-input({
-  type: "checkbox",
-  checked: formIsPublic,
-  oninput: (e: Event) =>
-    (formIsPublic.val = (e.target as HTMLInputElement).checked),
-})
+// Connected Props：多个输入框共享同一个 State
+input({ type: "text", value: text, oninput: e => text.val = e.target.value })
+input({ type: "text", value: text, oninput: e => text.val = e.target.value })
 ```
 
-**关于 `value` 绑定的重要陷阱（见第六节 6.1）**：当输入框在模态框等会被重建的容器中时，`value` 绑定 State 对象可能导致焦点丢失。此时需改绑原始值 `.val` 并纯靠 `oninput` 管理。
+**为什么默认推荐 State-typed？** 与静态值 `.val` 相比，State-typed 和 State-derived property（`() => state.val`）都能给元素打上「身份标记」——当同级兄弟的 State-derived binding 触发父容器 diff 时，VanJS 能认出同一个受控元素，保留 DOM 节点而不替换，从而避免焦点丢失。例如 `ChatPanel.ts` 中使用 `value: () => chatInput.val`（State-derived）同样不会失焦。
+
+> **注意**：State-typed 在模态框等动态容器中同样可以正常工作（参见 `GenerateModal.ts` 210-221 行，模态框中使用 `value: extraPromptInput` 无焦点丢失）。仅在极少数有同级响应式干扰的特殊场景才考虑 `value: state.val`。
 
 ### 3.2 事件冒泡控制
 
@@ -434,43 +441,64 @@ if (formMode.val.type === "edit") {
 
 ### 6.1 输入框输入即失焦
 
-**现象**：模态框中的 textarea/input 每输入一个字符就失去焦点。
+**概述**：`value: state`（State-typed）是默认安全的绑定方式，在模态框等动态容器中同样可以正常工作（参见 `GenerateModal.ts` 210-221 行）。`value: state.val`（静态值）反而可能在特定场景导致焦点丢失。
 
-**根因**：将 `value` 属性绑定到 `van.state` 对象本身（如 `value: extraPromptInput`）。当 `oninput` 更新 `.val` 后，VanJS 的 DOM diff 会重写输入框的 `value` 属性，破坏浏览器的输入状态和光标位置，严重时触发父级 DOM 子树的重建导致输入框被销毁重挂载。
+> **勘误说明**：此前文档中认为模态框中 State-typed 会导致失焦、推荐使用 `.val` 的结论与实际代码不符。`GenerateModal.ts` 在模态框中成功使用 `value: extraPromptInput`（State-typed），无焦点丢失问题。
 
-**修复方案**：将 `value` 绑定改为读取原始值（`.val`）做一次性初始化，输入逻辑完全由 `oninput` 事件管理：
+#### 场景 A：同级有 State-derived binding — 静态值导致失焦
+
+**现象**：稳定存在于页面上的输入框（如聊天面板），每输入一个字符就失去焦点。
+
+**根因**：同级兄弟节点中存在依赖同一 State 的 State-derived binding（如 `disabled: () => !chatInput.val.trim()`）。用户在输入框输入 → State 变化 → 兄弟的 State-derived binding 触发父容器子树 reconciliation → VanJS diff 过程中，用静态值绑定的输入框没有「身份标记」（不是 State-typed 也不是 State-derived），可能被当作需重建的节点销毁重挂载 → 焦点丢失。
+
+**修复**：改用 State-typed（`value: state`）或 State-derived property（`value: () => state.val`），两者都能给元素提供响应式身份标识，在 diff 时保持元素不被替换。
+
+**示例**（`ChatPanel.ts`）：
 
 ```typescript
-// 错误写法 —— 会导致焦点丢失
+// ❌ 导致失焦 —— 静态值无身份标记，兄弟 reactive binding 触发 diff 时被换掉
 textarea({
-  placeholder: "Additional instructions...",
-  value: extraPromptInput,          // 绑定 State 对象
-  oninput: (e: Event) => {
-    extraPromptInput.val = (e.target as HTMLTextAreaElement).value;
-  },
+  value: chatInput.val,        // 静态值
+  oninput: (e: InputEvent) => (chatInput.val = (e.target as HTMLTextAreaElement).value),
 })
 
-// 正确写法 —— 适用于模态框等动态容器
-textarea({
-  placeholder: "Additional instructions...",
-  value: extraPromptInput.val,      // 绑定原始值（一次性初始化）
-  oninput: (e: Event) => {
-    extraPromptInput.val = (e.target as HTMLTextAreaElement).value;
-  },
+// 同级兄弟有依赖 chatInput 的 State-derived binding
+button({
+  disabled: () => chatStreaming.val || !chatInput.val.trim(), // ← 触发 diff
 })
 
-// 同理 input 也适用
-input({
-  type: "text",
-  placeholder: "Memo IDs (e.g. 1,3,5)",
-  value: manualMemoIds.val,
-  oninput: (e: Event) => {
-    manualMemoIds.val = (e.target as HTMLInputElement).value;
-  },
+// ✅ 正确 —— State-typed，diff 时元素身份被保留
+textarea({
+  value: chatInput,            // State 对象
+  oninput: (e: InputEvent) => (chatInput.val = (e.target as HTMLTextAreaElement).value),
+})
+
+// ✅ 也可行 —— State-derived property，同样有响应式身份标记
+textarea({
+  value: () => chatInput.val,  // State-derived
+  oninput: (e: InputEvent) => (chatInput.val = (e.target as HTMLTextAreaElement).value),
 })
 ```
 
-> **注意区分场景**：对于不会导致 DOM 重建的静态表单（如 `PromptForm` 中始终存在于 DOM 的输入框），`value: promptFormTitle` 绑定 State 对象是安全的，因为容器本身不会因外部状态变更而重建。
+#### 决策树
+
+```
+输入框 value 绑定用 State-typed 还是 .val？
+│
+├─ 同级兄弟有 State-derived binding 依赖同一 State？
+│     YES → value: state 或 () => state.val（有响应式身份）← 防 diff 时被替换
+│     NO  → 进入下一问
+│
+└─ 需要多个输入框共享同一个值（Connected Props）？
+      YES → value: state（State-typed）
+      NO  → 默认使用 State-typed（value: state），更安全
+```
+
+#### 根本原因总结
+
+失焦问题的本质在于：同级兄弟触发 diff 时，静态值节点（`value: state.val`）没有 State 引用或 State-derived 函数作为**身份标识**，可能被 VanJS 的 diff 算法误判为需重建的节点而销毁重挂载，导致焦点丢失。
+
+State-typed（`value: state`）和 State-derived property（`value: () => state.val`）的核心共同优势是给 DOM 节点打上响应式标记，在局部 reconciliation 中保持元素身份，从而避免焦点丢失。默认推荐 State-typed。
 
 **诊断思路**：在 `oninput`、`onfocus`、`onblur` 和触发状态变更的函数中注入 `document.activeElement` 检查日志，定位焦点丢失的精确时机。使用 `queueMicrotask` 可以确认是否是异步 DOM 重建导致的。
 
@@ -521,8 +549,7 @@ export function CreativeTab() {
 | 读取状态 | `state.val`（在非响应式上下文中） |
 | 条件渲染 | `() => cond ? Node() : ""` |
 | 列表渲染 | `div(items.map(Item))` 或 `...items.map(fn)` |
-| 表单输入-安全 Context | `value: state` + `oninput` 同步 |
-| 表单输入-动态容器 | `value: state.val` + 纯 `oninput` 管理 |
+| 表单输入 | 默认 `value: state`（State-typed）+ `oninput` 同步，模态框等动态容器同样适用 |
 | 动态 class | `class: () => "base" + (active.val ? " active" : "")` |
 | 加载/空/错误态 | `loading -> error -> empty -> data` 四级判断链 |
 | 异步请求 | `loading=true -> try/catch -> finally loading=false` |
