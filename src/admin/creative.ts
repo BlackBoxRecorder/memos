@@ -1,5 +1,6 @@
 import van from "vanjs-core";
 import { formatDate, truncate } from "../helper/util";
+import { renderMarkdown, truncateRendered } from "../helper/markdown";
 import { svgTrash } from "../helper/svgHelper";
 import type { Prompt, CreativeItem } from "../model";
 import {
@@ -145,25 +146,27 @@ function TagCloud() {
 
 function CreativeCard(item: CreativeItem) {
   const prompt = prompts.val.find((p) => p.id === item.prompt_id);
-  const isLong = item.content.length > 200;
-  const displayContent = isLong
-    ? item.content.slice(0, 200) + "..."
-    : item.content;
+  const fullHtml = renderMarkdown(item.content);
+  const { html: truncatedHtml, truncated: isTruncated } = truncateRendered(
+    fullHtml,
+    200,
+  );
 
   return div(
     { class: "creative-card", "data-creative-id": String(item.id) },
     div(
       { class: "creative-content" },
-      displayContent,
-      isLong
-        ? button(
-            {
-              class: "read-more-btn",
-              onclick: () => (readMoreItem.val = item),
-            },
-            " 更多",
-          )
-        : "",
+      span({ class: "md-content", innerHTML: truncatedHtml }),
+      () =>
+        isTruncated
+          ? button(
+              {
+                class: "read-more-btn",
+                onclick: () => (readMoreItem.val = item),
+              },
+              " 更多",
+            )
+          : "",
     ),
     div(
       { class: "creative-meta" },
@@ -240,7 +243,7 @@ function ReadMoreModal() {
       ),
       div(
         { class: "read-more-content", style: "padding-right:16px;" },
-        item.content,
+        span({ class: "md-content", innerHTML: renderMarkdown(item.content) }),
       ),
       item.extra_prompt
         ? div(

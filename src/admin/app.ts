@@ -1,6 +1,7 @@
 import van from "vanjs-core";
 import { CreativeTab, openPromptCreate } from "./creative";
 import { countWords } from "../helper/util";
+import { renderMarkdown } from "../helper/markdown";
 import {
   svgPlus,
   svgExternalLink,
@@ -96,7 +97,12 @@ function ReadMoreModal() {
           "\u2715",
         ),
       ),
-      div({ class: "read-more-content" }, () => readMoreText.val || ""),
+      div({ class: "read-more-content" }, () =>
+        span({
+          class: "md-content",
+          innerHTML: renderMarkdown(readMoreText.val || ""),
+        }),
+      ),
     ),
   );
 }

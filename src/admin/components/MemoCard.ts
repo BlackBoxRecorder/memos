@@ -1,5 +1,6 @@
 import van from "vanjs-core";
 import { formatDate, truncate } from "../../helper/util";
+import { renderMarkdown } from "../../helper/markdown";
 import {
   svgLock,
   svgUnlock,
@@ -275,10 +276,15 @@ export function MemoCard(memo: Memo) {
                         {
                           style:
                             "font-size:13px;line-height:20px;" +
-                            "white-space:pre-wrap;word-break:break-word;" +
+                            "word-break:break-word;" +
                             "color:#333;margin-bottom:12px;",
                         },
-                        aiPanelResult.val || "",
+                        () =>
+                          span({
+                            class: "md-content",
+                            style: "white-space:pre-wrap;",
+                            innerHTML: renderMarkdown(aiPanelResult.val || ""),
+                          }),
                       ),
                       div(
                         {

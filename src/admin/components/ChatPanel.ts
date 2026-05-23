@@ -1,4 +1,5 @@
 import van from "vanjs-core";
+import { renderMarkdown } from "../../helper/markdown";
 import {
   chatMessages,
   chatInput,
@@ -66,17 +67,35 @@ export function ChatPanel() {
                   ),
                   div(
                     {
-                      style:
-                        "white-space:pre-wrap;word-break:break-word;" +
-                        "font-size:14px;line-height:1.6;",
+                      style: () => {
+                        const isStreaming =
+                          chatStreaming.val &&
+                          i === chatMessages.val.length - 1;
+                        return (
+                          (isStreaming ? "white-space:pre-wrap;" : "") +
+                          "word-break:break-word;" +
+                          "font-size:14px;line-height:1.6;"
+                        );
+                      },
                     },
-                    msg.content ||
-                      (chatStreaming.val && i === chatMessages.val.length - 1
-                        ? div(
+                    () => {
+                      const isStreaming =
+                        chatStreaming.val && i === chatMessages.val.length - 1;
+                      const content = chatMessages.val[i]?.content || "";
+                      if (isStreaming) {
+                        return (
+                          content ||
+                          span(
                             { style: "color:var(--text-muted);" },
                             "思考中...",
                           )
-                        : ""),
+                        );
+                      }
+                      return span({
+                        class: "md-content",
+                        innerHTML: renderMarkdown(content),
+                      });
+                    },
                   ),
                 ),
               ),
