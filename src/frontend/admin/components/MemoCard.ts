@@ -1,6 +1,6 @@
 import van from "vanjs-core";
-import { formatDate, truncate } from "../../helper/util";
-import { renderMarkdown } from "../../helper/markdown";
+import { formatDate, truncate } from "../../../helper/util";
+import { renderMarkdown } from "../../../helper/markdown";
 import {
   svgLock,
   svgUnlock,
@@ -8,8 +8,8 @@ import {
   svgTrash,
   svgSparkle,
   svgPin,
-} from "../../helper/svgHelper";
-import type { Memo } from "../../model";
+} from "../../../helper/svgHelper";
+import type { Memo } from "../../../model";
 import {
   deleteConfirmId,
   deleteDeleting,

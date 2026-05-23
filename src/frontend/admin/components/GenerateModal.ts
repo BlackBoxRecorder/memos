@@ -1,5 +1,5 @@
 import van from "vanjs-core";
-import { truncate, formatDate } from "../../helper/util";
+import { truncate, formatDate } from "../../../helper/util";
 import {
   generateModalOpen,
   extraPromptInput,

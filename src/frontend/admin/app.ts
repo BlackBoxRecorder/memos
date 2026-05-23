@@ -1,13 +1,13 @@
 import van from "vanjs-core";
 import { CreativeTab, openPromptCreate } from "./creative";
-import { countWords } from "../helper/util";
-import { renderMarkdown } from "../helper/markdown";
+import { countWords } from "../../helper/util";
+import { renderMarkdown } from "../../helper/markdown";
 import {
   svgPlus,
   svgExternalLink,
   svgLogout,
   svgUpload,
-} from "../helper/svgHelper";
+} from "../../helper/svgHelper";
 import {
   authenticated,
   globalError,
@@ -26,6 +26,7 @@ import {
   openImportExport,
   closeReadMore,
 } from "./actions/memo";
+import { ReadMoreModal } from "../shared/components/ReadMoreModal";
 import { ModelSelector } from "./components/ModelSelector";
 import { FormModal } from "./components/FormModal";
 import { MemoCard } from "./components/MemoCard";
@@ -66,43 +67,6 @@ function LoginPage() {
         "登录",
       ),
       () => (globalError.val ? div({ class: "error" }, globalError.val) : ""),
-    ),
-  );
-}
-
-// ====== ReadMore Modal ======
-
-function ReadMoreModal() {
-  return div(
-    {
-      class: "modal-overlay",
-      style: () => (readMoreText.val != null ? "display:flex" : "display:none"),
-      onclick: (e: Event) => {
-        if (e.target === e.currentTarget) closeReadMore();
-      },
-    },
-    div(
-      { class: "modal" },
-      div(
-        {
-          style:
-            "display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;",
-        },
-        h3({ style: "margin:0" }, "Memo"),
-        button(
-          {
-            class: "btn btn-outline btn-sm",
-            onclick: closeReadMore,
-          },
-          "\u2715",
-        ),
-      ),
-      div({ class: "read-more-content" }, () =>
-        span({
-          class: "md-content",
-          innerHTML: renderMarkdown(readMoreText.val || ""),
-        }),
-      ),
     ),
   );
 }
@@ -243,7 +207,11 @@ function AdminPage() {
       ),
     ),
     () => (formMode.val.type !== "closed" ? FormModal() : ""),
-    () => (readMoreText.val != null ? ReadMoreModal() : ""),
+    () =>
+      ReadMoreModal({
+        text: readMoreText,
+        onClose: closeReadMore,
+      }),
     () => (importExportOpen.val ? ImportExportModal() : ""),
   );
 }

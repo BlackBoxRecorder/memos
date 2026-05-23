@@ -6,9 +6,16 @@ import {
   svgEyeIcon,
   svgCopy,
   svgCheck,
-} from "../helper/svgHelper";
-import { apiUrl } from "../helper/util";
-import { renderMarkdown, stripHtmlTags, hasMarkdown } from "../helper/markdown";
+} from "../../helper/svgHelper";
+import { apiUrl } from "../../helper/util";
+import {
+  renderMarkdown,
+  stripHtmlTags,
+  hasMarkdown,
+} from "../../helper/markdown";
+import { escapeHtml } from "../shared/utils/text";
+import { copyToClipboard } from "../shared/utils/clipboard";
+import { ReadMoreModal } from "../shared/components/ReadMoreModal";
 
 // --- config ---
 const font = '15px "Helvetica Neue", Helvetica, Arial, sans-serif';
@@ -81,14 +88,6 @@ function getOrPrepare(text: string, f: string): PreparedText {
 }
 
 // --- utility ---
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
 function truncateText(
   text: string,
   maxLen: number = 100,
@@ -273,31 +272,6 @@ async function fetchAndRender(pageNum: number = 0): Promise<void> {
   }
 }
 
-async function copyToClipboard(card: Card): Promise<void> {
-  try {
-    if (navigator.clipboard && window.isSecureContext) {
-      await navigator.clipboard.writeText(card.text);
-    } else {
-      // Fallback for older browsers or non-secure contexts
-      const textarea = document.createElement("textarea");
-      textarea.value = card.text;
-      textarea.style.position = "fixed";
-      textarea.style.left = "-9999px";
-      textarea.style.top = "-9999px";
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand("copy");
-      document.body.removeChild(textarea);
-    }
-    copiedCardId.val = card.id;
-    setTimeout(() => {
-      copiedCardId.val = null;
-    }, 1500);
-  } catch {
-    // Silently fail — clipboard may be unavailable
-  }
-}
-
 // --- debounced search ---
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -463,7 +437,7 @@ function MasonryCard(card: Card, index: number, layoutState: LayoutState) {
               style:
                 "font-size:12px;color:#e67e22;padding:0 0 4px 0;display:flex;align-items:center;gap:2px;",
             },
-            "📌 已置顶",
+            "\uD83D\uDCCC \u5DF2\u7F6E\u9876",
           )
         : "",
     div({ class: "card-text" }, escapeHtml(displayText)),
@@ -503,7 +477,12 @@ function MasonryCard(card: Card, index: number, layoutState: LayoutState) {
           title: "Copy full text",
           onclick: (e: Event) => {
             e.stopPropagation();
-            copyToClipboard(card);
+            copyToClipboard(card.text).then(() => {
+              copiedCardId.val = card.id;
+              setTimeout(() => {
+                copiedCardId.val = null;
+              }, 1500);
+            });
           },
         },
         () => (copiedCardId.val === card.id ? svgCheck() : svgCopy()),
@@ -592,41 +571,6 @@ function SimilarModal() {
   );
 }
 
-function ReadMoreModal() {
-  return div(
-    {
-      class: "modal-overlay",
-      style: () => (readMoreText.val != null ? "display:flex" : "display:none"),
-      onclick: (e: Event) => {
-        if (e.target === e.currentTarget) closeReadMore();
-      },
-    },
-    div(
-      { class: "modal" },
-      div(
-        {
-          style:
-            "display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;",
-        },
-        h3({ style: "margin:0" }, "Memo"),
-        button(
-          {
-            class: "btn btn-outline btn-sm",
-            onclick: closeReadMore,
-          },
-          "\u2715",
-        ),
-      ),
-      div(
-        { class: "readmore-modal-body" },
-        div({ class: "readmore-modal-text md-content" }, () =>
-          span({ innerHTML: renderMarkdown(readMoreText.val || "") }),
-        ),
-      ),
-    ),
-  );
-}
-
 function App() {
   // Resize handler
   window.addEventListener("resize", () => {
@@ -674,7 +618,11 @@ function App() {
       return MasonryContainer();
     },
     () => (similarMemoId.val != null ? SimilarModal() : ""),
-    () => (readMoreText.val != null ? ReadMoreModal() : ""),
+    () =>
+      ReadMoreModal({
+        text: readMoreText,
+        onClose: closeReadMore,
+      }),
   );
 }
 

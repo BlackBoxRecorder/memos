@@ -58,7 +58,14 @@ async function serveHtml(
 ): Promise<Response> {
   try {
     const file = Bun.file(`${STATIC_BASE}${filePath}`);
-    const html = await file.text();
+    let html = await file.text();
+    // 注入 base 标签确保深层路径下脚本 src 解析正确
+    if (urlDir !== "/") {
+      html = html.replace(
+        '<meta charset="utf-8" />',
+        `<meta charset="utf-8" />\n<base href="${urlDir}">`,
+      );
+    }
     return new Response(html, {
       headers: { "Content-Type": "text/html; charset=utf-8" },
     });
@@ -100,32 +107,43 @@ app.get("/favicon.svg", serveFavicon);
 app.get("/admin/favicon.svg", serveFavicon);
 
 // /admin/app.ts → 转译 JS
-app.get("/admin/app.ts", (c) => serveJs("/admin/app.ts"));
-app.get("/admin/app.js", (c) => serveJs("/admin/app.ts"));
+app.get("/admin/app.ts", (c) => serveJs("/frontend/admin/app.ts"));
+app.get("/admin/app.js", (c) => serveJs("/frontend/admin/app.ts"));
 
-// /admin 与 /admin/ → admin SPA（urlDir="/admin/" 确保脚本 src 解析正确）
-app.get("/admin", async (c) => serveHtml("/admin/index.html", "/admin/"));
-app.get("/admin/", async (c) => serveHtml("/admin/index.html", "/admin/"));
+// /admin 与 /admin/ → admin SPA
+app.get("/admin", async (c) =>
+  serveHtml("/frontend/admin/index.html", "/admin/"),
+);
+app.get("/admin/", async (c) =>
+  serveHtml("/frontend/admin/index.html", "/admin/"),
+);
 app.get("/admin/index.html", async (c) =>
-  serveHtml("/admin/index.html", "/admin/"),
+  serveHtml("/frontend/admin/index.html", "/admin/"),
 );
 
 // /index.ts → 转译 JS
-app.get("/index.ts", (c) => serveJs("/masonry/index.ts"));
-app.get("/index.js", (c) => serveJs("/masonry/index.ts"));
+app.get("/index.ts", (c) => serveJs("/frontend/masonry/index.ts"));
+app.get("/index.js", (c) => serveJs("/frontend/masonry/index.ts"));
 
-// / → masonry 首页（urlDir="/" 确保脚本 src 解析正确）
-app.get("/", async (c) => serveHtml("/masonry/index.html", "/"));
-app.get("/index.html", async (c) => serveHtml("/masonry/index.html", "/"));
+// / → masonry 首页
+app.get("/", async (c) => serveHtml("/frontend/masonry/index.html", "/"));
+app.get("/index.html", async (c) =>
+  serveHtml("/frontend/masonry/index.html", "/"),
+);
 
-// admin SPA 深层链接 + 其他 .ts 文件
+// 共享 CSS 文件
+app.get("/frontend/shared/styles/common.css", async (c) => {
+  const file = Bun.file(`${STATIC_BASE}/frontend/shared/styles/common.css`);
+  return new Response(file, {
+    headers: { "Content-Type": "text/css; charset=utf-8" },
+  });
+});
+
+// admin SPA 深层链接
 app.notFound(async (c) => {
   const path = c.req.path;
   if (path.startsWith("/admin/")) {
-    return serveHtml("/admin/index.html", "/admin/");
-  }
-  if (path.endsWith(".ts")) {
-    return serveJs(`/masonry${path}`);
+    return serveHtml("/frontend/admin/index.html", "/admin/");
   }
   return c.json({ error: "Not Found" }, 404);
 });

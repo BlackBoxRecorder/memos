@@ -1,7 +1,7 @@
-import { api, apiUrl } from "../../helper/util";
+import { api, apiUrl } from "../../../helper/util";
 import { getSelectedAiModel } from "../ai-state";
-import { streamSSE } from "../utils/sse";
-import type { Prompt, CreativeItem } from "../../model";
+import { streamSSE } from "../../shared/utils/sse";
+import type { Prompt, CreativeItem } from "../../../model";
 import type { PreviewMemo } from "../state";
 import {
   prompts,

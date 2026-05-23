@@ -27,7 +27,7 @@ export async function* streamSSE(
       try {
         yield JSON.parse(trimmed.slice(6));
       } catch (err) {
-        if ((err as Error).name === "SyntaxError") {
+        if ((err as Error).name === "SyntaxError" && buffer.length < 10_000) {
           // Incomplete JSON chunk, put back in buffer
           buffer = line + "\n" + buffer;
           continue;

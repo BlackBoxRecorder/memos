@@ -1,5 +1,5 @@
 import van from "vanjs-core";
-import type { Memo, CreativeItem, Prompt } from "../model";
+import type { Memo, CreativeItem, Prompt } from "../../model";
 
 // ====== Shared Types ======
 

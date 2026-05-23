@@ -1,5 +1,5 @@
 import van from "vanjs-core";
-import { svgSparkle, svgSpinner } from "../../helper/svgHelper";
+import { svgSparkle, svgSpinner } from "../../../helper/svgHelper";
 import {
   formMode,
   formContent,

@@ -1,5 +1,5 @@
-import { api } from "../../helper/util";
-import type { Memo } from "../../model";
+import { api } from "../../../helper/util";
+import type { Memo } from "../../../model";
 import {
   getSelectedAiModel,
   selectedProvider,

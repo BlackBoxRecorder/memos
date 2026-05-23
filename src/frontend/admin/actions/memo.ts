@@ -1,5 +1,5 @@
-import { api, apiUrl } from "../../helper/util";
-import type { Memo } from "../../model";
+import { api, apiUrl } from "../../../helper/util";
+import type { Memo } from "../../../model";
 import {
   loading,
   globalError,

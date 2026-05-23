@@ -1,8 +1,8 @@
 import van from "vanjs-core";
-import { formatDate, truncate } from "../helper/util";
-import { renderMarkdown, truncateRendered } from "../helper/markdown";
-import { svgTrash } from "../helper/svgHelper";
-import type { Prompt, CreativeItem } from "../model";
+import { formatDate, truncate } from "../../helper/util";
+import { renderMarkdown, truncateRendered } from "../../helper/markdown";
+import { svgTrash } from "../../helper/svgHelper";
+import type { Prompt, CreativeItem } from "../../model";
 import {
   prompts,
   selectedPromptId,
@@ -31,11 +31,12 @@ import {
 } from "./actions/creative-core";
 import { GenerateModal } from "./components/GenerateModal";
 import { ChatPanel } from "./components/ChatPanel";
-
-const { div, span, button, input, textarea, h3 } = van.tags;
+import { ReadMoreModal } from "../shared/components/ReadMoreModal";
 
 // Re-export for app.ts
 export { openPromptCreate };
+
+const { div, span, button, input, textarea, h3 } = van.tags;
 
 // ====== PromptForm ======
 
@@ -212,55 +213,6 @@ function CreativeCard(item: CreativeItem) {
   );
 }
 
-// ====== ReadMoreModal ======
-
-function ReadMoreModal() {
-  const item = readMoreItem.val;
-  if (!item) return "";
-  const prompt = prompts.val.find((p) => p.id === item.prompt_id);
-  return div(
-    {
-      class: "modal-overlay",
-      onclick: (e: Event) => {
-        if (e.target === e.currentTarget) readMoreItem.val = null;
-      },
-    },
-    div(
-      { class: "modal modal-wide" },
-      div(
-        {
-          style:
-            "display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;",
-        },
-        h3(prompt ? prompt.title : "Creative Content"),
-        button(
-          {
-            class: "btn btn-outline btn-sm",
-            onclick: () => (readMoreItem.val = null),
-          },
-          "\u2715",
-        ),
-      ),
-      div(
-        { class: "read-more-content", style: "padding-right:16px;" },
-        span({ class: "md-content", innerHTML: renderMarkdown(item.content) }),
-      ),
-      item.extra_prompt
-        ? div(
-            { style: "margin-top:12px;font-size:12px;color:#999;" },
-            "附加指令：",
-            item.extra_prompt,
-          )
-        : "",
-      div(
-        { style: "margin-top:4px;font-size:12px;color:#999;" },
-        "创建于：",
-        formatDate(item.created_at),
-      ),
-    ),
-  );
-}
-
 // ====== CreativeTab ======
 
 export function CreativeTab() {
@@ -363,7 +315,34 @@ export function CreativeTab() {
               return div(creativeItems.val.map(CreativeCard));
             },
             // Read more modal
-            () => (readMoreItem.val ? ReadMoreModal() : ""),
+            () => {
+              const item = readMoreItem.val;
+              if (!item) return "";
+              const prompt = prompts.val.find((p) => p.id === item.prompt_id);
+              return ReadMoreModal({
+                text: van.state(item.content),
+                onClose: () => (readMoreItem.val = null),
+                title: prompt ? prompt.title : "Creative Content",
+                footer: () =>
+                  div(
+                    {},
+                    item.extra_prompt
+                      ? div(
+                          {
+                            style: "margin-top:12px;font-size:12px;color:#999;",
+                          },
+                          "附加指令：",
+                          item.extra_prompt,
+                        )
+                      : "",
+                    div(
+                      { style: "margin-top:4px;font-size:12px;color:#999;" },
+                      "创建于：",
+                      formatDate(item.created_at),
+                    ),
+                  ),
+              });
+            },
           ),
   );
 }

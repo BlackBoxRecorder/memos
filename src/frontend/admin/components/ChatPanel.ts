@@ -1,5 +1,5 @@
 import van from "vanjs-core";
-import { renderMarkdown } from "../../helper/markdown";
+import { renderMarkdown } from "../../../helper/markdown";
 import {
   chatMessages,
   chatInput,

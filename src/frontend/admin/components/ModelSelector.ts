@@ -1,5 +1,5 @@
 import van from "vanjs-core";
-import { svgChevronDown } from "../../helper/svgHelper";
+import { svgChevronDown } from "../../../helper/svgHelper";
 import { selectedProvider, selectedModel } from "../ai-state";
 import { aiModels, aiModelsOpen } from "../state";
 import { saveModelSelection } from "../actions/ai";
