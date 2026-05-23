@@ -88,10 +88,9 @@ export function MemoCard(memo: Memo) {
       span({ class: "memo-id" }, `#${memo.id}`),
       span({ class: `badge ${badgeClass}` }, badgeText),
       ...memo.tags.map((tag) => span({ class: "badge badge-tag" }, tag)),
-      span(`\u521B\u5EFA\u4E8E\uFF1A${formatDate(memo.created_at)}`),
       memo.updated_at !== memo.created_at
         ? span(`\u66F4\u65B0\u4E8E\uFF1A${formatDate(memo.updated_at)}`)
-        : "",
+        : span(`\u521B\u5EFA\u4E8E\uFF1A${formatDate(memo.created_at)}`),
       span(
         { class: "memo-meta-icons" },
         button(
