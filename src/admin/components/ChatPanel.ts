@@ -94,38 +94,36 @@ export function ChatPanel() {
           )
         : "",
     // Input area
-    () =>
-      form(
+    form(
+      {
+        onsubmit: handleSubmit,
+        style: "display:flex;gap:8px;align-items:flex-end;",
+      },
+      textarea({
+        class: "form-input",
+        placeholder: "输入消息探索你的笔记...",
+        disabled: () => chatStreaming.val,
+        oninput: (e: InputEvent) =>
+          (chatInput.val = (e.target as HTMLTextAreaElement).value),
+        onkeydown: handleKeydown,
+        value: chatInput,
+        rows: 2,
+        style:
+          "flex:1;resize:none;min-height:44px;padding:8px;" +
+          "border-radius:8px;border:1px solid var(--border-color);" +
+          "font-size:14px;background:var(--bg-primary);color:var(--text-primary);",
+      }),
+      button(
         {
-          onsubmit: handleSubmit,
-          style: "display:flex;gap:8px;align-items:flex-end;",
+          class: () =>
+            "btn btn-sm " + (chatStreaming.val ? "btn-outline" : "btn-primary"),
+          disabled: () => chatStreaming.val || !chatInput.val.trim(),
+          type: "submit",
+          style: "flex-shrink:0;",
         },
-        textarea({
-          class: "form-input",
-          placeholder: "输入消息探索你的笔记...",
-          disabled: chatStreaming.val,
-          oninput: (e: InputEvent) =>
-            (chatInput.val = (e.target as HTMLTextAreaElement).value),
-          onkeydown: handleKeydown,
-          value: chatInput.val,
-          rows: 2,
-          style:
-            "flex:1;resize:none;min-height:44px;padding:8px;" +
-            "border-radius:8px;border:1px solid var(--border-color);" +
-            "font-size:14px;background:var(--bg-primary);color:var(--text-primary);",
-        }),
-        button(
-          {
-            class: () =>
-              "btn btn-sm " +
-              (chatStreaming.val ? "btn-outline" : "btn-primary"),
-            disabled: () => chatStreaming.val || !chatInput.val.trim(),
-            type: "submit",
-            style: "flex-shrink:0;",
-          },
-          () => (chatStreaming.val ? "..." : "发送"),
-        ),
+        () => (chatStreaming.val ? "..." : "发送"),
       ),
+    ),
     // Action buttons
     div(
       { style: "margin-top:12px;display:flex;gap:8px;" },

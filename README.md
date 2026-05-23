@@ -61,7 +61,7 @@ bun install
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
 | `PORT` | `3020` | 服务器监听端口 |
-| `MEMOS_SECRET_KEY` | `memos-dev-test` | 管理员登录密钥 |
+| `MEMOS_SECRET_KEY` | `123` | 管理员登录密钥 |
 
 ### 数据库初始化
 
@@ -87,7 +87,7 @@ bun run start
 
 ## 管理后台
 
-管理后台位于 `/admin`，通过密钥认证登录（默认密钥 `memos-dev-test`，可通过 `MEMOS_SECRET_KEY` 环境变量修改）。
+管理后台位于 `/admin`，通过密钥认证登录（默认密钥 `123`，可通过 `MEMOS_SECRET_KEY` 环境变量修改）。
 
 功能包括：
 

@@ -23,7 +23,7 @@ const SECRET_KEY = (() => {
   console.warn(
     "WARNING: Using default MEMOS_SECRET_KEY. Set MEMOS_SECRET_KEY in production!",
   );
-  return "memos-dev-test";
+  return "123";
 })();
 
 export const authApp = new Hono();

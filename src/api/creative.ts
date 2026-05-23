@@ -312,6 +312,41 @@ creativeApp.post("/generate", authMiddleware, async (c) => {
   });
 });
 
+// POST /api/creative — 直接创建 creative item（如对话保存等）
+creativeApp.post("/", authMiddleware, async (c) => {
+  let body: {
+    prompt_id?: number;
+    extra_prompt?: string;
+    content?: string;
+    context_memo_ids?: string;
+  };
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON" }, 400);
+  }
+
+  if (!body.prompt_id || typeof body.prompt_id !== "number") {
+    return c.json({ error: "prompt_id is required" }, 400);
+  }
+  if (
+    !body.content ||
+    typeof body.content !== "string" ||
+    body.content.trim().length === 0
+  ) {
+    return c.json({ error: "content is required" }, 400);
+  }
+
+  const item = createCreativeItem({
+    prompt_id: body.prompt_id,
+    extra_prompt: (body.extra_prompt || "").trim(),
+    content: body.content.trim(),
+    context_memo_ids: body.context_memo_ids || "",
+  });
+
+  return c.json({ item }, 201);
+});
+
 // DELETE /api/creative/:id — 删除 creative
 creativeApp.delete("/:id", authMiddleware, (c) => {
   const id = Number(c.req.param("id"));

@@ -90,22 +90,29 @@ export async function saveChatAsCreative(): Promise<void> {
     .map((m) => `**${m.role === "user" ? "用户" : "AI"}：**\n${m.content}`)
     .join("\n\n---\n\n");
   try {
-    const data = await api<{ prompts: Prompt[] }>("api/creative/prompts");
+    // 确保存在至少一个 prompt，否则自动创建
+    let data = await api<{ prompts: Prompt[] }>("api/creative/prompts");
     if (data.prompts.length === 0) {
       await api("api/creative/prompts", {
         method: "POST",
         body: JSON.stringify({ title: "对话记录", content: "对话记录" }),
       });
+      data = await api<{ prompts: Prompt[] }>("api/creative/prompts");
     }
-    const pdata = await api<{ prompts: Prompt[] }>("api/creative/prompts");
-    const promptId = pdata.prompts[0]?.id ?? 1;
-    const item = await api<{ item: CreativeItem }>("api/creative", {
+    const promptId = data.prompts[0]?.id ?? 1;
+    const itemResp = await api<{ item: CreativeItem }>("api/creative", {
       method: "POST",
-      body: JSON.stringify({ prompt_id: promptId, content, extra_prompt: "" }),
+      body: JSON.stringify({
+        prompt_id: promptId,
+        content,
+        extra_prompt: "",
+        context_memo_ids: "",
+      }),
     });
-    creativeItems.val = [item.item, ...creativeItems.val];
-  } catch {
-    // silently fail
+    creativeItems.val = [itemResp.item, ...creativeItems.val];
+    alert("对话已保存到创意内容列表");
+  } catch (err) {
+    alert("保存失败：" + (err as Error).message);
   }
 }
 
