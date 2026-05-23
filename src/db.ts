@@ -15,23 +15,6 @@ export function getDb(): Database {
 export function initDb(): void {
   const d = getDb();
 
-  // Migration: rename old 'tag' column to 'tags' and convert data to JSON arrays
-  const colInfo = d.query("PRAGMA table_info(memos)").all() as Array<{
-    name: string;
-  }>;
-  const hasTagColumn = colInfo.some((c) => c.name === "tag");
-  const hasTagsColumn = colInfo.some((c) => c.name === "tags");
-  if (hasTagColumn && !hasTagsColumn) {
-    // Rename the column
-    d.run("ALTER TABLE memos RENAME COLUMN tag TO tags");
-    // Convert existing string tags to JSON array format
-    d.run(
-      "UPDATE memos SET tags = json_array(tags) WHERE tags != '' AND tags NOT LIKE '[%'",
-    );
-    d.run("UPDATE memos SET tags = '[]' WHERE tags = ''");
-    console.log("[db] Migrated tag column to tags (JSON array)");
-  }
-
   d.run(`
     CREATE TABLE IF NOT EXISTS memos (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,15 +26,6 @@ export function initDb(): void {
       updated_at  TEXT    NOT NULL DEFAULT (datetime('now'))
     )
   `);
-
-  // Migration: add pinned_at column if not exists (for existing databases)
-  const memoCols = d.query("PRAGMA table_info(memos)").all() as Array<{
-    name: string;
-  }>;
-  if (memoCols.length > 0 && !memoCols.some((c) => c.name === "pinned_at")) {
-    d.run("ALTER TABLE memos ADD COLUMN pinned_at TEXT");
-    console.log("[db] Added pinned_at column to memos");
-  }
 
   d.run("CREATE INDEX IF NOT EXISTS idx_memos_pinned_at ON memos(pinned_at)");
   d.run(`

@@ -10,47 +10,7 @@ import { initSeedData } from "./init/seed";
 
 const PORT = parseInt(process.env.PORT || "3020");
 const STATIC_BASE = import.meta.dir;
-
-// 客户端 TS 打包（含 import 解析）+ mtime 缓存
-const buildCache = new Map<string, { js: string; mtime: number }>();
-
-async function buildClientJs(srcPath: string): Promise<string | null> {
-  try {
-    const file = Bun.file(srcPath);
-    if (!(await file.exists())) return null;
-
-    const mtime = file.lastModified;
-
-    const cached = buildCache.get(srcPath);
-    if (cached && cached.mtime === mtime) {
-      return cached.js;
-    }
-
-    const result = await Bun.build({
-      entrypoints: [srcPath],
-      target: "browser",
-      format: "esm",
-      splitting: false,
-      minify: false,
-    });
-
-    if (!result.success) {
-      for (const log of result.logs) {
-        console.error(`Build error in ${srcPath}:`, log);
-      }
-      return null;
-    }
-
-    const js = await result.outputs[0]?.text();
-    if (!js) return null;
-
-    buildCache.set(srcPath, { js, mtime });
-    return js;
-  } catch (e) {
-    console.error(`Build failed for ${srcPath}:`, e);
-    return null;
-  }
-}
+const DIST_BASE = `${import.meta.dir}/../dist`;
 
 async function serveHtml(
   filePath: string,
@@ -75,16 +35,6 @@ async function serveHtml(
   }
 }
 
-async function serveJs(path: string): Promise<Response> {
-  const js = await buildClientJs(`${STATIC_BASE}${path}`);
-  if (js === null) {
-    return new Response("Not Found", { status: 404 });
-  }
-  return new Response(js, {
-    headers: { "Content-Type": "application/javascript" },
-  });
-}
-
 const app = new Hono({ strict: false });
 
 // API 路由 — 子应用挂载
@@ -106,9 +56,13 @@ function serveFavicon(): Response {
 app.get("/favicon.svg", serveFavicon);
 app.get("/admin/favicon.svg", serveFavicon);
 
-// /admin/app.ts → 转译 JS
-app.get("/admin/app.ts", (c) => serveJs("/frontend/admin/app.ts"));
-app.get("/admin/app.js", (c) => serveJs("/frontend/admin/app.ts"));
+// /admin/app.js → 预构建 JS bundle
+app.get("/admin/app.js", async (c) => {
+  const file = Bun.file(`${DIST_BASE}/admin/app.js`);
+  return new Response(file, {
+    headers: { "Content-Type": "application/javascript" },
+  });
+});
 
 // /admin 与 /admin/ → admin SPA
 app.get("/admin", async (c) =>
@@ -121,9 +75,13 @@ app.get("/admin/index.html", async (c) =>
   serveHtml("/frontend/admin/index.html", "/admin/"),
 );
 
-// /index.ts → 转译 JS
-app.get("/index.ts", (c) => serveJs("/frontend/masonry/index.ts"));
-app.get("/index.js", (c) => serveJs("/frontend/masonry/index.ts"));
+// /index.js → 预构建 JS bundle
+app.get("/index.js", async (c) => {
+  const file = Bun.file(`${DIST_BASE}/masonry/index.js`);
+  return new Response(file, {
+    headers: { "Content-Type": "application/javascript" },
+  });
+});
 
 // / → masonry 首页
 app.get("/", async (c) => serveHtml("/frontend/masonry/index.html", "/"));

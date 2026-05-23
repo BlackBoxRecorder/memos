@@ -1,4 +1,4 @@
-import van from "vanjs-core";
+import van, { type State } from "vanjs-core";
 import { renderMarkdown } from "../../../helper/markdown";
 
 const { div, span, button, h3 } = van.tags;
@@ -18,7 +18,7 @@ export function ReadMoreModal({
   title = "Memo",
   footer,
 }: {
-  text: van.State<string | null>;
+  text: State<string | null>;
   onClose: () => void;
   title?: string;
   footer?: () => ReturnType<typeof div>;
