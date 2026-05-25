@@ -19,6 +19,10 @@ import {
   activeTab,
   aiModels,
   creativeItems,
+  aiPanelMemoId,
+  aiPanelResult,
+  aiPanelLoading,
+  aiPanelError,
 } from "./state";
 import { checkAuth, login, logout } from "./actions/auth";
 import {
@@ -27,6 +31,7 @@ import {
   closeReadMore,
 } from "./actions/memo";
 import { ReadMoreModal } from "../shared/components/ReadMoreModal";
+import { closeAiPanel } from "./actions/ai";
 import { ModelSelector } from "./components/ModelSelector";
 import { FormModal } from "./components/FormModal";
 import { MemoCard } from "./components/MemoCard";
@@ -228,3 +233,18 @@ van.add(appEl, () =>
 
 // ====== Init ======
 checkAuth();
+
+// Close AI toolbox dropdown when clicking outside
+document.addEventListener("click", (e: Event) => {
+  if (
+    aiPanelMemoId.val !== null &&
+    !aiPanelResult.val &&
+    !aiPanelLoading.val &&
+    !aiPanelError.val
+  ) {
+    const target = e.target as HTMLElement;
+    if (!target.closest(".ai-toolbox-trigger")) {
+      closeAiPanel();
+    }
+  }
+});
