@@ -163,7 +163,7 @@ function MasonryCard(card: Card, index: number, layoutState: LayoutState) {
               {
                 class: "card-readmore-btn",
                 title: "Read more",
-                onclick: () => openReadMore(card.text),
+                onclick: () => openReadMore(card.rawText),
               },
               svgEyeIcon(),
             )

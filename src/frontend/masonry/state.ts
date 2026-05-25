@@ -16,6 +16,7 @@ export type Card = {
   prepared: PreparedText;
   updatedAt: string;
   pinnedAt: string | null;
+  rawText: string;
 };
 
 export type PositionedCard = {

@@ -95,6 +95,7 @@ export async function fetchAndRender(pageNum: number = 0): Promise<void> {
       return {
         id: m.id,
         text: plainText,
+        rawText: m.content,
         updatedAt: m.updated_at,
         pinnedAt: m.pinned_at || null,
         prepared: getOrPrepare(truncateText(plainText).displayText, font),
