@@ -77,22 +77,22 @@ export function MemoCard(memo: Memo) {
     () =>
       memo.pinned_at
         ? div(
-            {
-              style:
-                "font-size:12px;color:#e67e22;padding:0 0 4px 0;display:flex;align-items:center;gap:2px;",
-            },
-            "📌 已置顶",
-          )
+          {
+            style:
+              "font-size:12px;color:#e67e22;padding:0 0 4px 0;display:flex;align-items:center;gap:2px;",
+          },
+          "📌 已置顶",
+        )
         : "",
     div({ class: "memo-content" }, truncate(memo.content, 200), () =>
       memo.content.length > 200
         ? button(
-            {
-              class: "read-more-btn",
-              onclick: () => openReadMore(memo.content),
-            },
-            "\u66F4\u591A",
-          )
+          {
+            class: "read-more-btn",
+            onclick: () => openReadMore(memo.content),
+          },
+          "\u66F4\u591A",
+        )
         : "",
     ),
     div(
@@ -142,203 +142,203 @@ export function MemoCard(memo: Memo) {
         () =>
           aiAvailable.val
             ? div(
+              {
+                class: "ai-toolbox-trigger",
+                style: "display:inline-flex;position:relative;",
+              },
+              button(
                 {
-                  class: "ai-toolbox-trigger",
-                  style: "display:inline-flex;position:relative;",
-                },
-                button(
-                  {
-                    class: "memo-icon-btn ai-toolbox-btn",
-                    title: "AI \u5199\u4F5C\u5DE5\u5177\u7BB1",
-                    onclick: (e: Event) => {
-                      e.stopPropagation();
-                      aiPanelMemoId.val = isPanelOpen() ? null : memo.id;
-                    },
+                  class: "memo-icon-btn ai-toolbox-btn",
+                  title: "AI \u5199\u4F5C\u5DE5\u5177\u7BB1",
+                  onclick: (e: Event) => {
+                    e.stopPropagation();
+                    aiPanelMemoId.val = isPanelOpen() ? null : memo.id;
                   },
-                  svgSparkle(),
-                ),
-                () =>
-                  isPanelOpen() && !aiPanelResult.val && !aiPanelLoading.val
-                    ? div(
-                        {
-                          class: "ai-toolbox-menu",
-                          style:
-                            "position:absolute;bottom:100%;right:0;" +
-                            "background:#fff;border:1px solid #e5e5e5;" +
-                            "border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,0.1);" +
-                            "padding:4px 0;z-index:10;min-width:120px;",
-                        },
-                        ...Object.entries(ACTION_LABELS).map(
-                          ([action, label]) =>
+                },
+                svgSparkle(),
+              ),
+              () =>
+                isPanelOpen() && !aiPanelResult.val && !aiPanelLoading.val
+                  ? div(
+                    {
+                      class: "ai-toolbox-menu",
+                      style:
+                        "position:absolute;top:100%;right:0;" +
+                        "background:#fff;border:1px solid #e5e5e5;" +
+                        "border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,0.1);" +
+                        "padding:4px 0;z-index:10;min-width:120px;",
+                    },
+                    ...Object.entries(ACTION_LABELS).map(
+                      ([action, label]) =>
+                        button(
+                          {
+                            class: "ai-toolbox-item",
+                            style:
+                              "display:block;width:100%;padding:6px 14px;" +
+                              "border:none;background:none;" +
+                              "font-size:13px;color:#333;cursor:pointer;" +
+                              "text-align:left;" +
+                              "white-space:nowrap;",
+                            onclick: (e: Event) => {
+                              e.stopPropagation();
+                              if (action === "rewrite") {
+                                aiPanelAction.val = action;
+                                aiPanelResult.val = null;
+                                return;
+                              }
+                              executeAiAction(
+                                memo.id,
+                                memo.content,
+                                action,
+                              );
+                            },
+                            onmouseenter: (e: Event) => {
+                              (e.target as HTMLElement).style.background =
+                                "#f5f5f5";
+                            },
+                            onmouseleave: (e: Event) => {
+                              (e.target as HTMLElement).style.background =
+                                "none";
+                            },
+                          },
+                          label,
+                        ),
+                    ),
+                    // Style selector for rewrite
+                    () =>
+                      aiPanelAction.val === "rewrite" &&
+                        !aiPanelLoading.val &&
+                        !aiPanelResult.val
+                        ? div(
+                          {
+                            style:
+                              "border-top:1px solid #eee;padding:4px 0;",
+                          },
+                          div(
+                            {
+                              style:
+                                "padding:2px 14px;font-size:11px;color:#999;",
+                            },
+                            "\u98CE\u683C\uFF1A",
+                          ),
+                          ...[
+                            ["professional", "\u4E13\u4E1A"],
+                            ["casual", "\u53E3\u8BED"],
+                            ["minimal", "\u6781\u7B80"],
+                            ["academic", "\u5B66\u672F"],
+                          ].map(([style, label]) =>
                             button(
                               {
                                 class: "ai-toolbox-item",
                                 style:
-                                  "display:block;width:100%;padding:6px 14px;" +
+                                  "display:block;width:100%;padding:4px 14px;" +
                                   "border:none;background:none;" +
-                                  "font-size:13px;color:#333;cursor:pointer;" +
-                                  "text-align:left;" +
-                                  "white-space:nowrap;",
+                                  "font-size:12px;color:#555;cursor:pointer;" +
+                                  "text-align:left;",
                                 onclick: (e: Event) => {
                                   e.stopPropagation();
-                                  if (action === "rewrite") {
-                                    aiPanelAction.val = action;
-                                    aiPanelResult.val = null;
-                                    return;
-                                  }
                                   executeAiAction(
                                     memo.id,
                                     memo.content,
-                                    action,
+                                    "rewrite",
+                                    style,
                                   );
                                 },
                                 onmouseenter: (e: Event) => {
-                                  (e.target as HTMLElement).style.background =
-                                    "#f5f5f5";
+                                  (
+                                    e.target as HTMLElement
+                                  ).style.background = "#f5f5f5";
                                 },
                                 onmouseleave: (e: Event) => {
-                                  (e.target as HTMLElement).style.background =
-                                    "none";
+                                  (
+                                    e.target as HTMLElement
+                                  ).style.background = "none";
                                 },
                               },
                               label,
                             ),
-                        ),
-                        // Style selector for rewrite
-                        () =>
-                          aiPanelAction.val === "rewrite" &&
-                          !aiPanelLoading.val &&
-                          !aiPanelResult.val
-                            ? div(
-                                {
-                                  style:
-                                    "border-top:1px solid #eee;padding:4px 0;",
-                                },
-                                div(
-                                  {
-                                    style:
-                                      "padding:2px 14px;font-size:11px;color:#999;",
-                                  },
-                                  "\u98CE\u683C\uFF1A",
-                                ),
-                                ...[
-                                  ["professional", "\u4E13\u4E1A"],
-                                  ["casual", "\u53E3\u8BED"],
-                                  ["minimal", "\u6781\u7B80"],
-                                  ["academic", "\u5B66\u672F"],
-                                ].map(([style, label]) =>
-                                  button(
-                                    {
-                                      class: "ai-toolbox-item",
-                                      style:
-                                        "display:block;width:100%;padding:4px 14px;" +
-                                        "border:none;background:none;" +
-                                        "font-size:12px;color:#555;cursor:pointer;" +
-                                        "text-align:left;",
-                                      onclick: (e: Event) => {
-                                        e.stopPropagation();
-                                        executeAiAction(
-                                          memo.id,
-                                          memo.content,
-                                          "rewrite",
-                                          style,
-                                        );
-                                      },
-                                      onmouseenter: (e: Event) => {
-                                        (
-                                          e.target as HTMLElement
-                                        ).style.background = "#f5f5f5";
-                                      },
-                                      onmouseleave: (e: Event) => {
-                                        (
-                                          e.target as HTMLElement
-                                        ).style.background = "none";
-                                      },
-                                    },
-                                    label,
-                                  ),
-                                ),
-                              )
-                            : "",
-                      )
-                    : "",
-              )
+                          ),
+                        )
+                        : "",
+                  )
+                  : "",
+            )
             : "",
       ),
     ),
     // AI result panel
     () =>
       isPanelOpen() &&
-      (aiPanelResult.val || aiPanelLoading.val || aiPanelError.val)
+        (aiPanelResult.val || aiPanelLoading.val || aiPanelError.val)
         ? div(
-            {
-              class: "ai-result-panel",
-              style:
-                "margin-top:12px;padding:12px;" +
-                "background:#f8f9fb;border:1px solid #e5e5e5;" +
-                "border-radius:6px;",
-            },
-            () =>
-              aiPanelLoading.val
+          {
+            class: "ai-result-panel",
+            style:
+              "margin-top:12px;padding:12px;" +
+              "background:#f8f9fb;border:1px solid #e5e5e5;" +
+              "border-radius:6px;",
+          },
+          () =>
+            aiPanelLoading.val
+              ? div(
+                { style: "font-size:13px;color:#888;" },
+                "\u6B63\u5728\u751F\u6210\u4E2D...",
+              )
+              : aiPanelError.val
                 ? div(
-                    { style: "font-size:13px;color:#888;" },
-                    "\u6B63\u5728\u751F\u6210\u4E2D...",
-                  )
-                : aiPanelError.val
-                  ? div(
-                      { style: "font-size:13px;color:#c00;" },
-                      aiPanelError.val,
-                    )
-                  : div(
-                      {},
-                      div(
-                        {
-                          style:
-                            "font-size:13px;line-height:20px;" +
-                            "word-break:break-word;" +
-                            "color:#333;margin-bottom:12px;",
-                        },
-                        () =>
-                          span({
-                            class: "md-content",
-                            style: "white-space:pre-wrap;",
-                            innerHTML: renderMarkdown(aiPanelResult.val || ""),
-                          }),
-                      ),
-                      div(
-                        {
-                          class: "ai-result-actions",
-                          style: "display:flex;gap:6px;",
-                        },
-                        button(
-                          {
-                            class: "btn btn-primary btn-sm",
-                            onclick: () => replaceMemoWithResult(memo.id),
-                          },
-                          "\u66FF\u6362\u539F\u6587",
-                        ),
-                        button(
-                          {
-                            class: "btn btn-outline btn-sm",
-                            onclick: () =>
-                              newMemoFromResult({
-                                id: memo.id,
-                                is_public: memo.is_public,
-                                tags: memo.tags,
-                              }),
-                          },
-                          "\u65B0\u5EFA memo",
-                        ),
-                        button(
-                          {
-                            class: "btn btn-outline btn-sm",
-                            onclick: closeAiPanel,
-                          },
-                          "\u4E22\u5F03",
-                        ),
-                      ),
+                  { style: "font-size:13px;color:#c00;" },
+                  aiPanelError.val,
+                )
+                : div(
+                  {},
+                  div(
+                    {
+                      style:
+                        "font-size:13px;line-height:20px;" +
+                        "word-break:break-word;" +
+                        "color:#333;margin-bottom:12px;",
+                    },
+                    () =>
+                      span({
+                        class: "md-content",
+                        style: "white-space:pre-wrap;",
+                        innerHTML: renderMarkdown(aiPanelResult.val || ""),
+                      }),
+                  ),
+                  div(
+                    {
+                      class: "ai-result-actions",
+                      style: "display:flex;gap:6px;",
+                    },
+                    button(
+                      {
+                        class: "btn btn-primary btn-sm",
+                        onclick: () => replaceMemoWithResult(memo.id),
+                      },
+                      "\u66FF\u6362\u539F\u6587",
                     ),
-          )
+                    button(
+                      {
+                        class: "btn btn-outline btn-sm",
+                        onclick: () =>
+                          newMemoFromResult({
+                            id: memo.id,
+                            is_public: memo.is_public,
+                            tags: memo.tags,
+                          }),
+                      },
+                      "\u65B0\u5EFA memo",
+                    ),
+                    button(
+                      {
+                        class: "btn btn-outline btn-sm",
+                        onclick: closeAiPanel,
+                      },
+                      "\u4E22\u5F03",
+                    ),
+                  ),
+                ),
+        )
         : "",
     () => (deleteConfirmId.val === memo.id ? DeleteConfirm(memo.id) : ""),
   );

@@ -11,8 +11,7 @@
     "start": "bun run build && bun run src/server.ts"
   },
   "devDependencies": {
-    "@types/bun": "latest",
-    "@types/dompurify": "^3.2.0"
+    "@types/bun": "latest"
   },
   "peerDependencies": {
     "typescript": "^5"
