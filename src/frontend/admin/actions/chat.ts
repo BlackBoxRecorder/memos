@@ -7,6 +7,7 @@ import {
   chatInput,
   chatStreaming,
   chatContextCount,
+  chatTagFilter,
   chatAbort,
   creativeItems,
   prompts,
@@ -39,6 +40,9 @@ export async function sendChatMessage(): Promise<void> {
     if (selected) {
       body.provider = selected.provider;
       body.model = selected.model;
+    }
+    if (chatTagFilter.val.trim()) {
+      body.tag = chatTagFilter.val.trim();
     }
 
     const resp = await fetch(apiUrl("api/ai/chat"), {
@@ -122,4 +126,5 @@ export function newChat(): void {
   chatInput.val = "";
   chatStreaming.val = false;
   chatContextCount.val = 0;
+  chatTagFilter.val = "";
 }

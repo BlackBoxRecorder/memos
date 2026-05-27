@@ -59,6 +59,12 @@ app.get("/admin/favicon.svg", serveFavicon);
 // /admin/app.js → 预构建 JS bundle
 app.get("/admin/app.js", async (c) => {
   const file = Bun.file(`${DIST_BASE}/admin/app.js`);
+  if (!(await file.exists())) {
+    return new Response(
+      "JS bundle not found. Please run: bun run build:admin",
+      { status: 503, headers: { "Content-Type": "text/plain; charset=utf-8" } },
+    );
+  }
   return new Response(file, {
     headers: { "Content-Type": "application/javascript" },
   });
@@ -78,6 +84,12 @@ app.get("/admin/index.html", async (c) =>
 // /index.js → 预构建 JS bundle
 app.get("/index.js", async (c) => {
   const file = Bun.file(`${DIST_BASE}/masonry/index.js`);
+  if (!(await file.exists())) {
+    return new Response(
+      "JS bundle not found. Please run: bun run build:masonry",
+      { status: 503, headers: { "Content-Type": "text/plain; charset=utf-8" } },
+    );
+  }
   return new Response(file, {
     headers: { "Content-Type": "application/javascript" },
   });

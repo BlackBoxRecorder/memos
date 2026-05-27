@@ -5,7 +5,9 @@ import {
   chatInput,
   chatStreaming,
   chatContextCount,
+  chatTagFilter,
   prompts,
+  availableTags,
 } from "../state";
 import { sendChatMessage, saveChatAsCreative, newChat } from "../actions/chat";
 
@@ -37,80 +39,120 @@ export function ChatPanel() {
       () =>
         chatMessages.val.length === 0
           ? div(
-              {
-                style:
-                  "text-align:center;color:var(--text-muted);padding:40px 20px;",
-              },
-              "开始与 AI 对话，探索你的笔记库。",
-            )
+            {
+              style:
+                "text-align:center;color:var(--text-muted);padding:40px 20px;",
+            },
+            "开始与 AI 对话，探索你的笔记库。",
+          )
           : div(
-              chatMessages.val.map((msg, i) =>
+            chatMessages.val.map((msg, i) =>
+              div(
+                {
+                  style: () => {
+                    const isUser = chatMessages.val[i]?.role === "user";
+                    return (
+                      "margin-bottom:12px;padding:8px 12px;" +
+                      "border-radius:8px;max-width:85%;" +
+                      (isUser
+                        ? "margin-left:auto;background:var(--primary-light);color:var(--primary-text);"
+                        : "margin-right:auto;background:var(--bg-primary);border:1px solid var(--border-color);")
+                    );
+                  },
+                },
+                div(
+                  {
+                    style:
+                      "font-size:11px;font-weight:600;margin-bottom:4px;color:var(--text-muted);",
+                  },
+                  msg.role === "user" ? "你" : "AI 助手",
+                ),
                 div(
                   {
                     style: () => {
-                      const isUser = chatMessages.val[i]?.role === "user";
+                      const isStreaming =
+                        chatStreaming.val &&
+                        i === chatMessages.val.length - 1;
                       return (
-                        "margin-bottom:12px;padding:8px 12px;" +
-                        "border-radius:8px;max-width:85%;" +
-                        (isUser
-                          ? "margin-left:auto;background:var(--primary-light);color:var(--primary-text);"
-                          : "margin-right:auto;background:var(--bg-primary);border:1px solid var(--border-color);")
+                        (isStreaming ? "white-space:pre-wrap;" : "") +
+                        "word-break:break-word;" +
+                        "font-size:14px;line-height:1.6;"
                       );
                     },
                   },
-                  div(
-                    {
-                      style:
-                        "font-size:11px;font-weight:600;margin-bottom:4px;color:var(--text-muted);",
-                    },
-                    msg.role === "user" ? "你" : "AI 助手",
-                  ),
-                  div(
-                    {
-                      style: () => {
-                        const isStreaming =
-                          chatStreaming.val &&
-                          i === chatMessages.val.length - 1;
-                        return (
-                          (isStreaming ? "white-space:pre-wrap;" : "") +
-                          "word-break:break-word;" +
-                          "font-size:14px;line-height:1.6;"
-                        );
-                      },
-                    },
-                    () => {
-                      const isStreaming =
-                        chatStreaming.val && i === chatMessages.val.length - 1;
-                      const content = chatMessages.val[i]?.content || "";
-                      if (isStreaming) {
-                        return (
-                          content ||
-                          span(
-                            { style: "color:var(--text-muted);" },
-                            "思考中...",
-                          )
-                        );
-                      }
-                      return span({
-                        class: "md-content",
-                        innerHTML: renderMarkdown(content),
-                      });
-                    },
-                  ),
+                  () => {
+                    const isStreaming =
+                      chatStreaming.val && i === chatMessages.val.length - 1;
+                    const content = chatMessages.val[i]?.content || "";
+                    if (isStreaming) {
+                      return (
+                        content ||
+                        span(
+                          { style: "color:var(--text-muted);" },
+                          "思考中...",
+                        )
+                      );
+                    }
+                    return span({
+                      class: "md-content",
+                      innerHTML: renderMarkdown(content),
+                    });
+                  },
                 ),
               ),
             ),
+          ),
     ),
     // Status bar
     () =>
       chatContextCount.val > 0
         ? div(
+          {
+            style:
+              "font-size:12px;color:var(--text-muted);margin-bottom:8px;",
+          },
+          `已检索 ${chatContextCount.val} 条相关备忘录作为上下文`,
+        )
+        : "",
+    // Tag filter for chat context
+    () =>
+      availableTags.val.length > 0
+        ? div(
+          {
+            style:
+              "margin-bottom:10px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;",
+          },
+          span(
+            { style: "font-size:12px;color:var(--text-muted);flex-shrink:0;" },
+            "上下文标签：",
+          ),
+          button(
             {
-              style:
-                "font-size:12px;color:var(--text-muted);margin-bottom:8px;",
+              class: () =>
+                "mode-btn" + (!chatTagFilter.val ? " active" : ""),
+              style: "font-size:11px;padding:2px 8px;border-radius:10px;",
+              onclick: () => {
+                chatTagFilter.val = "";
+              },
             },
-            `已检索 ${chatContextCount.val} 条相关备忘录作为上下文`,
-          )
+            "自动",
+          ),
+          ...availableTags.val.map((tag) =>
+            button(
+              {
+                class: () =>
+                  "mode-btn" +
+                  (chatTagFilter.val === tag ? " active" : ""),
+                style: "font-size:11px;padding:2px 8px;border-radius:10px;",
+                onclick: () => {
+                  chatTagFilter.val =
+                    chatTagFilter.val === tag ? "" : tag;
+                },
+              },
+              tag,
+            ),
+          ),
+        )
         : "",
     // Input area
     form(
@@ -167,30 +209,30 @@ export function ChatPanel() {
       () =>
         prompts.val.length > 0
           ? div(
-              {
-                style: "display:flex;gap:6px;flex-wrap:wrap;margin-left:auto;",
-              },
-              prompts.val.slice(0, 5).map((p) =>
-                button(
-                  {
-                    class: "tag-btn",
-                    style: "font-size:11px;padding:2px 8px;",
-                    title: p.content,
-                    onclick: () => {
-                      chatMessages.val = [
-                        ...chatMessages.val,
-                        {
-                          role: "user",
-                          content: `使用提示词「${p.title}」：\n${p.content}`,
-                        },
-                      ];
-                      setTimeout(() => sendChatMessage(), 100);
-                    },
+            {
+              style: "display:flex;gap:6px;flex-wrap:wrap;margin-left:auto;",
+            },
+            prompts.val.slice(0, 5).map((p) =>
+              button(
+                {
+                  class: "tag-btn",
+                  style: "font-size:11px;padding:2px 8px;",
+                  title: p.content,
+                  onclick: () => {
+                    chatMessages.val = [
+                      ...chatMessages.val,
+                      {
+                        role: "user",
+                        content: `使用提示词「${p.title}」：\n${p.content}`,
+                      },
+                    ];
+                    setTimeout(() => sendChatMessage(), 100);
                   },
-                  p.title,
-                ),
+                },
+                p.title,
               ),
-            )
+            ),
+          )
           : "",
     ),
   );

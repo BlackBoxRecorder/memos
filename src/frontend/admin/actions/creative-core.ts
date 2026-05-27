@@ -17,6 +17,7 @@ import {
   extraPromptInput,
   generationMode,
   manualMemoIds,
+  generateTagFilter,
   generating,
   generateError,
   streamContent,
@@ -29,6 +30,7 @@ import {
   previewLoading,
   previewError,
   previewFetched,
+  availableTags,
 } from "../state";
 
 // ====== Helpers ======
@@ -44,6 +46,17 @@ export function parseManualIds(): number[] {
     .split(",")
     .map((s) => Number(s.trim()))
     .filter((n) => !isNaN(n) && n > 0);
+}
+
+// ====== Tags ======
+
+export async function loadTags(): Promise<void> {
+  try {
+    const data = await api<{ tags: string[] }>("api/memos/tags");
+    availableTags.val = data.tags;
+  } catch {
+    // silently ignore
+  }
 }
 
 // ====== Prompt CRUD ======
@@ -177,6 +190,14 @@ export async function loadPreviewContext(): Promise<void> {
       return;
     }
     body.memo_ids = ids;
+  } else if (generationMode.val === "tag") {
+    if (!generateTagFilter.val.trim()) {
+      previewError.val = "请先选择一个标签";
+      previewFetched.val = false;
+      previewMemos.val = [];
+      return;
+    }
+    body.tag = generateTagFilter.val.trim();
   }
 
   previewLoading.val = true;
@@ -212,6 +233,10 @@ export async function handleGenerate(): Promise<void> {
     generateError.val = "请输入 Memo ID（用逗号分隔）";
     return;
   }
+  if (generationMode.val === "tag" && !generateTagFilter.val.trim()) {
+    generateError.val = "请选择一个标签";
+    return;
+  }
 
   const body: Record<string, unknown> = {
     prompt_id: selectedPromptId.val,
@@ -229,6 +254,8 @@ export async function handleGenerate(): Promise<void> {
       return;
     }
     body.memo_ids = ids;
+  } else if (generationMode.val === "tag") {
+    body.tag = generateTagFilter.val.trim();
   }
 
   generating.val = true;
@@ -316,6 +343,7 @@ export function closeGenerateModal(): void {
   generateModalOpen.val = false;
   extraPromptInput.val = "";
   manualMemoIds.val = "";
+  generateTagFilter.val = "";
   generationMode.val = "auto";
   generateError.val = null;
   streamContent.val = "";

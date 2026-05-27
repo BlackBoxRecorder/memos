@@ -26,6 +26,11 @@ import {
 
 export const creativeApp = new Hono();
 
+/** Maximum number of tag-filtered memos used as context to avoid token overflow */
+const MAX_TAG_CONTEXT = 20;
+/** Maximum number of memos returned in preview-context for tag mode */
+const MAX_TAG_PREVIEW = 50;
+
 // --- Prompts endpoints ---
 
 // GET /api/creative/prompts — 获取所有 prompts
@@ -120,6 +125,7 @@ creativeApp.post("/preview-context", authMiddleware, async (c) => {
     prompt_id?: number;
     extra_prompt?: string;
     memo_ids?: number[];
+    tag?: string;
   };
   try {
     body = await c.req.json();
@@ -155,10 +161,20 @@ creativeApp.post("/preview-context", authMiddleware, async (c) => {
   }
 
   const isManualMode = body.memo_ids !== undefined && body.memo_ids.length > 0;
+  const isTagMode =
+    !isManualMode &&
+    typeof body.tag === "string" &&
+    body.tag.trim().length > 0;
 
   if (isManualMode) {
     const memos = getMemos({ includePrivate: true, ids: body.memo_ids });
     return c.json({ memos, mode: "manual" });
+  }
+
+  if (isTagMode) {
+    const memos = getMemos({ includePrivate: true, tag: body.tag!.trim(), limit: MAX_TAG_PREVIEW });
+    // total_count reflects the actual total; we return a limited slice for performance
+    return c.json({ memos, mode: "tag" });
   }
 
   // Auto mode: consumes AI quota because it calls embedding + semantic search
@@ -189,6 +205,7 @@ creativeApp.post("/generate", authMiddleware, async (c) => {
     memo_ids?: number[];
     provider?: string;
     model?: string;
+    tag?: string;
   };
   try {
     body = await c.req.json();
@@ -235,11 +252,19 @@ creativeApp.post("/generate", authMiddleware, async (c) => {
   let embedding: Float32Array | null = null;
 
   const isManualMode = body.memo_ids !== undefined && body.memo_ids.length > 0;
+  const isTagMode =
+    !isManualMode &&
+    typeof body.tag === "string" &&
+    body.tag.trim().length > 0;
 
   if (isManualMode) {
     const memos = getMemos({ includePrivate: true, ids: body.memo_ids });
     contextMemos = memos.map((m) => m.content);
     contextMemoIds = body.memo_ids!.join(",");
+  } else if (isTagMode) {
+    const memos = getMemos({ includePrivate: true, tag: body.tag!.trim(), limit: MAX_TAG_CONTEXT });
+    contextMemos = memos.map((m) => m.content);
+    contextMemoIds = memos.map((m) => m.id).join(",");
   } else {
     embedding = await generateEmbedding(body.extra_prompt.trim());
     try {

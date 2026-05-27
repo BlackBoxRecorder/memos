@@ -18,9 +18,11 @@ import {
   promptFormSaving,
   generateModalOpen,
   creativeView,
+  availableTags,
 } from "./state";
 import {
   loadPrompts,
+  loadTags,
   openPromptCreate,
   openPromptEdit,
   closePromptForm,
@@ -161,12 +163,12 @@ function CreativeCard(item: CreativeItem) {
       () =>
         isTruncated
           ? button(
-              {
-                class: "read-more-btn",
-                onclick: () => (readMoreItem.val = item),
-              },
-              " 更多",
-            )
+            {
+              class: "read-more-btn",
+              onclick: () => (readMoreItem.val = item),
+            },
+            " 更多",
+          )
           : "",
     ),
     div(
@@ -191,24 +193,24 @@ function CreativeCard(item: CreativeItem) {
     () =>
       creativeDeleteId.val === item.id
         ? div(
-            { class: "delete-confirm" },
-            span("确定要删除这条创意内容吗？"),
-            button(
-              {
-                class: "btn btn-danger btn-sm",
-                disabled: () => creativeDeleting.val,
-                onclick: () => deleteCreativeItem(item.id),
-              },
-              "删除",
-            ),
-            button(
-              {
-                class: "btn btn-outline btn-sm",
-                onclick: () => (creativeDeleteId.val = null),
-              },
-              "取消",
-            ),
-          )
+          { class: "delete-confirm" },
+          span("确定要删除这条创意内容吗？"),
+          button(
+            {
+              class: "btn btn-danger btn-sm",
+              disabled: () => creativeDeleting.val,
+              onclick: () => deleteCreativeItem(item.id),
+            },
+            "删除",
+          ),
+          button(
+            {
+              class: "btn btn-outline btn-sm",
+              onclick: () => (creativeDeleteId.val = null),
+            },
+            "取消",
+          ),
+        )
         : "",
   );
 }
@@ -219,6 +221,9 @@ export function CreativeTab() {
   // Load data on first render
   if (prompts.val.length === 0) {
     loadPrompts();
+  }
+  if (availableTags.val.length === 0) {
+    loadTags();
   }
 
   return div(
@@ -273,76 +278,76 @@ export function CreativeTab() {
       creativeView.val === "chat"
         ? ChatPanel()
         : div(
-            // Tag cloud (list view only)
-            () => (prompts.val.length > 0 ? TagCloud() : ""),
-            // Generate button (below tag cloud)
-            div(
-              { style: "margin-bottom:16px;" },
-              button(
-                {
-                  class: "btn btn-primary btn-sm",
-                  disabled: () => selectedPromptId.val === null,
-                  onclick: () => (generateModalOpen.val = true),
-                  title:
-                    selectedPromptId.val === null
-                      ? "请先选择提示词"
-                      : "生成创意内容",
-                },
-                "生成",
-              ),
+          // Tag cloud (list view only)
+          () => (prompts.val.length > 0 ? TagCloud() : ""),
+          // Generate button (below tag cloud)
+          div(
+            { style: "margin-bottom:16px;" },
+            button(
+              {
+                class: "btn btn-primary btn-sm",
+                disabled: () => selectedPromptId.val === null,
+                onclick: () => (generateModalOpen.val = true),
+                title:
+                  selectedPromptId.val === null
+                    ? "请先选择提示词"
+                    : "生成创意内容",
+              },
+              "生成",
             ),
-            // Generate modal
-            () => (generateModalOpen.val ? GenerateModal() : ""),
-            // Prompt form modal
-            () => (promptFormMode.val.type !== "closed" ? PromptForm() : ""),
-            // Creative content list
-            () => {
-              if (prompts.val.length === 0) {
-                return div(
-                  { class: "empty-state" },
-                  "还没有提示词，创建一个开始吧！",
-                );
-              }
-              if (creativeLoading.val) {
-                return div({ class: "status-msg" }, "加载中...");
-              }
-              if (creativeItems.val.length === 0) {
-                return div(
-                  { class: "empty-state" },
-                  "还没有创意内容。请在上方选择提示词并点击生成。",
-                );
-              }
-              return div(creativeItems.val.map(CreativeCard));
-            },
-            // Read more modal
-            () => {
-              const item = readMoreItem.val;
-              if (!item) return "";
-              const prompt = prompts.val.find((p) => p.id === item.prompt_id);
-              return ReadMoreModal({
-                text: van.state(item.content),
-                onClose: () => (readMoreItem.val = null),
-                title: prompt ? prompt.title : "Creative Content",
-                footer: () =>
-                  div(
-                    {},
-                    item.extra_prompt
-                      ? div(
-                          {
-                            style: "margin-top:12px;font-size:12px;color:#999;",
-                          },
-                          "附加指令：",
-                          item.extra_prompt,
-                        )
-                      : "",
-                    div(
-                      { style: "margin-top:4px;font-size:12px;color:#999;" },
-                      "创建于：",
-                      formatDate(item.created_at),
-                    ),
-                  ),
-              });
-            },
           ),
+          // Generate modal
+          () => (generateModalOpen.val ? GenerateModal() : ""),
+          // Prompt form modal
+          () => (promptFormMode.val.type !== "closed" ? PromptForm() : ""),
+          // Creative content list
+          () => {
+            if (prompts.val.length === 0) {
+              return div(
+                { class: "empty-state" },
+                "还没有提示词，创建一个开始吧！",
+              );
+            }
+            if (creativeLoading.val) {
+              return div({ class: "status-msg" }, "加载中...");
+            }
+            if (creativeItems.val.length === 0) {
+              return div(
+                { class: "empty-state" },
+                "还没有创意内容。请在上方选择提示词并点击生成。",
+              );
+            }
+            return div(creativeItems.val.map(CreativeCard));
+          },
+          // Read more modal
+          () => {
+            const item = readMoreItem.val;
+            if (!item) return "";
+            const prompt = prompts.val.find((p) => p.id === item.prompt_id);
+            return ReadMoreModal({
+              text: van.state(item.content),
+              onClose: () => (readMoreItem.val = null),
+              title: prompt ? prompt.title : "Creative Content",
+              footer: () =>
+                div(
+                  {},
+                  item.extra_prompt
+                    ? div(
+                      {
+                        style: "margin-top:12px;font-size:12px;color:#999;",
+                      },
+                      "附加指令：",
+                      item.extra_prompt,
+                    )
+                    : "",
+                  div(
+                    { style: "margin-top:4px;font-size:12px;color:#999;" },
+                    "创建于：",
+                    formatDate(item.created_at),
+                  ),
+                ),
+            });
+          },
+        ),
   );
 }

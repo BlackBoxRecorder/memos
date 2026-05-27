@@ -9,6 +9,7 @@ import {
   streamDone,
   generationMode,
   manualMemoIds,
+  generateTagFilter,
   selectedPromptId,
   prompts,
   previewOpen,
@@ -16,6 +17,7 @@ import {
   previewLoading,
   previewError,
   previewFetched,
+  availableTags,
 } from "../state";
 import {
   handleGenerate,
@@ -100,12 +102,12 @@ function PreviewPanel() {
         const memoCount = previewMemos.val.length;
         return hasData
           ? span(
-              {
-                class:
-                  "context-preview-count" + (memoCount === 0 ? " empty" : ""),
-              },
-              memoCount === 0 ? "无结果" : memoCount + " 条 Memos",
-            )
+            {
+              class:
+                "context-preview-count" + (memoCount === 0 ? " empty" : ""),
+            },
+            memoCount === 0 ? "无结果" : memoCount + " 条 Memos",
+          )
           : "";
       },
       span(
@@ -163,24 +165,24 @@ export function GenerateModal() {
           () =>
             hasStarted
               ? button(
-                  {
-                    class: "btn btn-outline btn-sm",
-                    onclick: closeGenerateModal,
-                  },
-                  "\u2715",
-                )
+                {
+                  class: "btn btn-outline btn-sm",
+                  onclick: closeGenerateModal,
+                },
+                "\u2715",
+              )
               : "",
         ),
         () =>
           hasStarted
             ? div(
-                { class: "generation-summary" },
-                selectedPrompt ? selectedPrompt.title + " \u00B7 " : "",
-                truncate(extraPromptInput.val, 60),
-                generationMode.val === "manual" && manualMemoIds.val
-                  ? " \u00B7 ID\uFF1A" + manualMemoIds.val
-                  : "",
-              )
+              { class: "generation-summary" },
+              selectedPrompt ? selectedPrompt.title + " \u00B7 " : "",
+              truncate(extraPromptInput.val, 60),
+              generationMode.val === "manual" && manualMemoIds.val
+                ? " \u00B7 ID\uFF1A" + manualMemoIds.val
+                : "",
+            )
             : "",
       ),
 
@@ -197,27 +199,24 @@ export function GenerateModal() {
             () =>
               selectedPrompt
                 ? div(
-                    { class: "selected-prompt-label" },
-                    "已选提示词：",
-                    span(
-                      {
-                        style: "font-weight:500;color:#333",
-                      },
-                      selectedPrompt.title,
-                    ),
-                  )
+                  { class: "selected-prompt-label" },
+                  "已选提示词：",
+                  span(
+                    {
+                      style: "font-weight:500;color:#333",
+                    },
+                    selectedPrompt.title,
+                  ),
+                )
                 : "",
             textarea({
               placeholder: "AI 生成的附加指令...",
               value: extraPromptInput,
               disabled: () => generating.val,
               oninput: (e: Event) => {
-                const ta = e.target as HTMLTextAreaElement;
-                extraPromptInput.val = ta.value;
+                extraPromptInput.val = (e.target as HTMLTextAreaElement).value;
                 resetPreview();
               },
-              onfocus: () => {},
-              onblur: () => {},
             }),
             // Context mode toggle
             div(
@@ -254,32 +253,87 @@ export function GenerateModal() {
                 },
                 "手动选择",
               ),
+              button(
+                {
+                  class: () =>
+                    "mode-btn" +
+                    (generationMode.val === "tag" ? " active" : ""),
+                  disabled: () => generating.val,
+                  onclick: () => {
+                    generationMode.val = "tag";
+                    resetPreview();
+                  },
+                },
+                "按标签",
+              ),
             ),
             // Manual memo ID input
             () =>
               generationMode.val === "manual"
                 ? div(
-                    { style: "margin-top:8px;" },
-                    input({
-                      type: "text",
-                      placeholder: "Memo ID（例如 1,3,5）",
-                      value: manualMemoIds,
-                      disabled: () => generating.val,
-                      oninput: (e: Event) => {
-                        const inp = e.target as HTMLInputElement;
-                        manualMemoIds.val = inp.value;
-                        resetPreview();
-                      },
-                      onfocus: () => {},
-                      onblur: () => {},
-                    }),
-                    div(
-                      {
-                        style: "font-size:11px;color:#999;margin-top:4px;",
-                      },
-                      "输入 Memo ID，用逗号分隔。在备忘录标签页查看 ID（#编号）。",
-                    ),
-                  )
+                  { style: "margin-top:8px;" },
+                  input({
+                    type: "text",
+                    placeholder: "Memo ID（例如 1,3,5）",
+                    value: manualMemoIds,
+                    disabled: () => generating.val,
+                    oninput: (e: Event) => {
+                      const inp = e.target as HTMLInputElement;
+                      manualMemoIds.val = inp.value;
+                      resetPreview();
+                    },
+                    onfocus: () => { },
+                    onblur: () => { },
+                  }),
+                  div(
+                    {
+                      style: "font-size:11px;color:#999;margin-top:4px;",
+                    },
+                    "输入 Memo ID，用逗号分隔。在备忘录标签页查看 ID（#编号）。",
+                  ),
+                )
+                : "",
+            // Tag filter selector
+            () =>
+              generationMode.val === "tag"
+                ? div(
+                  { style: "margin-top:8px;" },
+                  div(
+                    {
+                      style:
+                        "display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;",
+                    },
+                    availableTags.val.length === 0
+                      ? div(
+                        { style: "font-size:12px;color:#999;" },
+                        "暂无可用标签",
+                      )
+                      : availableTags.val.map((tag) =>
+                        button(
+                          {
+                            class: () =>
+                              "mode-btn" +
+                              (generateTagFilter.val === tag
+                                ? " active"
+                                : ""),
+                            style:
+                              "font-size:12px;padding:3px 10px;border-radius:12px;",
+                            disabled: () => generating.val,
+                            onclick: () => {
+                              generateTagFilter.val =
+                                generateTagFilter.val === tag ? "" : tag;
+                              resetPreview();
+                            },
+                          },
+                          tag,
+                        ),
+                      ),
+                  ),
+                  div(
+                    { style: "font-size:11px;color:#999;margin-top:4px;" },
+                    "点击选择一个标签，该标签下所有 memo 将作为上下文。",
+                  ),
+                )
                 : "",
           ),
           // Context preview section
@@ -293,44 +347,44 @@ export function GenerateModal() {
         () =>
           hasStarted
             ? (() => {
-                if (!streamContent.val && !generating.val) return "";
-                const done = streamDone.val;
-                const active = generating.val;
-                return div(
+              if (!streamContent.val && !generating.val) return "";
+              const done = streamDone.val;
+              const active = generating.val;
+              return div(
+                {
+                  class: "hide-scrollbar",
+                  style:
+                    "background:#f8f9fb;border-radius:6px;" +
+                    "border:1px solid #e5e5e5;padding:14px;" +
+                    "min-height:200px;display:flex;flex-direction:column;",
+                },
+                div(
                   {
-                    class: "hide-scrollbar",
-                    style:
-                      "background:#f8f9fb;border-radius:6px;" +
-                      "border:1px solid #e5e5e5;padding:14px;" +
-                      "min-height:200px;display:flex;flex-direction:column;",
+                    style: "font-size:13px;color:#888;margin-bottom:8px;",
                   },
-                  div(
-                    {
-                      style: "font-size:13px;color:#888;margin-bottom:8px;",
-                    },
-                    done ? "生成的内容：" : "生成中...",
-                  ),
-                  div(
-                    {
-                      style:
-                        "font-size:14px;line-height:22px;" +
-                        "white-space:pre-wrap;word-break:break-word;" +
-                        "color:#333;flex:1;",
-                    },
-                    streamContent,
-                    () =>
-                      active
-                        ? span(
-                            {
-                              style:
-                                "animation:blink 0.8s infinite;color:#3b82f6;",
-                            },
-                            "\u258B",
-                          )
-                        : "",
-                  ),
-                );
-              })()
+                  done ? "生成的内容：" : "生成中...",
+                ),
+                div(
+                  {
+                    style:
+                      "font-size:14px;line-height:22px;" +
+                      "white-space:pre-wrap;word-break:break-word;" +
+                      "color:#333;flex:1;",
+                  },
+                  streamContent,
+                  () =>
+                    active
+                      ? span(
+                        {
+                          style:
+                            "animation:blink 0.8s infinite;color:#3b82f6;",
+                        },
+                        "\u258B",
+                      )
+                      : "",
+                ),
+              );
+            })()
             : "",
       ),
 
@@ -340,51 +394,51 @@ export function GenerateModal() {
         () =>
           generateError.val
             ? div(
-                {
-                  class: "form-error",
-                  style: "margin-bottom:8px;",
-                },
-                generateError.val,
-              )
+              {
+                class: "form-error",
+                style: "margin-bottom:8px;",
+              },
+              generateError.val,
+            )
             : "",
         () =>
           hasStarted
             ? div(
+              {
+                class: "modal-actions",
+                style: "margin-top:0;",
+              },
+              button(
                 {
-                  class: "modal-actions",
-                  style: "margin-top:0;",
+                  class: () =>
+                    "btn btn-sm " +
+                    (streamDone.val ? "btn-primary" : "btn-outline"),
+                  onclick: closeGenerateModal,
                 },
-                button(
-                  {
-                    class: () =>
-                      "btn btn-sm " +
-                      (streamDone.val ? "btn-primary" : "btn-outline"),
-                    onclick: closeGenerateModal,
-                  },
-                  () => (streamDone.val ? "关闭" : "取消"),
-                ),
-              )
-            : div(
-                {
-                  class: "modal-actions",
-                  style: "margin-top:0;",
-                },
-                button(
-                  {
-                    class: "btn btn-outline btn-sm",
-                    onclick: closeGenerateModal,
-                  },
-                  "取消",
-                ),
-                button(
-                  {
-                    class: "btn btn-primary btn-sm",
-                    disabled: () => generating.val || streamDone.val,
-                    onclick: handleGenerate,
-                  },
-                  "生成",
-                ),
+                () => (streamDone.val ? "关闭" : "取消"),
               ),
+            )
+            : div(
+              {
+                class: "modal-actions",
+                style: "margin-top:0;",
+              },
+              button(
+                {
+                  class: "btn btn-outline btn-sm",
+                  onclick: closeGenerateModal,
+                },
+                "取消",
+              ),
+              button(
+                {
+                  class: "btn btn-primary btn-sm",
+                  disabled: () => generating.val || streamDone.val,
+                  onclick: handleGenerate,
+                },
+                "生成",
+              ),
+            ),
       ),
     ),
   );

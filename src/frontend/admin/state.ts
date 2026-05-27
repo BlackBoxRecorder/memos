@@ -131,8 +131,9 @@ export const promptFormSaving = van.state(false);
 export const selectedPromptId = van.state<number | null>(null);
 export const generateModalOpen = van.state(false);
 export const extraPromptInput = van.state("");
-export const generationMode = van.state<"auto" | "manual">("auto");
+export const generationMode = van.state<"auto" | "manual" | "tag">("auto");
 export const manualMemoIds = van.state("");
+export const generateTagFilter = van.state("");
 export const generating = van.state(false);
 export const generateError = van.state<string | null>(null);
 
@@ -160,7 +161,12 @@ export const chatMessages = van.state<ChatMsg[]>([]);
 export const chatInput = van.state("");
 export const chatStreaming = van.state(false);
 export const chatContextCount = van.state(0);
+export const chatTagFilter = van.state("");
 export const chatAbort: { current: AbortController | null } = { current: null };
+
+// ====== Tags State ======
+
+export const availableTags = van.state<string[]>([]);
 
 // ====== Context Preview State ======
 

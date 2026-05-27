@@ -124,6 +124,7 @@ export function getMemos(opts: {
   search?: string;
   tag?: string;
   ids?: number[];
+  limit?: number;
 }): Memo[] {
   const d = getDb();
   const conditions: string[] = [];
@@ -158,7 +159,11 @@ export function getMemos(opts: {
 
   const where =
     conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-  const sql = `SELECT * FROM memos ${where} ORDER BY pinned_at IS NOT NULL DESC, pinned_at DESC, created_at DESC`;
+  const limitClause = opts.limit ? ` LIMIT ?` : "";
+  const sql = `SELECT * FROM memos ${where} ORDER BY pinned_at IS NOT NULL DESC, pinned_at DESC, created_at DESC${limitClause}`;
+  if (opts.limit) {
+    params.push(opts.limit);
+  }
   const rows = d.query(sql).all(...params) as MemoRow[];
   return rows.map(rowToMemo);
 }

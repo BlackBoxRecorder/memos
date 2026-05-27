@@ -12,12 +12,24 @@
 - [src/ai/embeddings.ts](file://src/ai/embeddings.ts)
 - [src/frontend/admin/components/GenerateModal.ts](file://src/frontend/admin/components/GenerateModal.ts)
 - [src/frontend/admin/components/ChatPanel.ts](file://src/frontend/admin/components/ChatPanel.ts)
+- [src/frontend/admin/components/MemoCard.ts](file://src/frontend/admin/components/MemoCard.ts)
+- [src/frontend/admin/components/FormModal.ts](file://src/frontend/admin/components/FormModal.ts)
 - [src/frontend/admin/creative.ts](file://src/frontend/admin/creative.ts)
 - [src/frontend/admin/state.ts](file://src/frontend/admin/state.ts)
 - [src/frontend/admin/ai-state.ts](file://src/frontend/admin/ai-state.ts)
+- [src/frontend/shared/styles/common.css](file://src/frontend/shared/styles/common.css)
+- [src/helper/svgHelper.ts](file://src/helper/svgHelper.ts)
 - [data/system-prompts/creative.txt](file://data/system-prompts/creative.txt)
 - [data/prompts/创意写作.txt](file://data/prompts/创意写作.txt)
 </cite>
+
+## 更新摘要
+**变更内容**
+- 更新了MemoCard组件的AI工具箱UI改进
+- 新增了AI重写功能的四种写作风格选择器
+- 增强了AI结果面板和操作按钮功能
+- 完善了FormModal中的AI工具箱设计
+- 更新了相关的状态管理和交互逻辑
 
 ## 目录
 1. [简介](#简介)
@@ -60,6 +72,8 @@ Admin[管理后台]
 Creative[创意写作模块]
 Chat[对话面板]
 Generate[生成模态框]
+MemoCard[Memo卡片组件]
+FormModal[表单模态框]
 end
 subgraph "配置文件"
 AppConfig[应用配置]
@@ -72,6 +86,8 @@ AI --> Embeddings
 Admin --> Creative
 Creative --> Generate
 Chat --> AI
+MemoCard --> AI
+FormModal --> AI
 AppConfig --> Server
 AIConfig --> AI
 Prompts --> AI
@@ -116,10 +132,20 @@ AI写作工具箱的核心服务架构包含多个相互协作的组件：
 - 实时流式输出显示
 - 生成内容的存储和管理
 
+#### 4. AI工具箱组件
+**更新** 新增了统一的AI工具箱组件，提供以下功能：
+- **触发按钮**：集成在每张memo卡片底部操作栏中的✨图标按钮
+- **下拉菜单**：点击弹出操作列表（摘要、改写、扩写、要点提炼、润色）
+- **改写风格选择**：选择改写后展开四种写作风格选择（专业/口语/极简/学术）
+- **内联结果面板**：在当前卡片下方插入结果面板，含三个操作按钮
+- **表单工具箱**：在编辑表单中提供相同的AI工具箱功能
+
 **章节来源**
 - [ai.config.json:1-44](file://ai.config.json#L1-L44)
 - [src/ai/service.ts:23-75](file://src/ai/service.ts#L23-L75)
 - [src/ai/embeddings.ts:13-64](file://src/ai/embeddings.ts#L13-L64)
+- [src/frontend/admin/components/MemoCard.ts:142-266](file://src/frontend/admin/components/MemoCard.ts#L142-L266)
+- [src/frontend/admin/components/FormModal.ts:104-222](file://src/frontend/admin/components/FormModal.ts#L104-L222)
 
 ## 架构概览
 
@@ -131,12 +157,15 @@ subgraph "表现层"
 UI[VanJS前端界面]
 Modals[模态框组件]
 Panels[功能面板]
+MemoCard[Memo卡片组件]
+FormModal[表单模态框]
 end
 subgraph "业务逻辑层"
 Creative[创意写作服务]
 Chat[对话服务]
 Tools[AI工具箱]
 Tags[标签服务]
+Actions[AI操作处理]
 end
 subgraph "数据访问层"
 Embeddings[嵌入向量缓存]
@@ -154,6 +183,7 @@ Panels --> Creative
 Panels --> Chat
 Creative --> Tools
 Tools --> Tags
+Tools --> Actions
 Creative --> Embeddings
 Chat --> Embeddings
 Tools --> Providers
@@ -161,12 +191,14 @@ Tags --> Providers
 Embeddings --> DashScope
 Creative --> RateLimit
 Tools --> RateLimit
+Actions --> Memory
 ```
 
 **图表来源**
 - [src/frontend/admin/creative.ts:218-349](file://src/frontend/admin/creative.ts#L218-L349)
 - [src/api/ai.ts:21-297](file://src/api/ai.ts#L21-L297)
 - [src/ai/service.ts:447-507](file://src/ai/service.ts#L447-L507)
+- [src/frontend/admin/components/MemoCard.ts:139-345](file://src/frontend/admin/components/MemoCard.ts#L139-L345)
 
 ## 详细组件分析
 
@@ -281,82 +313,128 @@ Rerank --> ReturnResults
 - [src/ai/embeddings.ts:77-93](file://src/ai/embeddings.ts#L77-L93)
 - [src/ai/embeddings.ts:117-150](file://src/ai/embeddings.ts#L117-L150)
 
-### 创意写作组件
+### AI工具箱组件
 
-#### 1. 生成模态框界面
+#### 1. MemoCard组件的AI工具箱
 
-创意写作功能通过模态框提供完整的用户体验：
+**更新** MemoCard组件实现了全新的AI工具箱UI设计：
 
 ```mermaid
 classDiagram
-class GenerateModal {
-+boolean hasStarted
-+string selectedPrompt
-+string extraPromptInput
-+string generationMode
-+string manualMemoIds
-+boolean generating
-+string generateError
-+renderPreviewBody() HTMLElement
-+PreviewPanel() HTMLElement
-+GenerateModal() HTMLElement
+class MemoCard {
++Memo memo
++boolean isPanelOpen()
++render() HTMLElement
 }
-class PreviewPanel {
-+boolean previewOpen
-+PreviewMemo[] previewMemos
-+boolean previewLoading
-+boolean previewFetched
-+loadPreviewContext() void
-+resetPreview() void
+class AIToolboxTrigger {
++boolean aiAvailable
++number aiPanelMemoId
++HTMLElement triggerButton
 }
-class CreativeState {
-+Prompt[] prompts
-+CreativeItem[] creativeItems
-+number selectedPromptId
-+boolean generateModalOpen
-+string streamContent
-+boolean streamDone
+class AIToolboxMenu {
++Record~string,string~ ACTION_LABELS
++string aiPanelAction
++HTMLElement menu
 }
-GenerateModal --> PreviewPanel : contains
-GenerateModal --> CreativeState : uses
-PreviewPanel --> CreativeState : uses
+class AIResultPanel {
++boolean aiPanelLoading
++string aiPanelResult
++string aiPanelError
++HTMLElement resultPanel
+}
+class AIActions {
++executeAiAction(number, string, string, string) void
++replaceMemoWithResult(number) void
++newMemoFromResult(Memo) void
++closeAiPanel() void
+}
+MemoCard --> AIToolboxTrigger : contains
+MemoCard --> AIToolboxMenu : contains
+MemoCard --> AIResultPanel : contains
+AIToolboxMenu --> AIActions : uses
+AIResultPanel --> AIActions : uses
 ```
 
 **图表来源**
-- [src/frontend/admin/components/GenerateModal.ts:138-392](file://src/frontend/admin/components/GenerateModal.ts#L138-L392)
-- [src/frontend/admin/state.ts:112-172](file://src/frontend/admin/state.ts#L112-L172)
+- [src/frontend/admin/components/MemoCard.ts:61-345](file://src/frontend/admin/components/MemoCard.ts#L61-L345)
+- [src/frontend/admin/actions/ai.ts:141-211](file://src/frontend/admin/actions/ai.ts#L141-L211)
 
-#### 2. 对话式AI面板
+#### 2. FormModal组件的AI工具箱
 
-对话面板提供了类似ChatGPT的交互体验：
+**更新** 表单模态框也实现了相同的AI工具箱设计：
+
+```mermaid
+classDiagram
+class FormModal {
++FormMode formMode
++string formContent
++string formTagInput
++boolean aiAvailable
++render() HTMLElement
+}
+class FormAIToolbox {
++boolean formAiMenuOpen
++boolean formAiLoading
++string formAiPendingAction
++HTMLElement triggerButton
+}
+class FormAIToolboxMenu {
++string[] ACTIONS
++HTMLElement menu
+}
+class FormAIActions {
++executeFormAiAction(string, string) void
++suggestTagsForContent() void
+}
+FormModal --> FormAIToolbox : contains
+FormAIToolbox --> FormAIToolboxMenu : contains
+FormAIToolboxMenu --> FormAIActions : uses
+```
+
+**图表来源**
+- [src/frontend/admin/components/FormModal.ts:22-281](file://src/frontend/admin/components/FormModal.ts#L22-L281)
+- [src/frontend/admin/actions/ai.ts:215-236](file://src/frontend/admin/actions/ai.ts#L215-L236)
+
+#### 3. 四种写作风格选择器
+
+**新增** AI重写功能现在支持四种不同的写作风格：
+
+| 风格类型 | 英文标识 | 中文描述 | 适用场景 |
+|----------|----------|----------|----------|
+| Professional | professional | 专业 | 学术论文、商务文档、正式报告 |
+| Casual | casual | 口语 | 日常聊天、非正式写作、社交媒体内容 |
+| Minimal | minimal | 极简 | 简洁表达、要点总结、快速笔记 |
+| Academic | academic | 学术 | 学术研究、论文写作、专业术语 |
+
+#### 4. AI结果面板增强
+
+**更新** 结果面板现在包含完整的操作按钮组：
 
 ```mermaid
 sequenceDiagram
 participant User as 用户
-participant ChatPanel as 对话面板
-participant State as 状态管理
-participant AI as AI服务
-participant Embeddings as 嵌入向量
-User->>ChatPanel : 输入消息
-ChatPanel->>State : 更新chatInput
-User->>ChatPanel : 点击发送
-ChatPanel->>State : 添加用户消息
-ChatPanel->>Embeddings : 获取相关备忘录
-Embeddings-->>ChatPanel : 返回上下文
-ChatPanel->>AI : 发送流式请求
-AI-->>ChatPanel : 返回增量响应
-ChatPanel->>State : 更新chatMessages
-ChatPanel-->>User : 显示回复
-Note over User,AI : 实时双向交互
+participant MemoCard as MemoCard组件
+participant AIActions as AI动作处理
+User->>MemoCard : 点击AI工具箱按钮
+MemoCard->>MemoCard : 显示下拉菜单
+User->>MemoCard : 选择操作如改写
+MemoCard->>AIActions : 执行AI操作
+AIActions-->>MemoCard : 返回结果
+MemoCard->>MemoCard : 显示结果面板
+User->>MemoCard : 点击操作按钮
+MemoCard->>AIActions : 执行相应操作
+AIActions-->>MemoCard : 更新状态
+MemoCard-->>User : 显示结果
 ```
 
 **图表来源**
-- [src/frontend/admin/components/ChatPanel.ts:14-198](file://src/frontend/admin/components/ChatPanel.ts#L14-L198)
-- [src/frontend/admin/state.ts:156-164](file://src/frontend/admin/state.ts#L156-L164)
+- [src/frontend/admin/components/MemoCard.ts:270-342](file://src/frontend/admin/components/MemoCard.ts#L270-L342)
+- [src/frontend/admin/actions/ai.ts:174-211](file://src/frontend/admin/actions/ai.ts#L174-L211)
 
 **章节来源**
-- [src/frontend/admin/components/GenerateModal.ts:138-392](file://src/frontend/admin/components/GenerateModal.ts#L138-L392)
-- [src/frontend/admin/components/ChatPanel.ts:14-198](file://src/frontend/admin/components/ChatPanel.ts#L14-L198)
+- [src/frontend/admin/components/MemoCard.ts:61-345](file://src/frontend/admin/components/MemoCard.ts#L61-L345)
+- [src/frontend/admin/components/FormModal.ts:22-281](file://src/frontend/admin/components/FormModal.ts#L22-L281)
+- [src/frontend/admin/actions/ai.ts:141-236](file://src/frontend/admin/actions/ai.ts#L141-L236)
 
 ### 配置管理系统
 
@@ -401,6 +479,7 @@ Hono[Hono Web框架]
 VanJS[VanJS前端框架]
 Pretext[Pretext文本排版]
 Dompurify[Dompurify安全处理]
+SVGHelper[SVG图标助手]
 end
 subgraph "AI相关"
 OpenAI[OpenAI兼容API]
@@ -417,6 +496,7 @@ ESM[ESM模块]
 end
 Hono --> VanJS
 VanJS --> Dompurify
+VanJS --> SVGHelper
 OpenAI --> Fetch
 DashScope --> Fetch
 SQLite --> WAL
@@ -426,6 +506,7 @@ Bun --> ESM
 **图表来源**
 - [package.json:20-26](file://package.json#L20-L26)
 - [src/server.ts:1-125](file://src/server.ts#L1-L125)
+- [src/helper/svgHelper.ts:1-113](file://src/helper/svgHelper.ts#L1-L113)
 
 **章节来源**
 - [package.json:1-28](file://package.json#L1-L28)
@@ -440,6 +521,7 @@ Bun --> ESM
 - **嵌入向量缓存**：内存中存储所有备忘录的向量表示
 - **配置缓存**：避免重复读取配置文件
 - **响应缓存**：对频繁请求的结果进行缓存
+- **UI状态缓存**：缓存AI工具箱的状态和用户选择
 
 ### 2. 流式处理
 
@@ -453,6 +535,13 @@ Bun --> ESM
 - 限流机制防止API滥用
 - 异常中断处理确保稳定性
 - 超时控制避免长时间等待
+
+### 4. UI渲染优化
+
+**更新** 新的AI工具箱组件采用了更高效的渲染策略：
+- 条件渲染减少DOM节点创建
+- 状态驱动的UI更新
+- 事件委托减少事件监听器数量
 
 ## 故障排除指南
 
@@ -485,9 +574,28 @@ Bun --> ESM
 - 调整requestTimeoutMs配置
 - 实现客户端重连机制
 
+#### 4. AI工具箱按钮不响应
+
+**症状**：点击AI工具箱按钮无反应
+**原因**：状态管理问题或事件绑定错误
+**解决方法**：
+- 检查aiPanelMemoId状态
+- 验证事件处理器绑定
+- 确认CSS样式未阻止点击事件
+
+#### 5. 写作风格选择器无效
+
+**症状**：改写操作无法应用特定风格
+**原因**：style参数传递错误或后端不支持
+**解决方法**：
+- 验证style参数格式
+- 检查后端AI服务支持的风格列表
+- 确认API请求包含正确的style字段
+
 **章节来源**
 - [src/ai/service.ts:98-115](file://src/ai/service.ts#L98-L115)
 - [src/ai/embeddings.ts:16-64](file://src/ai/embeddings.ts#L16-L64)
+- [src/frontend/admin/components/MemoCard.ts:142-266](file://src/frontend/admin/components/MemoCard.ts#L142-L266)
 
 ## 结论
 
@@ -498,5 +606,14 @@ AI写作工具箱是一个功能完整、架构清晰的智能写作辅助系统
 3. **实时交互体验**：流式处理提供接近实时的响应速度
 4. **模块化设计**：清晰的组件分离便于维护和扩展
 5. **性能优化**：多层缓存和并发控制确保系统稳定性
+6. **统一的UI设计**：全新的AI工具箱组件提供一致的用户体验
+7. **丰富的写作风格**：四种写作风格满足不同场景需求
+8. **完善的操作功能**：完整的AI结果处理和管理功能
+
+**更新** 最新的UI改进显著提升了用户体验：
+- **集成化设计**：AI工具箱按钮与现有操作按钮统一设计
+- **直观的菜单**：清晰的操作选项和风格选择
+- **增强的结果面板**：提供完整的操作按钮组
+- **一致的交互**：MemoCard和FormModal组件保持相同的用户体验
 
 该系统为用户提供了一个强大而易用的AI写作平台，能够显著提升内容创作效率和质量。通过合理的架构设计和配置管理，系统具备了良好的可扩展性和维护性，为未来的功能扩展奠定了坚实基础。
