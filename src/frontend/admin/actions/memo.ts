@@ -209,9 +209,13 @@ export async function handleImportFile(file: File): Promise<void> {
   importResult.val = null;
   importError.val = null;
   try {
+    const fileName = file.name.toLowerCase();
+    const isFlomoHtml = fileName.endsWith(".html") || fileName.endsWith(".htm");
+    const endpoint = isFlomoHtml ? "api/import-flomo" : "api/import";
+
     const formData = new FormData();
     formData.append("file", file);
-    const resp = await fetch(apiUrl("api/import"), {
+    const resp = await fetch(apiUrl(endpoint), {
       method: "POST",
       credentials: "same-origin",
       body: formData,

@@ -108,12 +108,12 @@ export function ImportExportModal() {
             () =>
               importError.val
                 ? div(
-                    {
-                      class: "form-error",
-                      style: "margin-top:12px;",
-                    },
-                    importError.val,
-                  )
+                  {
+                    class: "form-error",
+                    style: "margin-top:12px;",
+                  },
+                  importError.val,
+                )
                 : "",
           );
         }
@@ -124,24 +124,24 @@ export function ImportExportModal() {
           () =>
             importResult.val
               ? div(
-                  {
-                    class: "import-export-result success",
-                    style:
-                      "background:#dcfce7;color:#166534;padding:12px;border-radius:6px;margin-bottom:16px;font-size:13px;",
-                  },
-                  importResult.val,
-                )
+                {
+                  class: "import-export-result success",
+                  style:
+                    "background:#dcfce7;color:#166534;padding:12px;border-radius:6px;margin-bottom:16px;font-size:13px;",
+                },
+                importResult.val,
+              )
               : "",
           () =>
             importError.val
               ? div(
-                  {
-                    class: "import-export-result error",
-                    style:
-                      "background:#fef2f2;color:#c00;padding:12px;border-radius:6px;margin-bottom:16px;font-size:13px;",
-                  },
-                  importError.val,
-                )
+                {
+                  class: "import-export-result error",
+                  style:
+                    "background:#fef2f2;color:#c00;padding:12px;border-radius:6px;margin-bottom:16px;font-size:13px;",
+                },
+                importError.val,
+              )
               : "",
           // Drag & drop area
           div(
@@ -161,30 +161,30 @@ export function ImportExportModal() {
             () =>
               importLoading.val
                 ? div(
-                    {
-                      style:
-                        "display:flex;flex-direction:column;align-items:center;gap:8px;color:#888;",
-                    },
-                    "导入中...",
-                  )
+                  {
+                    style:
+                      "display:flex;flex-direction:column;align-items:center;gap:8px;color:#888;",
+                  },
+                  "导入中...",
+                )
                 : div(
-                    {
-                      style:
-                        "display:flex;flex-direction:column;align-items:center;gap:8px;color:#888;",
-                    },
-                    span({ style: "font-size:28px;" }, "\u21E7"),
-                    span(
-                      { style: "font-size:14px;" },
-                      "拖拽文件到此处，或点击选择文件",
-                    ),
-                    span(
-                      { style: "font-size:12px;color:#bbb;" },
-                      "支持 .txt 文本文件",
-                    ),
+                  {
+                    style:
+                      "display:flex;flex-direction:column;align-items:center;gap:8px;color:#888;",
+                  },
+                  span({ style: "font-size:28px;" }, "\u21E7"),
+                  span(
+                    { style: "font-size:14px;" },
+                    "拖拽文件到此处，或点击选择文件",
                   ),
+                  span(
+                    { style: "font-size:12px;color:#bbb;" },
+                    "支持 .txt 文本文件 / .html (flomo 导出)",
+                  ),
+                ),
             input({
               type: "file",
-              accept: ".txt",
+              accept: ".txt,.html,.htm",
               style: "display:none;",
               onchange: handleFileChange,
               oncreate: (el: HTMLInputElement) => {

@@ -8,6 +8,7 @@ import {
   ensureDefaultPrompt,
   memoContentExists,
   creativeContentExists,
+  getDb,
 } from "../db";
 import type { Memo, CreativeItem } from "../model";
 
@@ -160,6 +161,101 @@ function splitBlocks(text: string): string[] {
   return blocks.filter((b) => b.trim().length > 0);
 }
 
+// ====== Flomo HTML Parser ======
+
+const HTML_ENTITIES: Record<string, string> = {
+  "&amp;": "&",
+  "&lt;": "<",
+  "&gt;": ">",
+  "&quot;": '"',
+  "&#39;": "'",
+  "&apos;": "'",
+  "&nbsp;": " ",
+};
+
+function decodeHTMLEntities(text: string): string {
+  return text.replace(
+    /&(?:amp|lt|gt|quot|#39|apos|nbsp);/g,
+    (match) => HTML_ENTITIES[match] ?? match,
+  );
+}
+
+function htmlToPlainText(html: string): string {
+  let text = html;
+
+  // 处理自闭合标签
+  text = text.replace(/<br\s*\/?>/gi, "\n");
+  text = text.replace(/<hr\s*\/?>/gi, "\n");
+
+  // 块级元素结束标签 → 换行
+  text = text.replace(/<\/(?:p|li|h[1-6]|div|tr)>/gi, "\n");
+
+  // 列表/表格容器结束标签 → 换行
+  text = text.replace(/<\/(?:ul|ol|table)>/gi, "\n");
+
+  // 去除所有剩余标签
+  text = text.replace(/<[^>]*>/g, "");
+
+  // 解码 HTML 实体
+  text = decodeHTMLEntities(text);
+
+  // 规范化空白
+  text = text.replace(/\n{3,}/g, "\n\n").trim();
+
+  return text;
+}
+
+function extractTags(text: string): string[] {
+  const matches = text.match(/#([^\s#<>]+)/g);
+  if (!matches) return [];
+  const tags = matches.map((t) => t.slice(1));
+  return [...new Set(tags)];
+}
+
+interface FlomoRecord {
+  time: string;
+  content: string;
+  tags: string[];
+}
+
+function parseFlomoHTML(html: string): FlomoRecord[] {
+  const records: FlomoRecord[] = [];
+
+  const memoRegex =
+    /<div class="memo">\s*([\s\S]*?)<\/div>\s*(?=<div class="memo">|\s*<\/div>\s*<script|$)/g;
+
+  let match: RegExpExecArray | null;
+  while ((match = memoRegex.exec(html)) !== null) {
+    const block = match[1]!;
+
+    // 提取时间
+    const timeMatch = block.match(
+      /<div class="time">\s*(.*?)\s*<\/div>/,
+    );
+    const time = timeMatch ? timeMatch[1]!.trim() : "";
+
+    // 提取内容 HTML
+    const contentMatch = block.match(
+      /<div class="content">\s*([\s\S]*?)\s*<\/div>/,
+    );
+    const contentHTML = contentMatch ? contentMatch[1]!.trim() : "";
+
+    if (!contentHTML) continue;
+
+    // HTML → 纯文本
+    const plainText = htmlToPlainText(contentHTML);
+
+    if (!plainText) continue;
+
+    // 提取标签
+    const tags = extractTags(plainText);
+
+    records.push({ time, content: plainText, tags });
+  }
+
+  return records;
+}
+
 // ====== Endpoints ======
 
 // GET /api/export — 导出所有数据为文本文件
@@ -281,6 +377,91 @@ exportImportApp.post("/import", authMiddleware, async (c) => {
     imported,
     skipped,
     deduped,
+    errors: errors.length > 0 ? errors : undefined,
+    message,
+  });
+});
+
+// POST /api/import-flomo — 从上传的 flomo HTML 文件导入数据
+exportImportApp.post("/import-flomo", authMiddleware, async (c) => {
+  let fileContent: string | null = null;
+
+  try {
+    const body = await c.req.parseBody({ all: true });
+    for (const [, value] of Object.entries(body)) {
+      if (value instanceof File) {
+        fileContent = await value.text();
+        break;
+      }
+    }
+  } catch {
+    return c.json({ error: "Invalid form data" }, 400);
+  }
+
+  if (!fileContent) {
+    return c.json({ error: "No file uploaded" }, 400);
+  }
+
+  if (fileContent.trim().length === 0) {
+    return c.json({ error: "Empty file" }, 400);
+  }
+
+  // 解析 flomo HTML
+  const records = parseFlomoHTML(fileContent);
+  if (records.length === 0) {
+    return c.json({
+      imported: 0,
+      skipped: 0,
+      message: "No valid flomo memo records found in the HTML file",
+    });
+  }
+
+  let imported = 0;
+  let skipped = 0;
+  const errors: string[] = [];
+
+  for (let i = 0; i < records.length; i++) {
+    const record = records[i]!;
+
+    try {
+      // 去重检查
+      if (memoContentExists(record.content)) {
+        skipped++;
+        continue;
+      }
+
+      // 导入
+      importMemo({
+        content: record.content,
+        tags: record.tags,
+        is_public: false,
+        created_at:
+          record.time ||
+          new Date().toISOString().replace("T", " ").slice(0, 19),
+      });
+      imported++;
+    } catch (err) {
+      skipped++;
+      errors.push(
+        `Record ${i + 1}: ${(err as Error).message || "import failed"}`,
+      );
+    }
+  }
+
+  // WAL checkpoint: 将 WAL 日志合并回主数据库文件
+  if (imported > 0) {
+    const d = getDb();
+    d.run("PRAGMA wal_checkpoint(TRUNCATE)");
+  }
+
+  const message =
+    errors.length > 0
+      ? `Imported ${imported}, skipped ${skipped}. Errors: ${errors.join("; ")}`
+      : `Imported ${imported}, skipped ${skipped} record(s) from flomo HTML.`;
+
+  return c.json({
+    imported,
+    skipped,
     errors: errors.length > 0 ? errors : undefined,
     message,
   });
