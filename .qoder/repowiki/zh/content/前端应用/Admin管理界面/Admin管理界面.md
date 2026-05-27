@@ -115,7 +115,7 @@ CREATIVE --> CREATIVE_ACT
 - [src/frontend/admin/creative.ts](file://src/frontend/admin/creative.ts)
 
 ## 架构总览
-Admin采用“状态驱动的组件化”架构：
+Admin采用"状态驱动的组件化"架构：
 - 响应式状态：VanJS的van.state统一管理UI状态与数据
 - 组件渲染：函数式组件通过状态订阅自动重渲染
 - 事件处理：组件内绑定事件回调，调用动作层API
@@ -170,7 +170,7 @@ AUTH->>API : GET /api/memos?all=true
 API-->>AUTH : {memos}
 AUTH->>ST : 更新memos
 AUTH->>AUTH : checkAiStatus()/loadAiModels()
-AUTH-->>U : 进入AdminPage
+-->>U : 进入AdminPage
 ```
 
 **图表来源**
@@ -187,7 +187,7 @@ AUTH-->>U : 进入AdminPage
 - AdminPage根据认证状态切换登录页或管理页
 - 顶部工具栏包含模型选择器、新建按钮、导入导出、查看网站、退出登录
 - 根据当前标签页显示时间线侧边栏（备忘录或创意内容）
-- 内容区根据activeTab切换“Memo”或“Creative”
+- 内容区根据activeTab切换"Memo"或"Creative"
 
 ```mermaid
 flowchart TD
@@ -224,7 +224,7 @@ participant MC as "MemoCard"
 participant ACT as "actions/memo.ts"
 participant ST as "state.ts"
 participant API as "后端API"
-U->>MC : 点击“编辑/置顶/切换公开/删除”
+U->>MC : 点击"编辑/置顶/切换公开/删除"
 MC->>ACT : openEditForm()/togglePin()/toggleVisibility()/deleteMemo()
 ACT->>API : PUT /api/memos/ : id
 API-->>ACT : 成功
@@ -350,7 +350,7 @@ participant FM as "FormModal"
 participant ACT as "actions/memo.ts"
 participant API as "后端API"
 U->>FM : 输入内容/标签/勾选公开
-U->>FM : 点击“保存”
+U->>FM : 点击"保存"
 FM->>ACT : saveForm()
 ACT->>API : POST/PUT /api/memos
 API-->>ACT : 成功
@@ -380,7 +380,7 @@ participant CC as "actions/creative-core.ts"
 participant ST as "state.ts"
 participant API as "后端API"
 U->>GM : 选择提示词/输入附加指令/选择上下文模式
-U->>GM : 点击“生成”
+U->>GM : 点击"生成"
 GM->>CC : handleGenerate()
 CC->>API : POST /api/creative/generate
 API-->>CC : SSE流式返回
@@ -399,6 +399,38 @@ CC->>ST : 重置状态
 - [src/frontend/admin/creative.ts](file://src/frontend/admin/creative.ts)
 - [src/frontend/admin/components/GenerateModal.ts](file://src/frontend/admin/components/GenerateModal.ts)
 - [src/frontend/admin/actions/creative-core.ts](file://src/frontend/admin/actions/creative-core.ts)
+
+### CreativeTab组件数据加载优化
+**更新** CreativeTab组件现已实现智能数据加载机制，防止无限数据加载循环
+
+CreativeTab组件在首次渲染时会检查并设置数据加载状态标志，确保提示词和标签数据只加载一次：
+
+- **promptsLoaded状态标志**：控制提示词数据的首次加载，防止重复请求
+- **tagsLoaded状态标志**：控制标签数据的首次加载，避免重复获取
+- **懒加载策略**：只有在数据为空时才触发加载，提升初始渲染性能
+- **状态管理**：使用van.state创建布尔标志，确保数据加载的幂等性
+
+```mermaid
+flowchart TD
+Start(["CreativeTab首次渲染"]) --> CheckPrompts["检查promptsLoaded状态"]
+CheckPrompts --> |false| LoadPrompts["设置promptsLoaded=true<br/>调用loadPrompts()"]
+CheckPrompts --> |true| CheckTags["检查tagsLoaded状态"]
+LoadPrompts --> CheckTags
+CheckTags --> |false| LoadTags["设置tagsLoaded=true<br/>调用loadTags()"]
+CheckTags --> |true| RenderContent["渲染内容"]
+LoadTags --> RenderContent
+RenderContent --> End(["完成渲染"])
+```
+
+**图表来源**
+- [src/frontend/admin/creative.ts:222-231](file://src/frontend/admin/creative.ts#L222-L231)
+- [src/frontend/admin/state.ts:116](file://src/frontend/admin/state.ts#L116)
+- [src/frontend/admin/state.ts:171](file://src/frontend/admin/state.ts#L171)
+
+**章节来源**
+- [src/frontend/admin/creative.ts:222-231](file://src/frontend/admin/creative.ts#L222-L231)
+- [src/frontend/admin/state.ts:116](file://src/frontend/admin/state.ts#L116)
+- [src/frontend/admin/state.ts:171](file://src/frontend/admin/state.ts#L171)
 
 ## 依赖关系分析
 
@@ -446,11 +478,11 @@ GENMODAL["GenerateModal.ts"] --> CREATIVE_ACT
 - 状态粒度控制：将UI状态与业务状态分离，避免无关状态变更引发重渲染
 - 计算缓存：时间线侧边栏对数据进行缓存，仅在数据变化时重建
 - 异步中断：AI标签建议与创意生成使用AbortController中断上一次请求
-- 懒加载：首次进入CreativeTab时才加载提示词与标签
+- 懒加载：首次进入CreativeTab时才加载提示词与标签，使用promptsLoaded和tagsLoaded标志防止重复加载
 - DOM节流：流式生成使用requestAnimationFrame合并更新
 - 本地存储：模型选择持久化减少重复请求
 
-[本节为通用指导，无需特定文件引用]
+**更新** CreativeTab组件的智能数据加载机制显著提升了性能，通过状态标志确保数据只在首次渲染时加载一次，避免了无限数据加载循环。
 
 ## 故障排查指南
 - 登录失败：检查密钥是否正确，查看全局错误提示
@@ -458,6 +490,7 @@ GENMODAL["GenerateModal.ts"] --> CREATIVE_ACT
 - AI不可用：检查AI状态与模型加载，确认默认模型是否有效
 - 导入失败：确认文件格式为.txt，查看错误信息并重试
 - 生成异常：检查提示词选择、附加指令、上下文模式与网络连接
+- CreativeTab数据加载异常：检查promptsLoaded和tagsLoaded状态标志是否正确设置
 
 **章节来源**
 - [src/frontend/admin/app.ts](file://src/frontend/admin/app.ts)
@@ -469,15 +502,19 @@ GENMODAL["GenerateModal.ts"] --> CREATIVE_ACT
 ## 结论
 Admin管理界面以VanJS为核心，通过清晰的状态层、组件层与动作层实现高内聚低耦合的架构。借助响应式状态与事件驱动，实现了登录认证、备忘录管理、标签系统、公开/私密切换、AI工具箱与创意写作的完整闭环。时间线侧边栏与模态框提升了交互效率。遵循本文的状态管理与性能优化建议，可进一步提升用户体验与系统稳定性。
 
+**更新** CreativeTab组件的数据加载修复显著改善了应用性能，通过智能状态标志管理确保数据加载的幂等性和效率，为用户提供了更流畅的使用体验。
+
 ## 附录
 - 最佳实践
   - 使用van.state集中管理UI状态，避免跨组件共享复杂对象
   - 将副作用（API调用）集中在actions层，保持组件纯函数特性
   - 对耗时操作（AI建议、生成）提供中断能力与错误兜底
   - 合理使用缓存与懒加载，降低首屏与频繁操作的延迟
+  - 在组件初始化时使用状态标志防止重复数据加载
 - 常见问题
   - 模态框无法关闭：检查事件冒泡与状态重置逻辑
   - 时间线不更新：确认数据变更后是否更新缓存与selectedMonth
   - AI结果不显示：检查aiPanelMemoId与aiPanelResult状态联动
+  - CreativeTab数据加载循环：确认promptsLoaded和tagsLoaded标志正确设置
 
-[本节为通用指导，无需特定文件引用]
+**更新** 新增CreativeTab组件数据加载优化的最佳实践，强调使用状态标志防止重复加载的重要性。
