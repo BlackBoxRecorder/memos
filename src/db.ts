@@ -460,8 +460,8 @@ export function memoContentExists(content: string): boolean {
   const d = getDb();
   const row = d
     .query("SELECT 1 FROM memos WHERE content = ? LIMIT 1")
-    .get(content) as { 1: number } | undefined;
-  return row !== undefined;
+    .get(content) as { 1: number } | null;
+  return row !== null;
 }
 
 /** Check if a creative item with the exact same content already exists in the database. */
@@ -469,8 +469,8 @@ export function creativeContentExists(content: string): boolean {
   const d = getDb();
   const row = d
     .query("SELECT 1 FROM creative WHERE content = ? LIMIT 1")
-    .get(content) as { 1: number } | undefined;
-  return row !== undefined;
+    .get(content) as { 1: number } | null;
+  return row !== null;
 }
 
 /** Get all creative items without any filter (for export). */
