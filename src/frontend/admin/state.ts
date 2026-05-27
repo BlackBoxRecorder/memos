@@ -113,6 +113,7 @@ export const timelineCache: { memos: Memo[] | null; data: YearGroup[] | null } =
 
 export const creativeItems = van.state<CreativeItem[]>([]);
 export const prompts = van.state<Prompt[]>([]);
+export const promptsLoaded = van.state(false);
 export const creativeLoading = van.state(false);
 export const creativeDeleteId = van.state<number | null>(null);
 export const creativeDeleting = van.state(false);
@@ -167,6 +168,7 @@ export const chatAbort: { current: AbortController | null } = { current: null };
 // ====== Tags State ======
 
 export const availableTags = van.state<string[]>([]);
+export const tagsLoaded = van.state(false);
 
 // ====== Context Preview State ======
 

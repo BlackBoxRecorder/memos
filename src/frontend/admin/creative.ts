@@ -5,6 +5,7 @@ import { svgTrash } from "../../helper/svgHelper";
 import type { Prompt, CreativeItem } from "../../model";
 import {
   prompts,
+  promptsLoaded,
   selectedPromptId,
   creativeItems,
   creativeLoading,
@@ -19,6 +20,7 @@ import {
   generateModalOpen,
   creativeView,
   availableTags,
+  tagsLoaded,
 } from "./state";
 import {
   loadPrompts,
@@ -218,11 +220,13 @@ function CreativeCard(item: CreativeItem) {
 // ====== CreativeTab ======
 
 export function CreativeTab() {
-  // Load data on first render
-  if (prompts.val.length === 0) {
+  // Load data on first render (use loaded flags to avoid infinite re-fetch when data is empty)
+  if (!promptsLoaded.val) {
+    promptsLoaded.val = true;
     loadPrompts();
   }
-  if (availableTags.val.length === 0) {
+  if (!tagsLoaded.val) {
+    tagsLoaded.val = true;
     loadTags();
   }
 
