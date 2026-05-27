@@ -19,6 +19,7 @@ import {
   similarMemos,
   similarLoading,
   similarError,
+  authenticated,
   getOrPrepare,
   truncateText,
   font,
@@ -39,6 +40,7 @@ export async function loadTags(): Promise<void> {
 
 export async function loadCount(): Promise<void> {
   try {
+    // Auth is determined via session cookie (same-origin), no query param needed
     const resp = await fetch(apiUrl("api/memos/count"));
     if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
     const data: { count: number } = await resp.json();
@@ -63,6 +65,7 @@ export async function fetchAndRender(pageNum: number = 0): Promise<void> {
     const params = new URLSearchParams();
     if (currentSearch) params.set("search", currentSearch);
     if (currentTag) params.set("tag", currentTag);
+    if (authenticated.val) params.set("all", "true");
     params.set("page", String(pageNum));
     params.set("limit", "50");
     const url = apiUrl(`api/memos?${params.toString()}`);
@@ -73,6 +76,7 @@ export async function fetchAndRender(pageNum: number = 0): Promise<void> {
       memos: {
         id: number;
         content: string;
+        tags: string[];
         updated_at: string;
         pinned_at: string | null;
       }[];
@@ -96,6 +100,7 @@ export async function fetchAndRender(pageNum: number = 0): Promise<void> {
         id: m.id,
         text: plainText,
         rawText: m.content,
+        tags: m.tags || [],
         updatedAt: m.updated_at,
         pinnedAt: m.pinned_at || null,
         prepared: getOrPrepare(truncateText(plainText).displayText, font),

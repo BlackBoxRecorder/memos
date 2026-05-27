@@ -23,6 +23,13 @@ import {
   dragOver,
   fileInputRef,
   importExportTab,
+  formAiMenuOpen,
+  formAiMenuPos,
+  formAiLoading,
+  formAiPendingAction,
+  tagAutocompleteOpen,
+  tagAutocompleteHighlight,
+  aiMenuPos,
 } from "../state";
 
 // ====== Memo CRUD ======
@@ -125,6 +132,12 @@ export function openCreateForm(): void {
   formTags.val = [];
   formTagInput.val = "";
   formError.val = null;
+  formAiMenuOpen.val = false;
+  formAiMenuPos.val = null;
+  formAiLoading.val = false;
+  formAiPendingAction.val = "";
+  tagAutocompleteOpen.val = false;
+  tagAutocompleteHighlight.val = -1;
   document.body.style.overflow = "hidden";
 }
 
@@ -136,6 +149,12 @@ export function openEditForm(memo: Memo): void {
   formTagInput.val = "";
   formError.val = null;
   aiSuggestedTags.val = [];
+  formAiMenuOpen.val = false;
+  formAiMenuPos.val = null;
+  formAiLoading.val = false;
+  formAiPendingAction.val = "";
+  tagAutocompleteOpen.val = false;
+  tagAutocompleteHighlight.val = -1;
   document.body.style.overflow = "hidden";
 }
 
@@ -147,6 +166,13 @@ export function closeForm(): void {
   formTagInput.val = "";
   formError.val = null;
   aiSuggestedTags.val = [];
+  formAiMenuOpen.val = false;
+  formAiMenuPos.val = null;
+  formAiLoading.val = false;
+  formAiPendingAction.val = "";
+  tagAutocompleteOpen.val = false;
+  tagAutocompleteHighlight.val = -1;
+  aiMenuPos.val = null;
   document.body.style.overflow = "";
 }
 

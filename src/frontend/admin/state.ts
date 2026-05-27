@@ -38,6 +38,7 @@ export const authenticated = van.state<boolean | null>(null);
 export const globalError = van.state<string | null>(null);
 export const loading = van.state(false);
 export const activeTab = van.state<"memos" | "creative">("memos");
+export const theme = van.state<"light" | "dark">("light");
 
 // ====== Memo List State ======
 
@@ -88,6 +89,11 @@ export const aiPanelStyle = van.state<
 export const formAiMenuOpen = van.state(false);
 export const formAiLoading = van.state(false);
 export const formAiPendingAction = van.state("");
+
+// ====== AI Menu Position State ======
+
+export const aiMenuPos = van.state<{ top: number; left: number } | null>(null);
+export const formAiMenuPos = van.state<{ top: number; left: number } | null>(null);
 
 // ====== Import/Export State ======
 
@@ -169,6 +175,11 @@ export const chatAbort: { current: AbortController | null } = { current: null };
 
 export const availableTags = van.state<string[]>([]);
 export const tagsLoaded = van.state(false);
+
+// ====== Tag Autocomplete State ======
+
+export const tagAutocompleteOpen = van.state(false);
+export const tagAutocompleteHighlight = van.state(-1);
 
 // ====== Context Preview State ======
 

@@ -17,7 +17,9 @@ import {
   aiPanelResult,
   aiPanelError,
   aiPanelAction,
+  aiMenuPos,
   formAiMenuOpen,
+  formAiMenuPos,
   formAiLoading,
   formContent,
   formError,
@@ -169,6 +171,41 @@ export function closeAiPanel(): void {
   aiPanelMemoId.val = null;
   aiPanelResult.val = null;
   aiPanelError.val = null;
+}
+
+// ====== AI Menu Positioning ======
+
+const ESTIMATED_MENU_H = 230;
+const ESTIMATED_MENU_W = 140;
+
+export function openAiMenu(buttonEl: HTMLElement): void {
+  const rect = buttonEl.getBoundingClientRect();
+  const spaceBelow = window.innerHeight - rect.bottom;
+  const spaceRight = window.innerWidth - rect.right;
+
+  aiMenuPos.val = {
+    top: spaceBelow >= ESTIMATED_MENU_H ? rect.bottom + 4 : rect.top - ESTIMATED_MENU_H - 4,
+    left: spaceRight >= ESTIMATED_MENU_W ? rect.left : rect.right - ESTIMATED_MENU_W,
+  };
+}
+
+export function closeAiMenu(): void {
+  aiMenuPos.val = null;
+}
+
+export function openFormAiMenu(buttonEl: HTMLElement): void {
+  const rect = buttonEl.getBoundingClientRect();
+  const spaceBelow = window.innerHeight - rect.bottom;
+  const spaceRight = window.innerWidth - rect.right;
+
+  formAiMenuPos.val = {
+    top: spaceBelow >= ESTIMATED_MENU_H ? rect.bottom + 4 : rect.top - ESTIMATED_MENU_H - 4,
+    left: spaceRight >= ESTIMATED_MENU_W ? rect.left : rect.right - ESTIMATED_MENU_W,
+  };
+}
+
+export function closeFormAiMenu(): void {
+  formAiMenuPos.val = null;
 }
 
 export async function replaceMemoWithResult(memoId: number): Promise<void> {

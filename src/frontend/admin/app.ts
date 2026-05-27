@@ -23,6 +23,8 @@ import {
   aiPanelResult,
   aiPanelLoading,
   aiPanelError,
+  formAiMenuOpen,
+  theme,
 } from "./state";
 import { checkAuth, login, logout } from "./actions/auth";
 import {
@@ -31,7 +33,7 @@ import {
   closeReadMore,
 } from "./actions/memo";
 import { ReadMoreModal } from "../shared/components/ReadMoreModal";
-import { closeAiPanel } from "./actions/ai";
+import { closeAiPanel, closeAiMenu, closeFormAiMenu } from "./actions/ai";
 import { ModelSelector } from "./components/ModelSelector";
 import { FormModal } from "./components/FormModal";
 import { MemoCard } from "./components/MemoCard";
@@ -44,6 +46,29 @@ import {
 const { div, span, button, input, a, h1, h3 } = van.tags;
 
 const siteUrl = "/";
+
+// ====== Theme ======
+const THEME_KEY = "memos-theme";
+
+function initTheme(): void {
+  const saved = localStorage.getItem(THEME_KEY);
+  if (saved === "dark" || saved === "light") {
+    theme.val = saved as "light" | "dark";
+  } else if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+    theme.val = "dark";
+  }
+  applyTheme();
+}
+
+function applyTheme(): void {
+  document.documentElement.dataset.theme = theme.val;
+  localStorage.setItem(THEME_KEY, theme.val);
+}
+
+function toggleTheme(): void {
+  theme.val = theme.val === "dark" ? "light" : "dark";
+  applyTheme();
+}
 
 // ====== LoginPage ======
 
@@ -105,21 +130,21 @@ function AdminPage() {
           () =>
             activeTab.val === "memos"
               ? button(
-                  {
-                    class: "btn btn-primary btn-sm",
-                    title: "New Memo",
-                    onclick: openCreateForm,
-                  },
-                  svgPlus(),
-                )
+                {
+                  class: "btn btn-primary btn-sm",
+                  title: "New Memo",
+                  onclick: openCreateForm,
+                },
+                svgPlus(),
+              )
               : button(
-                  {
-                    class: "btn btn-primary btn-sm",
-                    title: "New Prompt",
-                    onclick: openPromptCreate,
-                  },
-                  svgPlus(),
-                ),
+                {
+                  class: "btn btn-primary btn-sm",
+                  title: "New Prompt",
+                  onclick: openPromptCreate,
+                },
+                svgPlus(),
+              ),
           button(
             {
               class: "btn btn-outline btn-sm",
@@ -135,6 +160,15 @@ function AdminPage() {
               title: "查看网站",
             },
             svgExternalLink(),
+          ),
+          button(
+            {
+              class: "theme-toggle-btn",
+              title: () =>
+                theme.val === "dark" ? "切换到亮色模式" : "切换到暗色模式",
+              onclick: toggleTheme,
+            },
+            () => (theme.val === "dark" ? "\u2600\uFE0F" : "\uD83C\uDF19"),
           ),
           button(
             {
@@ -183,31 +217,31 @@ function AdminPage() {
         () =>
           globalError.val
             ? div(
-                { class: "error-banner" },
-                globalError.val,
-                button(
-                  {
-                    class: "btn btn-sm btn-outline",
-                    style: "margin-left:8px",
-                    onclick: () => (globalError.val = null),
-                  },
-                  "关闭",
-                ),
-              )
+              { class: "error-banner" },
+              globalError.val,
+              button(
+                {
+                  class: "btn btn-sm btn-outline",
+                  style: "margin-left:8px",
+                  onclick: () => (globalError.val = null),
+                },
+                "关闭",
+              ),
+            )
             : "",
         // Tab content
         () =>
           activeTab.val === "memos"
             ? div(() => {
-                if (loading.val)
-                  return div({ class: "status-msg" }, "Loading memos...");
-                if (memos.val.length === 0 && formMode.val.type === "closed")
-                  return div(
-                    { class: "empty-state" },
-                    "还没有 Memos，创建第一条吧！",
-                  );
-                return div(memos.val.map(MemoCard));
-              })
+              if (loading.val)
+                return div({ class: "status-msg" }, "Loading memos...");
+              if (memos.val.length === 0 && formMode.val.type === "closed")
+                return div(
+                  { class: "empty-state" },
+                  "还没有 Memos，创建第一条吧！",
+                );
+              return div(memos.val.map(MemoCard));
+            })
             : CreativeTab(),
       ),
     ),
@@ -232,19 +266,29 @@ van.add(appEl, () =>
 );
 
 // ====== Init ======
+initTheme();
 checkAuth();
 
 // Close AI toolbox dropdown when clicking outside
 document.addEventListener("click", (e: Event) => {
+  const target = e.target as HTMLElement;
+  // Close MemoCard AI menu
   if (
     aiPanelMemoId.val !== null &&
     !aiPanelResult.val &&
     !aiPanelLoading.val &&
     !aiPanelError.val
   ) {
-    const target = e.target as HTMLElement;
     if (!target.closest(".ai-toolbox-trigger")) {
+      closeAiMenu();
       closeAiPanel();
+    }
+  }
+  // Close FormModal AI menu
+  if (formAiMenuOpen.val) {
+    if (!target.closest(".ai-toolbox-trigger")) {
+      closeFormAiMenu();
+      formAiMenuOpen.val = false;
     }
   }
 });

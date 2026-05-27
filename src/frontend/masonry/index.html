@@ -14,27 +14,36 @@
 
     body {
         font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-        background: #f0f0f0;
-        color: #333
+        background: var(--bg-page);
+        color: var(--text-primary)
     }
 </style>
 
 <body>
     <div id="app"></div>
     <style>
+        /* Fallback variables in case common.css fails to load */
+        :root {
+            --bg-page: #f0f0f0;
+            --bg-primary: #fff;
+            --text-primary: #333;
+            --card-bg: #fff;
+            --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        }
+
         body {
             overflow-y: scroll;
         }
 
         .card {
             position: absolute;
-            background: white;
+            background: var(--card-bg);
             border-radius: 8px;
             padding: 16px;
             font-size: 15px;
             line-height: 22px;
-            color: #333;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+            color: var(--text-primary);
+            box-shadow: var(--card-shadow);
             overflow: hidden;
             transition: box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
             cursor: default;
@@ -49,7 +58,7 @@
             position: sticky;
             top: 0;
             z-index: 50;
-            background: rgba(240, 240, 240, 0.92);
+            background: var(--bg-page);
             backdrop-filter: blur(8px);
             -webkit-backdrop-filter: blur(8px);
             padding: 12px 16px;
@@ -68,7 +77,7 @@
 
         #search-input {
             padding: 8px 12px;
-            border: 1px solid #ddd;
+            border: 1px solid var(--input-border);
             border-radius: 6px;
             font-size: 14px;
             font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
@@ -76,10 +85,12 @@
             width: 240px;
             max-width: 100%;
             transition: border-color .15s;
+            background: var(--input-bg);
+            color: var(--text-primary);
         }
 
         #search-input:focus {
-            border-color: #3b82f6;
+            border-color: var(--input-focus-border);
             box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
         }
 
@@ -87,13 +98,13 @@
             display: inline-flex;
             align-items: center;
             padding: 8px 14px;
-            border: 1px solid #ddd;
+            border: 1px solid var(--border-light);
             border-radius: 6px;
             font-size: 14px;
             font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-            color: #666;
+            color: var(--text-secondary);
             text-decoration: none;
-            background-color: #fff;
+            background-color: var(--bg-primary);
             transition: color .15s, border-color .15s, box-shadow .15s;
             white-space: nowrap;
             height: auto;
@@ -101,8 +112,8 @@
         }
 
         #admin-btn:hover {
-            color: #333;
-            border-color: #bbb;
+            color: var(--text-primary);
+            border-color: var(--border-light);
         }
 
         #site-header {
@@ -115,7 +126,7 @@
         .site-title {
             font-size: 28px;
             font-weight: 600;
-            color: #1a1a1a;
+            color: var(--text-primary);
             letter-spacing: -0.5px;
             line-height: 1.2;
             margin: 0;
@@ -123,7 +134,7 @@
 
         .memo-count {
             font-size: 14px;
-            color: #888;
+            color: var(--text-muted);
             font-weight: 400;
             white-space: nowrap;
         }
@@ -179,12 +190,12 @@
 
         .select-trigger {
             padding: 8px 10px 8px 12px;
-            border: 1px solid #ddd;
+            border: 1px solid var(--border-light);
             border-radius: 6px;
             font-size: 14px;
             font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-            background-color: #fff;
-            color: #333;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -198,7 +209,7 @@
 
         .custom-select:focus .select-trigger,
         .custom-select.open .select-trigger {
-            border-color: #3b82f6;
+            border-color: var(--primary-color);
             box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
         }
 
@@ -211,7 +222,7 @@
         .select-arrow {
             width: 12px;
             height: 12px;
-            color: #999;
+            color: var(--text-muted);
             flex-shrink: 0;
             transition: transform .2s;
         }
@@ -225,8 +236,8 @@
             top: calc(100% + 4px);
             left: 0;
             right: 0;
-            background: #fff;
-            border: 1px solid #ddd;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-light);
             border-radius: 6px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
             max-height: 300px;
@@ -243,7 +254,7 @@
             padding: 8px 12px;
             font-size: 14px;
             font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-            color: #333;
+            color: var(--text-primary);
             transition: background-color .1s;
             cursor: pointer;
             overflow: hidden;
@@ -252,12 +263,12 @@
         }
 
         .select-option:hover {
-            background-color: #f5f5f5;
+            background-color: var(--bg-hover);
         }
 
         .select-option.selected {
-            background-color: #eff6ff;
-            color: #2563eb;
+            background-color: var(--primary-light);
+            color: var(--primary-hover);
             font-weight: 500;
         }
 
@@ -277,7 +288,7 @@
             gap: 10px;
             align-items: center;
             font-size: 11px;
-            color: #aaa;
+            color: var(--text-muted);
             font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
             line-height: 1;
             user-select: none;
@@ -306,7 +317,7 @@
             border: none;
             border-radius: 4px;
             background: transparent;
-            color: #bbb;
+            color: var(--text-muted);
             cursor: pointer;
             display: flex;
             align-items: center;
@@ -317,7 +328,7 @@
 
         .card-similar-btn:hover {
             background: rgba(59, 130, 246, 0.12);
-            color: #3b82f6;
+            color: var(--primary-color);
         }
 
         /* Read more button on card */
@@ -327,7 +338,7 @@
             border: none;
             border-radius: 4px;
             background: transparent;
-            color: #bbb;
+            color: var(--text-muted);
             cursor: pointer;
             display: flex;
             align-items: center;
@@ -338,7 +349,7 @@
 
         .card-readmore-btn:hover {
             background: rgba(59, 130, 246, 0.12);
-            color: #3b82f6;
+            color: var(--primary-color);
         }
 
         /* Copy button on card */
@@ -348,7 +359,7 @@
             border: none;
             border-radius: 4px;
             background: transparent;
-            color: #bbb;
+            color: var(--text-muted);
             cursor: pointer;
             display: flex;
             align-items: center;
@@ -359,11 +370,11 @@
 
         .card-copy-btn:hover {
             background: rgba(59, 130, 246, 0.12);
-            color: #3b82f6;
+            color: var(--primary-color);
         }
 
         .card-copy-btn.copied {
-            color: #16a34a;
+            color: var(--success-color);
             background: rgba(22, 163, 74, 0.12);
         }
 
@@ -378,17 +389,17 @@
             text-align: center;
             padding: 24px 0;
             font-size: 14px;
-            color: #888;
+            color: var(--text-muted);
         }
 
         .similar-error {
-            color: #c0392b;
+            color: var(--danger-color);
         }
 
         .similar-memo-item {
             padding: 12px;
-            background: #fafafa;
-            border: 1px solid #eee;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
             border-radius: 6px;
             margin-bottom: 10px;
         }
@@ -402,14 +413,14 @@
         }
 
         .similar-memo-id {
-            color: #3b82f6;
+            color: var(--primary-color);
             font-weight: 500;
         }
 
         .similar-memo-tag {
             padding: 1px 8px;
-            background: #eff6ff;
-            color: #2563eb;
+            background: var(--primary-light);
+            color: var(--primary-hover);
             border-radius: 4px;
             font-size: 11px;
             font-weight: 500;
@@ -418,9 +429,37 @@
         .similar-memo-text {
             font-size: 14px;
             line-height: 21px;
-            color: #333;
+            color: var(--text-primary);
             white-space: pre-wrap;
             word-break: break-word;
+        }
+
+        /* Card tags */
+        .card-tags {
+            display: flex;
+            flex-wrap: nowrap;
+            gap: 4px;
+            padding-bottom: 4px;
+            overflow: hidden;
+        }
+
+        .card-tag {
+            display: inline-block;
+            padding: 1px 8px;
+            background: var(--tag-bg);
+            color: var(--text-secondary);
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.15s;
+            border: none;
+            font-family: inherit;
+            line-height: 1.5;
+        }
+
+        .card-tag:hover {
+            background: var(--tag-hover-bg);
         }
     </style>
     <script type="module" src="index.js"></script>

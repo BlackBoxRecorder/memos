@@ -19,6 +19,7 @@ import {
   aiPanelResult,
   aiPanelError,
   aiPanelAction,
+  aiMenuPos,
 } from "../state";
 import {
   toggleVisibility,
@@ -32,6 +33,8 @@ import {
   closeAiPanel,
   replaceMemoWithResult,
   newMemoFromResult,
+  openAiMenu,
+  closeAiMenu,
 } from "../actions/ai";
 
 const { div, span, button } = van.tags;
@@ -152,21 +155,34 @@ export function MemoCard(memo: Memo) {
                   title: "AI \u5199\u4F5C\u5DE5\u5177\u7BB1",
                   onclick: (e: Event) => {
                     e.stopPropagation();
-                    aiPanelMemoId.val = isPanelOpen() ? null : memo.id;
+                    if (isPanelOpen()) {
+                      closeAiMenu();
+                      aiPanelMemoId.val = null;
+                    } else {
+                      openAiMenu(e.currentTarget as HTMLElement);
+                      aiPanelMemoId.val = memo.id;
+                    }
                   },
                 },
                 svgSparkle(),
               ),
               () =>
-                isPanelOpen() && !aiPanelResult.val && !aiPanelLoading.val
+                isPanelOpen() &&
+                  !aiPanelResult.val &&
+                  !aiPanelLoading.val &&
+                  aiMenuPos.val
                   ? div(
                     {
                       class: "ai-toolbox-menu",
-                      style:
-                        "position:absolute;top:100%;right:0;" +
-                        "background:#fff;border:1px solid #e5e5e5;" +
-                        "border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,0.1);" +
-                        "padding:4px 0;z-index:10;min-width:120px;",
+                      style: () =>
+                        "position:fixed;top:" +
+                        aiMenuPos.val!.top +
+                        "px;left:" +
+                        aiMenuPos.val!.left +
+                        "px;" +
+                        "background:var(--bg-primary);border:1px solid var(--border-color);" +
+                        "border-radius:6px;box-shadow:var(--dropdown-shadow);" +
+                        "padding:4px 0;z-index:100;min-width:120px;",
                     },
                     ...Object.entries(ACTION_LABELS).map(
                       ([action, label]) =>
@@ -176,7 +192,7 @@ export function MemoCard(memo: Memo) {
                             style:
                               "display:block;width:100%;padding:6px 14px;" +
                               "border:none;background:none;" +
-                              "font-size:13px;color:#333;cursor:pointer;" +
+                              "font-size:13px;color:var(--text-primary);cursor:pointer;" +
                               "text-align:left;" +
                               "white-space:nowrap;",
                             onclick: (e: Event) => {
@@ -194,7 +210,7 @@ export function MemoCard(memo: Memo) {
                             },
                             onmouseenter: (e: Event) => {
                               (e.target as HTMLElement).style.background =
-                                "#f5f5f5";
+                                "var(--bg-hover)";
                             },
                             onmouseleave: (e: Event) => {
                               (e.target as HTMLElement).style.background =
@@ -212,12 +228,12 @@ export function MemoCard(memo: Memo) {
                         ? div(
                           {
                             style:
-                              "border-top:1px solid #eee;padding:4px 0;",
+                              "border-top:1px solid var(--border-color);padding:4px 0;",
                           },
                           div(
                             {
                               style:
-                                "padding:2px 14px;font-size:11px;color:#999;",
+                                "padding:2px 14px;font-size:11px;color:var(--text-muted);",
                             },
                             "\u98CE\u683C\uFF1A",
                           ),
@@ -233,7 +249,7 @@ export function MemoCard(memo: Memo) {
                                 style:
                                   "display:block;width:100%;padding:4px 14px;" +
                                   "border:none;background:none;" +
-                                  "font-size:12px;color:#555;cursor:pointer;" +
+                                  "font-size:12px;color:var(--text-secondary);cursor:pointer;" +
                                   "text-align:left;",
                                 onclick: (e: Event) => {
                                   e.stopPropagation();
@@ -247,7 +263,7 @@ export function MemoCard(memo: Memo) {
                                 onmouseenter: (e: Event) => {
                                   (
                                     e.target as HTMLElement
-                                  ).style.background = "#f5f5f5";
+                                  ).style.background = "var(--bg-hover)";
                                 },
                                 onmouseleave: (e: Event) => {
                                   (
@@ -275,18 +291,18 @@ export function MemoCard(memo: Memo) {
             class: "ai-result-panel",
             style:
               "margin-top:12px;padding:12px;" +
-              "background:#f8f9fb;border:1px solid #e5e5e5;" +
+              "background:var(--bg-secondary);border:1px solid var(--border-color);" +
               "border-radius:6px;",
           },
           () =>
             aiPanelLoading.val
               ? div(
-                { style: "font-size:13px;color:#888;" },
+                { style: "font-size:13px;color:var(--text-muted);" },
                 "\u6B63\u5728\u751F\u6210\u4E2D...",
               )
               : aiPanelError.val
                 ? div(
-                  { style: "font-size:13px;color:#c00;" },
+                  { style: "font-size:13px;color:var(--danger-color);" },
                   aiPanelError.val,
                 )
                 : div(
@@ -296,7 +312,7 @@ export function MemoCard(memo: Memo) {
                       style:
                         "font-size:13px;line-height:20px;" +
                         "word-break:break-word;" +
-                        "color:#333;margin-bottom:12px;",
+                        "color:var(--text-primary);margin-bottom:12px;",
                     },
                     () =>
                       span({

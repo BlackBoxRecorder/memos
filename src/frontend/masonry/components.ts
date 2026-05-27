@@ -1,14 +1,3 @@
-import van from "vanjs-core";
-import {
-  svgSearchIcon,
-  svgChevronDown,
-  svgEyeIcon,
-  svgCopy,
-  svgCheck,
-} from "../../helper/svgHelper";
-import { escapeHtml } from "../shared/utils/text";
-import { copyToClipboard } from "../shared/utils/clipboard";
-import { ReadMoreModal } from "../shared/components/ReadMoreModal";
 import {
   cards,
   search,
@@ -28,6 +17,8 @@ import {
   readMoreText,
   copiedCardId,
   windowWidth,
+  theme,
+  authenticated,
   getLayout,
   truncateText,
   formatDate,
@@ -38,8 +29,36 @@ import {
   type LayoutState,
 } from "./state";
 import { fetchAndRender, openSimilarModal, debouncedSearch } from "./api";
+import van from "vanjs-core";
+import { svgSearchIcon, svgChevronDown, svgEyeIcon, svgCopy, svgCheck } from "../../helper/svgHelper";
+import { escapeHtml } from "../shared/utils/text";
+import { copyToClipboard } from "../shared/utils/clipboard";
+import { ReadMoreModal } from "../shared/components/ReadMoreModal";
 
 const { div, span, button, input, h1, h3, a } = van.tags;
+
+// --- Theme ---
+const THEME_KEY = "memos-theme";
+
+export function initTheme(): void {
+  const saved = localStorage.getItem(THEME_KEY);
+  if (saved === "dark" || saved === "light") {
+    theme.val = saved;
+  } else if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+    theme.val = "dark";
+  }
+  applyTheme();
+}
+
+function applyTheme(): void {
+  document.documentElement.dataset.theme = theme.val;
+  localStorage.setItem(THEME_KEY, theme.val);
+}
+
+export function toggleTheme(): void {
+  theme.val = theme.val === "dark" ? "light" : "dark";
+  applyTheme();
+}
 
 function SiteHeader() {
   return div({ id: "site-header" }, h1({ class: "site-title" }, "Memos"), () =>
@@ -125,7 +144,20 @@ function FilterBar() {
     { id: "filter-bar" },
     SiteHeader(),
     div({ class: "filter-center" }, SearchInput(), TagSelect()),
-    a({ href: "admin/", id: "admin-btn" }, "Admin"),
+    div(
+      { style: "display:flex;align-items:center;gap:8px;justify-self:end;" },
+      button(
+        {
+          class: "theme-toggle-btn",
+          title: () => (theme.val === "dark" ? "切换到亮色模式" : "切换到暗色模式"),
+          onclick: toggleTheme,
+        },
+        () => (theme.val === "dark" ? "\u2600\uFE0F" : "\uD83C\uDF19"),
+      ),
+      a({ href: "admin/", id: "admin-btn" }, () =>
+        authenticated.val === false ? "\u767B\u5F55" : "Admin",
+      ),
+    ),
   );
 }
 
@@ -142,14 +174,37 @@ function MasonryCard(card: Card, index: number, layoutState: LayoutState) {
     () =>
       card.pinnedAt
         ? div(
-            {
-              style:
-                "font-size:12px;color:#e67e22;padding:0 0 4px 0;display:flex;align-items:center;gap:2px;",
-            },
-            "\uD83D\uDCCC \u5DF2\u7F6E\u9876",
-          )
+          {
+            style:
+              "font-size:12px;color:var(--pin-color);padding:0 0 4px 0;display:flex;align-items:center;gap:2px;",
+          },
+          "\uD83D\uDCCC \u5DF2\u7F6E\u9876",
+        )
         : "",
     div({ class: "card-text" }, escapeHtml(displayText)),
+    () => {
+      if (card.tags.length === 0) return "";
+      const maxVisible = 5;
+      const visibleTags = card.tags.slice(0, maxVisible);
+      const remaining = card.tags.length - maxVisible;
+      return div(
+        { class: "card-tags" },
+        ...visibleTags.map((t) =>
+          span(
+            {
+              class: "card-tag",
+              onclick: (e: Event) => {
+                e.stopPropagation();
+                tag.val = t;
+                fetchAndRender(0);
+              },
+            },
+            t,
+          ),
+        ),
+        remaining > 0 ? span({ class: "card-tag" }, `+${remaining}`) : "",
+      );
+    },
     div(
       { class: "card-info" },
       span({}, `#${card.id}`),
@@ -160,13 +215,13 @@ function MasonryCard(card: Card, index: number, layoutState: LayoutState) {
       () =>
         isTruncated
           ? button(
-              {
-                class: "card-readmore-btn",
-                title: "Read more",
-                onclick: () => openReadMore(card.rawText),
-              },
-              svgEyeIcon(),
-            )
+            {
+              class: "card-readmore-btn",
+              title: "Read more",
+              onclick: () => openReadMore(card.rawText),
+            },
+            svgEyeIcon(),
+          )
           : "",
       button(
         {

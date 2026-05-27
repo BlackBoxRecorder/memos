@@ -17,6 +17,7 @@ export type Card = {
   updatedAt: string;
   pinnedAt: string | null;
   rawText: string;
+  tags: string[];
 };
 
 export type PositionedCard = {
@@ -57,6 +58,8 @@ export const similarError = van.state<string | null>(null);
 export const readMoreText = van.state<string | null>(null);
 export const copiedCardId = van.state<number | null>(null);
 export const windowWidth = van.state(0);
+export const theme = van.state<"light" | "dark">("light");
+export const authenticated = van.state<boolean | null>(null);
 
 // --- prepared text cache ---
 const preparedCache = new Map<string, PreparedText>();
@@ -111,8 +114,9 @@ export function computeLayout(cardsArr: Card[], winWidth: number): LayoutState {
 
     const { height } = layout(cardsArr[i]!.prepared, textWidth, lineHeight);
     const pinBadgeHeight = cardsArr[i]!.pinnedAt ? 18 : 0;
+    const tagRowHeight = cardsArr[i]!.tags.length > 0 ? 20 : 0;
     const buttonAreaHeight = 28;
-    const totalH = height + cardPadding * 2 + buttonAreaHeight + pinBadgeHeight;
+    const totalH = height + cardPadding * 2 + buttonAreaHeight + pinBadgeHeight + tagRowHeight;
 
     positionedCards.push({
       cardIndex: i,

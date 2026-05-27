@@ -53,8 +53,8 @@ memosApp.get("/", async (c) => {
     }
   }
 
-  // When all=true (admin), return everything without pagination
-  if (allParam === "true") {
+  // When all=true without pagination params (admin), return everything
+  if (allParam === "true" && !c.req.query("page") && !c.req.query("limit")) {
     return c.json({ memos: result });
   }
 
@@ -125,10 +125,10 @@ memosApp.post("/", authMiddleware, async (c) => {
 
   const tags = Array.isArray(body.tags)
     ? body.tags
-        .filter(
-          (t): t is string => typeof t === "string" && t.trim().length > 0,
-        )
-        .map((t) => t.trim())
+      .filter(
+        (t): t is string => typeof t === "string" && t.trim().length > 0,
+      )
+      .map((t) => t.trim())
     : [];
 
   const memo = createMemo(body.content.trim(), body.is_public !== false, tags);
@@ -166,10 +166,10 @@ memosApp.put("/:id", authMiddleware, async (c) => {
   if (body.tags !== undefined) {
     fields.tags = Array.isArray(body.tags)
       ? body.tags
-          .filter(
-            (t): t is string => typeof t === "string" && t.trim().length > 0,
-          )
-          .map((t) => t.trim())
+        .filter(
+          (t): t is string => typeof t === "string" && t.trim().length > 0,
+        )
+        .map((t) => t.trim())
       : [];
   }
 
