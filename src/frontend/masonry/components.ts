@@ -30,7 +30,7 @@ import {
 } from "./state";
 import { fetchAndRender, openSimilarModal, debouncedSearch } from "./api";
 import van from "vanjs-core";
-import { svgSearchIcon, svgChevronDown, svgEyeIcon, svgCopy, svgCheck } from "../../helper/svgHelper";
+import { svgSearchIcon, svgChevronDown, svgEyeIcon, svgCopy, svgCheck, svgSun, svgMoon } from "../../helper/svgHelper";
 import { escapeHtml } from "../shared/utils/text";
 import { copyToClipboard } from "../shared/utils/clipboard";
 import { ReadMoreModal } from "../shared/components/ReadMoreModal";
@@ -160,7 +160,7 @@ function FilterBar() {
           title: () => (theme.val === "dark" ? "切换到亮色模式" : "切换到暗色模式"),
           onclick: toggleTheme,
         },
-        () => (theme.val === "dark" ? "\u2600\uFE0F" : "\uD83C\uDF19"),
+        () => (theme.val === "dark" ? svgSun() : svgMoon()),
       ),
       a({ href: "admin/", id: "admin-btn" }, () =>
         authenticated.val === false ? "\u767B\u5F55" : "Admin",

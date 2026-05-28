@@ -7,6 +7,8 @@ import {
   svgExternalLink,
   svgLogout,
   svgUpload,
+  svgSun,
+  svgMoon,
 } from "../../helper/svgHelper";
 import {
   authenticated,
@@ -172,12 +174,12 @@ function AdminPage() {
           ),
           button(
             {
-              class: "theme-toggle-btn",
+              class: "btn btn-outline btn-sm",
               title: () =>
                 theme.val === "dark" ? "切换到亮色模式" : "切换到暗色模式",
               onclick: toggleTheme,
             },
-            () => (theme.val === "dark" ? "\u2600\uFE0F" : "\uD83C\uDF19"),
+            () => (theme.val === "dark" ? svgSun() : svgMoon()),
           ),
           button(
             {
