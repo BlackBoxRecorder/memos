@@ -121,9 +121,6 @@ const VALID_ACTIONS = [
 ] as const;
 const VALID_STYLES = ["professional", "casual", "minimal", "academic"];
 
-/** Maximum number of tag-filtered memos used as context to avoid token overflow */
-const MAX_TAG_CONTEXT = 20;
-
 aiApp.post("/action", authMiddleware, async (c) => {
   let body: {
     content?: string;
@@ -207,7 +204,6 @@ aiApp.post("/chat", authMiddleware, async (c) => {
     history?: ChatMessage[];
     provider?: string;
     model?: string;
-    tag?: string;
   };
   try {
     body = await c.req.json();
@@ -242,38 +238,14 @@ aiApp.post("/chat", authMiddleware, async (c) => {
     )
     : [];
 
-  const hasTag =
-    typeof body.tag === "string" && body.tag.trim().length > 0;
-
-  // Build context: tag-filtered memos + semantic search, merged and deduplicated
+  // Build context via semantic search
   let contextMemos: string[] = [];
-  const seenIds = new Set<number>();
 
-  if (hasTag) {
-    try {
-      const tagMemos = getMemos({ includePrivate: true, tag: body.tag!.trim(), limit: MAX_TAG_CONTEXT });
-      for (const m of tagMemos) {
-        if (!seenIds.has(m.id)) {
-          seenIds.add(m.id);
-          contextMemos.push(m.content);
-        }
-      }
-    } catch {
-      // Tag search failed, continue
-    }
-  }
-
-  // Semantic search as supplementary context (or primary if no tag)
   try {
     const semanticIds = await getSemanticResults(message, 5);
     if (semanticIds.length > 0) {
       const semMemos = getMemos({ includePrivate: true, ids: semanticIds });
-      for (const m of semMemos) {
-        if (!seenIds.has(m.id)) {
-          seenIds.add(m.id);
-          contextMemos.push(m.content);
-        }
-      }
+      contextMemos = semMemos.map((m) => m.content);
     }
   } catch {
     // Semantic search failed, continue without context

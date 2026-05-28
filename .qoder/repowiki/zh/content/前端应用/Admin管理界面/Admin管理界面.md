@@ -19,7 +19,16 @@
 - [src/frontend/admin/actions/ai.ts](file://src/frontend/admin/actions/ai.ts)
 - [src/frontend/admin/actions/creative-core.ts](file://src/frontend/admin/actions/creative-core.ts)
 - [src/frontend/admin/actions/chat.ts](file://src/frontend/admin/actions/chat.ts)
+- [src/frontend/shared/styles/common.css](file://src/frontend/shared/styles/common.css)
 </cite>
+
+## 更新摘要
+**变更内容**
+- 新增主题切换系统，支持明暗主题自动检测与手动切换
+- 实现AI菜单动态定位功能，支持智能菜单位置计算
+- 完善认证状态识别机制，优化登录检查流程
+- 增强ChatPanel组件布局与交互体验
+- 优化CreativeTab组件数据加载性能
 
 ## 目录
 1. [简介](#简介)
@@ -36,6 +45,8 @@
 ## 简介
 本文件面向Admin管理界面，系统性阐述VanJS框架在Admin中的应用，包括响应式状态管理、组件化开发与事件处理机制。文档覆盖登录页面、主管理页面、备忘录管理、标签系统、公开/私密状态切换、AI工具箱集成、时间线侧边栏、以及表单模态框、导入导出模态框等交互组件。同时提供状态管理最佳实践与性能优化建议。
 
+**更新** 新增主题切换系统支持明暗主题自动检测与手动切换，AI菜单实现动态定位功能，认证状态识别得到完善优化。
+
 ## 项目结构
 Admin前端采用VanJS进行声明式UI构建，核心目录如下：
 - 入口与布局：index.html定义样式与容器；app.ts负责挂载与路由渲染
@@ -49,10 +60,14 @@ graph TB
 subgraph "入口与布局"
 HTML["index.html"]
 APP["app.ts"]
+THEME["主题系统"]
+CSS["common.css"]
 end
 subgraph "状态层"
 STATE["state.ts"]
 AI_STATE["ai-state.ts"]
+AUTH_STATE["认证状态"]
+THEME_STATE["主题状态"]
 end
 subgraph "组件层"
 LOGIN["LoginPage"]
@@ -74,8 +89,10 @@ CREATIVE_ACT["actions/creative-core.ts"]
 CHAT_ACT["actions/chat.ts"]
 end
 HTML --> APP
+APP --> THEME
 APP --> STATE
 APP --> AI_STATE
+APP --> CSS
 APP --> LOGIN
 APP --> ADMIN
 ADMIN --> MEMOCARD
@@ -99,6 +116,7 @@ CHATPANEL --> CHAT_ACT
 - [src/frontend/admin/state.ts](file://src/frontend/admin/state.ts)
 - [src/frontend/admin/ai-state.ts](file://src/frontend/admin/ai-state.ts)
 - [src/frontend/admin/creative.ts](file://src/frontend/admin/creative.ts)
+- [src/frontend/shared/styles/common.css](file://src/frontend/shared/styles/common.css)
 
 **章节来源**
 - [src/frontend/admin/index.html](file://src/frontend/admin/index.html)
@@ -114,6 +132,8 @@ CHATPANEL --> CHAT_ACT
 - AI工具箱：模型选择器、内容优化、创意写作（提示词+上下文）
 - 创意内容：提示词管理、生成流式输出、对话/列表视图
 - **ChatPanel组件**：重构后的对话面板，支持标签过滤、上下文预览和提示词快速调用
+- **主题切换系统**：支持明暗主题自动检测与手动切换，持久化用户偏好
+- **AI菜单动态定位**：智能计算菜单位置，避免超出屏幕边界
 
 **章节来源**
 - [src/frontend/admin/app.ts](file://src/frontend/admin/app.ts)
@@ -133,9 +153,11 @@ sequenceDiagram
 participant U as "用户"
 participant APP as "app.ts"
 participant ST as "state.ts"
+participant THEME as "主题系统"
 participant ACT as "actions/*"
 participant API as "后端API"
 U->>APP : 触发操作登录/新建/编辑/删除/导入/导出/生成
+APP->>THEME : 检查主题状态
 APP->>ST : 读取/更新状态
 APP->>ACT : 调用动作函数
 ACT->>API : 发起HTTP请求
@@ -192,7 +214,7 @@ AUTH->>AUTH : checkAiStatus()/loadAiModels()
 
 ### 主管理页面与时间线侧边栏
 - AdminPage根据认证状态切换登录页或管理页
-- 顶部工具栏包含模型选择器、新建按钮、导入导出、查看网站、退出登录
+- 顶部工具栏包含模型选择器、新建按钮、导入导出、查看网站、退出登录、主题切换
 - 根据当前标签页显示时间线侧边栏（备忘录或创意内容）
 - 内容区根据activeTab切换"Memo"或"Creative"
 
@@ -206,7 +228,8 @@ RenderCreativeTimeline --> RenderContainer
 RenderContainer --> RenderTabs["渲染标签页：Memo/Creative"]
 RenderTabs --> RenderContent["渲染内容：Memo卡片或Creative卡片"]
 RenderContent --> RenderModals["渲染模态框：Form/ImportExport/ReadMore/Generate"]
-RenderModals --> End(["完成渲染"])
+RenderModals --> RenderThemeToggle["渲染主题切换按钮"]
+RenderThemeToggle --> End(["完成渲染"])
 ```
 
 **图表来源**
@@ -514,6 +537,140 @@ CA->>API : 保存/重置对话
 - [src/frontend/admin/components/ChatPanel.ts:16-249](file://src/frontend/admin/components/ChatPanel.ts#L16-L249)
 - [src/frontend/admin/actions/chat.ts:16-131](file://src/frontend/admin/actions/chat.ts#L16-L131)
 
+### 主题切换系统
+**新增** Admin界面现已集成完整的主题切换系统，支持明暗主题自动检测与手动切换。
+
+#### 主题状态管理
+- **主题状态**：使用van.state管理当前主题状态（light/dark）
+- **自动检测**：优先使用用户本地存储的主题偏好，否则检测系统深色模式偏好
+- **持久化存储**：主题切换结果保存到localStorage，刷新后保持一致
+
+#### 主题应用机制
+- **CSS变量**：通过`:root`和[data-theme="light"/"dark"]选择器定义主题变量
+- **动态切换**：切换时更新`document.documentElement.dataset.theme`属性
+- **即时生效**：所有组件样式自动响应主题变化
+
+#### 主题切换按钮
+- **位置**：位于顶部工具栏右侧，与模型选择器、导入导出等按钮并列
+- **图标**：太阳/月亮图标根据当前主题动态切换
+- **标题**：显示当前主题状态的切换提示
+
+```mermaid
+flowchart TD
+InitTheme["初始化主题"] --> CheckLocalStorage["检查localStorage主题偏好"]
+CheckLocalStorage --> |有| SetFromStorage["从localStorage设置主题"]
+CheckLocalStorage --> |无| CheckSystem["检测系统深色模式偏好"]
+SetFromStorage --> ApplyTheme["应用主题"]
+CheckSystem --> |匹配| SetDark["设置为暗色主题"]
+CheckSystem --> |不匹配| SetLight["设置为亮色主题"]
+SetDark --> ApplyTheme
+SetLight --> ApplyTheme
+ApplyTheme --> UserToggle["用户手动切换"]
+UserToggle --> UpdateState["更新主题状态"]
+UpdateState --> SaveToStorage["保存到localStorage"]
+SaveToStorage --> ApplyTheme
+```
+
+**图表来源**
+- [src/frontend/admin/app.ts:50-71](file://src/frontend/admin/app.ts#L50-L71)
+- [src/frontend/shared/styles/common.css:1-77](file://src/frontend/shared/styles/common.css#L1-L77)
+
+**章节来源**
+- [src/frontend/admin/app.ts:50-71](file://src/frontend/admin/app.ts#L50-L71)
+- [src/frontend/shared/styles/common.css:1-77](file://src/frontend/shared/styles/common.css#L1-L77)
+
+### AI菜单动态定位
+**新增** AI工具箱菜单现已实现智能动态定位功能，避免菜单超出屏幕边界。
+
+#### 定位算法
+- **边界检测**：计算按钮元素相对于视窗的位置和可用空间
+- **智能决策**：根据可用空间决定菜单的上下方显示位置
+- **尺寸估算**：使用预设的菜单尺寸（高度230px，宽度140px）进行计算
+
+#### 定位逻辑
+- **向下显示**：当按钮底部到视窗底部的距离≥230px时，菜单显示在按钮下方
+- **向上显示**：当按钮上方到视窗顶部的距离≥230px时，菜单显示在按钮上方
+- **水平适配**：当按钮右侧到视窗右侧的距离≥140px时，菜单左对齐按钮
+- **反向适配**：当按钮左侧到视窗左侧的距离≥140px时，菜单右对齐按钮
+
+#### 状态管理
+- **位置状态**：使用aiMenuPos和formAiMenuPos两个状态分别管理备忘录和表单的菜单位置
+- **动态更新**：每次打开菜单时重新计算位置，确保在窗口大小变化时仍正确显示
+
+```mermaid
+flowchart TD
+OpenMenu["打开AI菜单"] --> GetRect["获取按钮元素矩形信息"]
+GetRect --> CalcSpace["计算上下左右可用空间"]
+CalcSpace --> CheckBottom["检查底部空间>=230px"]
+CheckBottom --> |是| PlaceBelow["菜单显示在按钮下方"]
+CheckBottom --> |否| CheckTop["检查顶部空间>=230px"]
+CheckTop --> |是| PlaceAbove["菜单显示在按钮上方"]
+CheckTop --> |否| DefaultBelow["默认下方显示"]
+CalcSpace --> CheckRight["检查右侧空间>=140px"]
+CheckRight --> |是| AlignLeft["菜单左对齐按钮"]
+CheckRight --> |否| CheckLeft["检查左侧空间>=140px"]
+CheckLeft --> |是| AlignRight["菜单右对齐按钮"]
+CheckLeft --> |否| DefaultAlign["默认左对齐"]
+PlaceBelow --> SetPosition["设置菜单位置状态"]
+PlaceAbove --> SetPosition
+AlignLeft --> SetPosition
+AlignRight --> SetPosition
+DefaultBelow --> SetPosition
+DefaultAlign --> SetPosition
+SetPosition --> RenderMenu["渲染菜单"]
+```
+
+**图表来源**
+- [src/frontend/admin/actions/ai.ts:176-209](file://src/frontend/admin/actions/ai.ts#L176-L209)
+- [src/frontend/admin/components/MemoCard.ts:174-280](file://src/frontend/admin/components/MemoCard.ts#L174-L280)
+- [src/frontend/admin/components/FormModal.ts:277-375](file://src/frontend/admin/components/FormModal.ts#L277-L375)
+
+**章节来源**
+- [src/frontend/admin/actions/ai.ts:176-209](file://src/frontend/admin/actions/ai.ts#L176-L209)
+- [src/frontend/admin/components/MemoCard.ts:174-280](file://src/frontend/admin/components/MemoCard.ts#L174-L280)
+- [src/frontend/admin/components/FormModal.ts:277-375](file://src/frontend/admin/components/FormModal.ts#L277-L375)
+
+### 认证状态识别优化
+**更新** 认证状态识别机制得到完善，优化了登录检查流程和状态管理。
+
+#### 登录检查流程
+- **异步检查**：启动时调用checkAuth()异步检查认证状态
+- **状态管理**：authenticated状态使用van.state管理，支持null、true、false三种状态
+- **UI反馈**：根据状态显示"Checking..."、登录页或管理页
+
+#### 认证状态处理
+- **null状态**：应用启动时的初始状态，显示加载提示
+- **false状态**：未认证状态，显示登录页面
+- **true状态**：已认证状态，加载备忘录数据并初始化AI功能
+
+#### 错误处理
+- **全局错误**：使用globalError状态统一管理错误信息
+- **用户友好**：登录失败时显示错误提示，支持手动关闭
+- **恢复机制**：错误清除后可重新尝试登录
+
+```mermaid
+flowchart TD
+AppStart["应用启动"] --> CheckAuth["checkAuth()"]
+CheckAuth --> AuthNull["authenticated=null"]
+AuthNull --> ShowChecking["显示'Checking...'"]
+ShowChecking --> AuthCheck["检查认证状态"]
+AuthCheck --> |authenticated=true| LoadData["加载数据并初始化"]
+AuthCheck --> |authenticated=false| ShowLogin["显示登录页"]
+LoadData --> InitAI["初始化AI功能"]
+InitAI --> ShowAdmin["显示管理页"]
+ShowLogin --> UserLogin["用户登录"]
+UserLogin --> LoginSuccess["登录成功"]
+LoginSuccess --> LoadData
+```
+
+**图表来源**
+- [src/frontend/admin/actions/auth.ts:12-25](file://src/frontend/admin/actions/auth.ts#L12-L25)
+- [src/frontend/admin/app.ts:258-270](file://src/frontend/admin/app.ts#L258-L270)
+
+**章节来源**
+- [src/frontend/admin/actions/auth.ts:12-25](file://src/frontend/admin/actions/auth.ts#L12-L25)
+- [src/frontend/admin/app.ts:258-270](file://src/frontend/admin/app.ts#L258-L270)
+
 ## 依赖关系分析
 
 ```mermaid
@@ -525,6 +682,7 @@ APP --> MEMO_ACT["actions/memo.ts"]
 APP --> AI_ACT["actions/ai.ts"]
 APP --> CREATIVE["creative.ts"]
 APP --> CHATPANEL["ChatPanel.ts"]
+APP --> THEME["主题系统"]
 CREATIVE --> CREATIVE_ACT["actions/creative-core.ts"]
 CHATPANEL --> CHAT_ACT["actions/chat.ts"]
 MEMOCARD["MemoCard.ts"] --> MEMO_ACT
@@ -536,6 +694,8 @@ MODELSEL["ModelSelector.ts"] --> AI_STATE
 MODELSEL --> STATE
 IMPORTMODAL["ImportExportModal.ts"] --> MEMO_ACT
 GENMODAL["GenerateModal.ts"] --> CREATIVE_ACT
+THEME --> COMMON_CSS["common.css"]
+THEME --> THEME_STATE["theme状态"]
 ```
 
 **图表来源**
@@ -555,6 +715,7 @@ GENMODAL["GenerateModal.ts"] --> CREATIVE_ACT
 - [src/frontend/admin/components/GenerateModal.ts](file://src/frontend/admin/components/GenerateModal.ts)
 - [src/frontend/admin/components/ChatPanel.ts](file://src/frontend/admin/components/ChatPanel.ts)
 - [src/frontend/admin/actions/chat.ts](file://src/frontend/admin/actions/chat.ts)
+- [src/frontend/shared/styles/common.css](file://src/frontend/shared/styles/common.css)
 
 **章节来源**
 - [src/frontend/admin/app.ts](file://src/frontend/admin/app.ts)
@@ -569,8 +730,11 @@ GENMODAL["GenerateModal.ts"] --> CREATIVE_ACT
 - 本地存储：模型选择持久化减少重复请求
 - **ChatPanel优化**：对话区域使用虚拟滚动和消息缓存，避免大量DOM节点的频繁重渲染
 - **内存管理**：聊天消息采用增量更新策略，只更新变化的部分
+- **主题切换优化**：主题状态持久化到localStorage，避免重复计算
+- **AI菜单定位优化**：使用预设尺寸估算，减少布局计算开销
+- **认证状态优化**：异步检查认证状态，避免阻塞UI渲染
 
-**更新** CreativeTab组件的智能数据加载机制显著提升了性能，通过状态标志确保数据只在首次渲染时加载一次，避免了无限数据加载循环。ChatPanel组件的布局重构优化了内存使用和渲染性能。
+**更新** 新增主题切换系统显著提升了用户体验，通过CSS变量实现即时主题切换。AI菜单动态定位功能优化了菜单显示效果，避免超出屏幕边界。认证状态识别机制得到完善，提供了更好的错误处理和用户反馈。
 
 ## 故障排查指南
 - 登录失败：检查密钥是否正确，查看全局错误提示
@@ -581,6 +745,9 @@ GENMODAL["GenerateModal.ts"] --> CREATIVE_ACT
 - CreativeTab数据加载异常：检查promptsLoaded和tagsLoaded状态标志是否正确设置
 - **ChatPanel问题**：检查SSE连接状态、标签过滤器是否正常工作、消息流是否中断
 - **内存泄漏**：确认聊天消息及时清理，避免长时间对话导致的内存占用
+- **主题切换问题**：检查localStorage权限、CSS变量是否正确应用
+- **AI菜单定位异常**：确认按钮元素是否正确获取、边界检测计算是否准确
+- **认证状态异常**：检查checkAuth()调用、API响应格式、状态更新逻辑
 
 **章节来源**
 - [src/frontend/admin/app.ts](file://src/frontend/admin/app.ts)
@@ -593,7 +760,7 @@ GENMODAL["GenerateModal.ts"] --> CREATIVE_ACT
 ## 结论
 Admin管理界面以VanJS为核心，通过清晰的状态层、组件层与动作层实现高内聚低耦合的架构。借助响应式状态与事件驱动，实现了登录认证、备忘录管理、标签系统、公开/私密切换、AI工具箱与创意写作的完整闭环。时间线侧边栏与模态框提升了交互效率。
 
-**更新** ChatPanel组件的布局重构显著提升了对话体验，采用三段式布局设计使界面更加直观和高效。CreativeTab组件的数据加载优化确保了应用的稳定性和性能。新增的AI聊天功能为用户提供了更丰富的交互体验。
+**更新** 新增的主题切换系统显著提升了用户体验，支持明暗主题的自动检测与手动切换。AI菜单动态定位功能优化了菜单显示效果，确保在各种屏幕尺寸下的良好体验。认证状态识别机制得到完善，提供了更好的错误处理和用户反馈。ChatPanel组件的布局重构显著提升了对话体验，采用三段式布局设计使界面更加直观和高效。CreativeTab组件的数据加载优化确保了应用的稳定性和性能。
 
 遵循本文的状态管理与性能优化建议，可进一步提升用户体验与系统稳定性。
 
@@ -605,6 +772,9 @@ Admin管理界面以VanJS为核心，通过清晰的状态层、组件层与动�
   - 合理使用缓存与懒加载，降低首屏与频繁操作的延迟
   - 在组件初始化时使用状态标志防止重复数据加载
   - **ChatPanel优化**：利用流式渲染和增量更新策略提升大消息处理性能
+  - **主题系统优化**：使用CSS变量实现即时主题切换，避免重排重绘
+  - **AI菜单优化**：使用预设尺寸估算减少布局计算开销
+  - **认证状态优化**：异步检查认证状态，避免阻塞UI渲染
 - 常见问题
   - 模态框无法关闭：检查事件冒泡与状态重置逻辑
   - 时间线不更新：确认数据变更后是否更新缓存与selectedMonth
@@ -612,3 +782,6 @@ Admin管理界面以VanJS为核心，通过清晰的状态层、组件层与动�
   - CreativeTab数据加载循环：确认promptsLoaded和tagsLoaded标志正确设置
   - **ChatPanel流式显示异常**：检查SSE连接状态和消息流完整性
   - **标签过滤失效**：确认availableTags状态正确更新且过滤逻辑正常
+  - **主题切换失效**：检查localStorage权限和CSS变量应用
+  - **AI菜单定位错误**：确认按钮元素获取和边界检测计算
+  - **认证状态异常**：检查API响应格式和状态更新逻辑

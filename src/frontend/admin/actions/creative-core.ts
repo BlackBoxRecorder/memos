@@ -2,7 +2,6 @@ import { api, apiUrl } from "../../../helper/util";
 import { getSelectedAiModel } from "../ai-state";
 import { streamSSE } from "../../shared/utils/sse";
 import type { Prompt, CreativeItem } from "../../../model";
-import type { PreviewMemo } from "../state";
 import {
   prompts,
   selectedPromptId,
@@ -13,40 +12,16 @@ import {
   promptFormContent,
   promptFormError,
   promptFormSaving,
-  generateModalOpen,
   extraPromptInput,
-  generationMode,
-  manualMemoIds,
-  generateTagFilter,
+  selectedTagFilter,
   generating,
   generateError,
-  streamContent,
-  streamDone,
   streamAbort,
   creativeDeleteId,
   creativeDeleting,
-  previewOpen,
-  previewMemos,
-  previewLoading,
-  previewError,
-  previewFetched,
   availableTags,
+  promptModalSelectedId,
 } from "../state";
-
-// ====== Helpers ======
-
-export function resetPreview(): void {
-  previewFetched.val = false;
-  previewMemos.val = [];
-  previewError.val = null;
-}
-
-export function parseManualIds(): number[] {
-  return manualMemoIds.val
-    .split(",")
-    .map((s) => Number(s.trim()))
-    .filter((n) => !isNaN(n) && n > 0);
-}
 
 // ====== Tags ======
 
@@ -90,6 +65,7 @@ async function loadCreativeItems(promptId?: number): Promise<void> {
 
 export function openPromptCreate(): void {
   promptFormMode.val = { type: "create" };
+  promptModalSelectedId.val = null;
   promptFormTitle.val = "";
   promptFormContent.val = "";
   promptFormError.val = null;
@@ -97,6 +73,7 @@ export function openPromptCreate(): void {
 
 export function openPromptEdit(prompt: Prompt): void {
   promptFormMode.val = { type: "edit", id: prompt.id };
+  promptModalSelectedId.val = prompt.id;
   promptFormTitle.val = prompt.title;
   promptFormContent.val = prompt.content;
   promptFormError.val = null;
@@ -104,6 +81,7 @@ export function openPromptEdit(prompt: Prompt): void {
 
 export function closePromptForm(): void {
   promptFormMode.val = { type: "closed" };
+  promptModalSelectedId.val = null;
   promptFormTitle.val = "";
   promptFormContent.val = "";
   promptFormError.val = null;
@@ -125,6 +103,7 @@ export async function savePromptForm(): Promise<void> {
       title: promptFormTitle.val.trim(),
       content: promptFormContent.val.trim(),
     });
+    // Keep selection after save
     if (promptFormMode.val.type === "create") {
       await api("api/creative/prompts", { method: "POST", body });
     } else if (promptFormMode.val.type === "edit") {
@@ -133,8 +112,29 @@ export async function savePromptForm(): Promise<void> {
         body,
       });
     }
+    const wasEdit = promptFormMode.val.type === "edit";
+    const savedId = wasEdit ? (promptFormMode.val as { type: "edit"; id: number }).id : null;
     closePromptForm();
     await loadPrompts();
+    // Re-select the saved prompt
+    if (savedId !== null) {
+      promptModalSelectedId.val = savedId;
+      const p = prompts.val.find((pp) => pp.id === savedId);
+      if (p) {
+        promptFormMode.val = { type: "edit", id: p.id };
+        promptFormTitle.val = p.title;
+        promptFormContent.val = p.content;
+      }
+    } else {
+      // After create, select the first prompt
+      const first = prompts.val[0];
+      if (first) {
+        promptModalSelectedId.val = first.id;
+        promptFormMode.val = { type: "edit", id: first.id };
+        promptFormTitle.val = first.title;
+        promptFormContent.val = first.content;
+      }
+    }
   } catch (err) {
     promptFormError.val = (err as Error).message;
   } finally {
@@ -160,64 +160,6 @@ export async function selectPrompt(id: number): Promise<void> {
   await loadCreativeItems(id);
 }
 
-// ====== Context Preview ======
-
-export async function loadPreviewContext(): Promise<void> {
-  if (selectedPromptId.val === null) {
-    previewError.val = "请先选择提示词";
-    previewFetched.val = false;
-    previewMemos.val = [];
-    return;
-  }
-  if (!extraPromptInput.val.trim()) {
-    previewError.val = "请先输入附加指令";
-    previewFetched.val = false;
-    previewMemos.val = [];
-    return;
-  }
-
-  const body: Record<string, unknown> = {
-    prompt_id: selectedPromptId.val,
-    extra_prompt: extraPromptInput.val.trim(),
-  };
-
-  if (generationMode.val === "manual") {
-    const ids = parseManualIds();
-    if (ids.length === 0) {
-      previewError.val = "无效的 Memo ID。请输入有效的数字 ID，用逗号分隔。";
-      previewFetched.val = false;
-      previewMemos.val = [];
-      return;
-    }
-    body.memo_ids = ids;
-  } else if (generationMode.val === "tag") {
-    if (!generateTagFilter.val.trim()) {
-      previewError.val = "请先选择一个标签";
-      previewFetched.val = false;
-      previewMemos.val = [];
-      return;
-    }
-    body.tag = generateTagFilter.val.trim();
-  }
-
-  previewLoading.val = true;
-  previewError.val = null;
-  try {
-    const data = await api<{ memos: PreviewMemo[] }>(
-      "api/creative/preview-context",
-      { method: "POST", body: JSON.stringify(body) },
-    );
-    previewMemos.val = data.memos;
-    previewFetched.val = true;
-  } catch (err) {
-    previewError.val = (err as Error).message;
-    previewMemos.val = [];
-    previewFetched.val = false;
-  } finally {
-    previewLoading.val = false;
-  }
-}
-
 // ====== Generate ======
 
 export async function handleGenerate(): Promise<void> {
@@ -229,11 +171,7 @@ export async function handleGenerate(): Promise<void> {
     generateError.val = "请先选择提示词";
     return;
   }
-  if (generationMode.val === "manual" && !manualMemoIds.val.trim()) {
-    generateError.val = "请输入 Memo ID（用逗号分隔）";
-    return;
-  }
-  if (generationMode.val === "tag" && !generateTagFilter.val.trim()) {
+  if (!selectedTagFilter.val.trim()) {
     generateError.val = "请选择一个标签";
     return;
   }
@@ -241,27 +179,15 @@ export async function handleGenerate(): Promise<void> {
   const body: Record<string, unknown> = {
     prompt_id: selectedPromptId.val,
     extra_prompt: extraPromptInput.val.trim(),
+    tag: selectedTagFilter.val.trim(),
   };
 
   const { provider, model } = getSelectedAiModel();
   body.provider = provider;
   body.model = model;
 
-  if (generationMode.val === "manual") {
-    const ids = parseManualIds();
-    if (ids.length === 0) {
-      generateError.val = "无效的 Memo ID。请输入有效的数字 ID，用逗号分隔。";
-      return;
-    }
-    body.memo_ids = ids;
-  } else if (generationMode.val === "tag") {
-    body.tag = generateTagFilter.val.trim();
-  }
-
   generating.val = true;
   generateError.val = null;
-  streamContent.val = "";
-  streamDone.val = false;
 
   if (streamAbort.current) streamAbort.current.abort();
   streamAbort.current = new AbortController();
@@ -282,35 +208,12 @@ export async function handleGenerate(): Promise<void> {
       throw new Error(err.error || "请求失败");
     }
 
-    let pendingStreamContent = "";
-    let rafScheduled = false;
-
-    const flushStreamContent = () => {
-      if (pendingStreamContent) {
-        streamContent.val += pendingStreamContent;
-        pendingStreamContent = "";
-      }
-      rafScheduled = false;
-    };
-
     for await (const msg of streamSSE(resp)) {
-      if (msg.type === "content") {
-        pendingStreamContent += msg.content as string;
-        if (!rafScheduled) {
-          rafScheduled = true;
-          requestAnimationFrame(flushStreamContent);
-        }
-      } else if (msg.type === "done") {
+      if (msg.type === "done") {
         creativeItems.val = [msg.item as CreativeItem, ...creativeItems.val];
-        streamDone.val = true;
       } else if (msg.type === "error") {
         throw new Error(msg.error as string);
       }
-    }
-
-    if (pendingStreamContent) {
-      streamContent.val += pendingStreamContent;
-      pendingStreamContent = "";
     }
   } catch (err) {
     if ((err as Error).name === "AbortError") return;
@@ -336,18 +239,10 @@ export async function deleteCreativeItem(id: number): Promise<void> {
   }
 }
 
-// ====== Close Generate Modal ======
+// ====== Reset Generation ======
 
-export function closeGenerateModal(): void {
+export function resetGeneration(): void {
   if (streamAbort.current) streamAbort.current.abort();
-  generateModalOpen.val = false;
   extraPromptInput.val = "";
-  manualMemoIds.val = "";
-  generateTagFilter.val = "";
-  generationMode.val = "auto";
   generateError.val = null;
-  streamContent.val = "";
-  streamDone.val = false;
-  previewOpen.val = false;
-  resetPreview();
 }

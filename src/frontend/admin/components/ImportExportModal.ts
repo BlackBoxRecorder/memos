@@ -93,7 +93,7 @@ export function ImportExportModal() {
             span(
               {
                 style:
-                  "display:block;font-size:14px;color:#666;margin-bottom:20px;",
+                  "display:block;font-size:14px;color:var(--text-secondary);margin-bottom:20px;",
               },
               "将所有备忘录和创意内容导出为文本文件",
             ),
@@ -127,7 +127,7 @@ export function ImportExportModal() {
                 {
                   class: "import-export-result success",
                   style:
-                    "background:#dcfce7;color:#166534;padding:12px;border-radius:6px;margin-bottom:16px;font-size:13px;",
+                    "background:var(--success-bg);color:var(--success-text);padding:12px;border-radius:6px;margin-bottom:16px;font-size:13px;",
                 },
                 importResult.val,
               )
@@ -138,7 +138,7 @@ export function ImportExportModal() {
                 {
                   class: "import-export-result error",
                   style:
-                    "background:#fef2f2;color:#c00;padding:12px;border-radius:6px;margin-bottom:16px;font-size:13px;",
+                    "background:var(--danger-bg-light);color:var(--danger-text);padding:12px;border-radius:6px;margin-bottom:16px;font-size:13px;",
                 },
                 importError.val,
               )
@@ -163,14 +163,14 @@ export function ImportExportModal() {
                 ? div(
                   {
                     style:
-                      "display:flex;flex-direction:column;align-items:center;gap:8px;color:#888;",
+                      "display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--text-muted);",
                   },
                   "导入中...",
                 )
                 : div(
                   {
                     style:
-                      "display:flex;flex-direction:column;align-items:center;gap:8px;color:#888;",
+                      "display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--text-muted);",
                   },
                   span({ style: "font-size:28px;" }, "\u21E7"),
                   span(
@@ -178,7 +178,7 @@ export function ImportExportModal() {
                     "拖拽文件到此处，或点击选择文件",
                   ),
                   span(
-                    { style: "font-size:12px;color:#bbb;" },
+                    { style: "font-size:12px;color:var(--text-muted);" },
                     "支持 .txt 文本文件 / .html (flomo 导出)",
                   ),
                 ),

@@ -13,13 +13,6 @@ export type PromptFormMode =
   | { type: "create" }
   | { type: "edit"; id: number };
 
-export interface ChatMsg {
-  role: "user" | "assistant";
-  content: string;
-}
-
-export type PreviewMemo = Pick<Memo, "id" | "content" | "tags" | "created_at">;
-
 export interface MonthGroup {
   month: number;
   name: string;
@@ -136,11 +129,7 @@ export const promptFormSaving = van.state(false);
 // ====== Creative Generation State ======
 
 export const selectedPromptId = van.state<number | null>(null);
-export const generateModalOpen = van.state(false);
 export const extraPromptInput = van.state("");
-export const generationMode = van.state<"auto" | "manual" | "tag">("auto");
-export const manualMemoIds = van.state("");
-export const generateTagFilter = van.state("");
 export const generating = van.state(false);
 export const generateError = van.state<string | null>(null);
 
@@ -161,16 +150,6 @@ export const creativeTimelineCache: {
   data: YearGroup[] | null;
 } = { items: null, data: null };
 
-// ====== Chat State ======
-
-export const creativeView = van.state<"list" | "chat">("list");
-export const chatMessages = van.state<ChatMsg[]>([]);
-export const chatInput = van.state("");
-export const chatStreaming = van.state(false);
-export const chatContextCount = van.state(0);
-export const chatTagFilter = van.state("");
-export const chatAbort: { current: AbortController | null } = { current: null };
-
 // ====== Tags State ======
 
 export const availableTags = van.state<string[]>([]);
@@ -181,10 +160,8 @@ export const tagsLoaded = van.state(false);
 export const tagAutocompleteOpen = van.state(false);
 export const tagAutocompleteHighlight = van.state(-1);
 
-// ====== Context Preview State ======
+// ====== Generate Inline State ======
 
-export const previewOpen = van.state(false);
-export const previewMemos = van.state<PreviewMemo[]>([]);
-export const previewLoading = van.state(false);
-export const previewError = van.state<string | null>(null);
-export const previewFetched = van.state(false);
+export const selectedTagFilter = van.state("");
+export const promptDrawerOpen = van.state(false);
+export const promptModalSelectedId = van.state<number | null>(null);

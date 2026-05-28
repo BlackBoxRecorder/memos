@@ -23,7 +23,7 @@
     <div id="app"></div>
     <style>
         /* Fallback variables in case common.css fails to load */
-        :root {
+        [data-theme="light"] {
             --bg-page: #f0f0f0;
             --bg-primary: #fff;
             --text-primary: #333;
@@ -50,7 +50,7 @@
         }
 
         .card:hover {
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+            box-shadow: var(--card-hover-shadow);
             transform: translateY(-2px);
         }
 
@@ -204,7 +204,7 @@
         }
 
         .select-trigger:hover {
-            border-color: #bbb;
+            border-color: var(--hover-border);
         }
 
         .custom-select:focus .select-trigger,
@@ -239,7 +239,7 @@
             background: var(--bg-primary);
             border: 1px solid var(--border-light);
             border-radius: 6px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+            box-shadow: var(--dropdown-shadow);
             max-height: 300px;
             overflow-y: auto;
             z-index: 200;

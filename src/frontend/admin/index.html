@@ -23,7 +23,7 @@
 <body>
     <style>
         /* Fallback variables in case common.css fails to load */
-        :root {
+        [data-theme="light"] {
             --bg-page: #f0f0f0;
             --bg-primary: #fff;
             --text-primary: #333;
@@ -104,7 +104,7 @@
         }
 
         .login-card button:disabled {
-            background: #93c5fd;
+            opacity: 0.5;
             cursor: default;
         }
 
@@ -184,7 +184,7 @@
         }
 
         .model-select-trigger:hover {
-            border-color: #bbb;
+            border-color: var(--hover-border);
         }
 
         .model-select.open .model-select-trigger,
@@ -214,7 +214,7 @@
             background: var(--bg-primary);
             border: 1px solid var(--border-light);
             border-radius: 6px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+            box-shadow: var(--dropdown-shadow);
             max-height: 280px;
             overflow-y: auto;
             z-index: 300;
@@ -502,6 +502,22 @@
             color: #5b21b6;
         }
 
+        /* Dark mode badge variants */
+        [data-theme="dark"] .badge-public {
+            background: #0f3d22;
+            color: #6dd4a0;
+        }
+
+        [data-theme="dark"] .badge-private {
+            background: #3a1a08;
+            color: #e0a060;
+        }
+
+        [data-theme="dark"] .badge-tag {
+            background: #251050;
+            color: #b8a4e0;
+        }
+
         .memo-id {
             font-weight: 600;
             font-size: 11px;
@@ -565,12 +581,24 @@
             color: #d35400;
         }
 
+        [data-theme="dark"] .memo-icon-btn.pinned {
+            border-color: #4a2e14;
+            background: #2e1c0c;
+        }
+
+        [data-theme="dark"] .memo-icon-btn.pinned:hover {
+            background: #3a2410;
+            border-color: #c8883a;
+            color: #d09840;
+        }
+
         /* Creative card icon buttons (mirrors memo-icon-btn) */
         .creative-meta-icons {
             display: inline-flex;
             align-items: center;
             gap: 2px;
             margin-left: auto;
+            flex-shrink: 0;
         }
 
         .creative-icon-btn {
@@ -644,7 +672,7 @@
         }
 
         .ai-optimize-btn:hover {
-            background: #e8e8ff;
+            background: var(--primary-light);
             border-color: var(--primary-color);
             color: var(--primary-color);
         }
@@ -665,6 +693,18 @@
 
             to {
                 transform: rotate(360deg);
+            }
+        }
+
+        @keyframes gen-border-pulse {
+
+            0%,
+            100% {
+                box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary-color) 20%, transparent);
+            }
+
+            50% {
+                box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary-color) 70%, transparent);
             }
         }
 
@@ -712,6 +752,31 @@
         .tag-chip:disabled {
             opacity: 0.6;
             cursor: not-allowed;
+        }
+
+        /* Dark mode tag-chip variants */
+        [data-theme="dark"] .tag-chip {
+            background: #251050;
+            color: #b8a4e0;
+            border-color: #3a2068;
+        }
+
+        [data-theme="dark"] .tag-chip:hover {
+            background: #2e1460;
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+        }
+
+        [data-theme="dark"] .tag-chip.active {
+            background: #251050;
+            border-color: #5a3d9e;
+            color: #b8a4e0;
+        }
+
+        [data-theme="dark"] .tag-chip.active:hover {
+            background: #3a1818;
+            border-color: var(--danger-color);
+            color: var(--danger-text);
         }
 
         /* Tag display area */
@@ -1024,11 +1089,27 @@
             gap: 10px;
             font-size: 12px;
             color: var(--text-muted);
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
+            min-width: 0;
         }
 
         .creative-meta .badge {
             font-size: 11px;
+            flex-shrink: 0;
+        }
+
+        .creative-meta-extra {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            min-width: 0;
+            flex: 0 1 auto;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+            background: var(--bg-hover);
+            color: var(--text-muted);
         }
 
         .read-more-btn {
@@ -1078,8 +1159,8 @@
         }
 
         .import-export-result.success {
-            background: #dcfce7;
-            color: #166534;
+            background: var(--success-bg);
+            color: var(--success-text);
         }
 
         .import-export-result.error {

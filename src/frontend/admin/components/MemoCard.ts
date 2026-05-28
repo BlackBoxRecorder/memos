@@ -82,7 +82,7 @@ export function MemoCard(memo: Memo) {
         ? div(
           {
             style:
-              "font-size:12px;color:#e67e22;padding:0 0 4px 0;display:flex;align-items:center;gap:2px;",
+              "font-size:12px;color:var(--pin-color);padding:0 0 4px 0;display:flex;align-items:center;gap:2px;",
           },
           "📌 已置顶",
         )

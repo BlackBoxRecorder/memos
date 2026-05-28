@@ -1,5 +1,5 @@
 import van from "vanjs-core";
-import { CreativeTab, openPromptCreate } from "./creative";
+import { CreativeTab } from "./creative";
 import { countWords } from "../../helper/util";
 import { renderMarkdown } from "../../helper/markdown";
 import {
@@ -18,13 +18,13 @@ import {
   importExportOpen,
   activeTab,
   aiModels,
-  creativeItems,
   aiPanelMemoId,
   aiPanelResult,
   aiPanelLoading,
   aiPanelError,
   formAiMenuOpen,
   theme,
+  promptDrawerOpen,
 } from "./state";
 import { checkAuth, login, logout } from "./actions/auth";
 import {
@@ -69,6 +69,14 @@ function toggleTheme(): void {
   theme.val = theme.val === "dark" ? "light" : "dark";
   applyTheme();
 }
+
+// 跨标签页实时同步主题
+window.addEventListener("storage", (e) => {
+  if (e.key === THEME_KEY && (e.newValue === "dark" || e.newValue === "light")) {
+    theme.val = e.newValue as "light" | "dark";
+    document.documentElement.dataset.theme = theme.val;
+  }
+});
 
 // ====== LoginPage ======
 
@@ -139,11 +147,12 @@ function AdminPage() {
               )
               : button(
                 {
-                  class: "btn btn-primary btn-sm",
-                  title: "New Prompt",
-                  onclick: openPromptCreate,
+                  class: "btn btn-outline btn-sm",
+                  title: "管理提示词",
+                  style: "font-size:16px;line-height:1;",
+                  onclick: () => (promptDrawerOpen.val = !promptDrawerOpen.val),
                 },
-                svgPlus(),
+                "\u2699",
               ),
           button(
             {
@@ -184,10 +193,10 @@ function AdminPage() {
     div(
       { class: "admin-layout" },
       () => {
-        if (activeTab.val === "memos" && memos.val.length > 0) {
+        if (activeTab.val === "memos") {
           return TimelineSidebar();
         }
-        if (activeTab.val === "creative" && creativeItems.val.length > 0) {
+        if (activeTab.val === "creative") {
           return CreativeTimelineSidebar();
         }
         return "";

@@ -60,6 +60,14 @@ export function toggleTheme(): void {
   applyTheme();
 }
 
+// 跨标签页实时同步主题
+window.addEventListener("storage", (e) => {
+  if (e.key === THEME_KEY && (e.newValue === "dark" || e.newValue === "light")) {
+    theme.val = e.newValue;
+    document.documentElement.dataset.theme = theme.val;
+  }
+});
+
 function SiteHeader() {
   return div({ id: "site-header" }, h1({ class: "site-title" }, "Memos"), () =>
     memoCount.val != null
@@ -359,7 +367,7 @@ export function App() {
         return div(
           {
             style:
-              "text-align:center;padding:60px 20px;font-size:15px;color:#666;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif",
+              "text-align:center;padding:60px 20px;font-size:15px;color:var(--text-secondary);font-family:'Helvetica Neue',Helvetica,Arial,sans-serif",
           },
           "Loading...",
         );
@@ -367,7 +375,7 @@ export function App() {
         return div(
           {
             style:
-              "text-align:center;padding:60px 20px;font-size:15px;color:#c00;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif",
+              "text-align:center;padding:60px 20px;font-size:15px;color:var(--danger-color);font-family:'Helvetica Neue',Helvetica,Arial,sans-serif",
           },
           error.val,
         );
@@ -375,7 +383,7 @@ export function App() {
         return div(
           {
             style:
-              "text-align:center;padding:60px 20px;font-size:15px;color:#666;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif",
+              "text-align:center;padding:60px 20px;font-size:15px;color:var(--text-secondary);font-family:'Helvetica Neue',Helvetica,Arial,sans-serif",
           },
           "No memos found.",
         );

@@ -13,10 +13,8 @@ import {
   getMemos,
 } from "../db";
 import {
-  generateEmbedding,
   generateCreativeContentStream,
 } from "../ai/service";
-import { getSemanticResults } from "../ai/embeddings";
 import {
   checkRateLimit,
   recordRateLimit,
@@ -28,8 +26,6 @@ export const creativeApp = new Hono();
 
 /** Maximum number of tag-filtered memos used as context to avoid token overflow */
 const MAX_TAG_CONTEXT = 20;
-/** Maximum number of memos returned in preview-context for tag mode */
-const MAX_TAG_PREVIEW = 50;
 
 // --- Prompts endpoints ---
 
@@ -119,90 +115,11 @@ creativeApp.get("/", (c) => {
   return c.json({ items });
 });
 
-// POST /api/creative/preview-context — 预览生成将使用的上下文 memos
-creativeApp.post("/preview-context", authMiddleware, async (c) => {
-  let body: {
-    prompt_id?: number;
-    extra_prompt?: string;
-    memo_ids?: number[];
-    tag?: string;
-  };
-  try {
-    body = await c.req.json();
-  } catch {
-    return c.json({ error: "Invalid JSON" }, 400);
-  }
-
-  if (!body.prompt_id || typeof body.prompt_id !== "number") {
-    return c.json({ error: "prompt_id is required" }, 400);
-  }
-  if (
-    !body.extra_prompt ||
-    typeof body.extra_prompt !== "string" ||
-    body.extra_prompt.trim().length === 0
-  ) {
-    return c.json({ error: "extra_prompt is required" }, 400);
-  }
-  if (body.memo_ids !== undefined) {
-    if (
-      !Array.isArray(body.memo_ids) ||
-      body.memo_ids.some((id) => typeof id !== "number" || id <= 0)
-    ) {
-      return c.json(
-        { error: "memo_ids must be an array of positive integers" },
-        400,
-      );
-    }
-  }
-
-  const prompt = getPrompt(body.prompt_id);
-  if (!prompt) {
-    return c.json({ error: "Prompt not found" }, 404);
-  }
-
-  const isManualMode = body.memo_ids !== undefined && body.memo_ids.length > 0;
-  const isTagMode =
-    !isManualMode &&
-    typeof body.tag === "string" &&
-    body.tag.trim().length > 0;
-
-  if (isManualMode) {
-    const memos = getMemos({ includePrivate: true, ids: body.memo_ids });
-    return c.json({ memos, mode: "manual" });
-  }
-
-  if (isTagMode) {
-    const memos = getMemos({ includePrivate: true, tag: body.tag!.trim(), limit: MAX_TAG_PREVIEW });
-    // total_count reflects the actual total; we return a limited slice for performance
-    return c.json({ memos, mode: "tag" });
-  }
-
-  // Auto mode: consumes AI quota because it calls embedding + semantic search
-  const ip = getClientIP(c);
-  const rateError = checkRateLimit(ip, "ai");
-  if (rateError) {
-    return c.json({ error: formatRateLimitError("ai", rateError) }, 429);
-  }
-  recordRateLimit(ip, "ai");
-
-  try {
-    const semanticIds = await getSemanticResults(body.extra_prompt.trim(), 5);
-    if (semanticIds.length === 0) {
-      return c.json({ memos: [], mode: "auto" });
-    }
-    const memos = getMemos({ includePrivate: true, ids: semanticIds });
-    return c.json({ memos, mode: "auto" });
-  } catch {
-    return c.json({ memos: [], mode: "auto" });
-  }
-});
-
 // POST /api/creative/generate — 生成创意内容（流式输出）
 creativeApp.post("/generate", authMiddleware, async (c) => {
   let body: {
     prompt_id?: number;
     extra_prompt?: string;
-    memo_ids?: number[];
     provider?: string;
     model?: string;
     tag?: string;
@@ -223,17 +140,6 @@ creativeApp.post("/generate", authMiddleware, async (c) => {
   ) {
     return c.json({ error: "extra_prompt is required" }, 400);
   }
-  if (body.memo_ids !== undefined) {
-    if (
-      !Array.isArray(body.memo_ids) ||
-      body.memo_ids.some((id) => typeof id !== "number" || id <= 0)
-    ) {
-      return c.json(
-        { error: "memo_ids must be an array of positive integers" },
-        400,
-      );
-    }
-  }
 
   const prompt = getPrompt(body.prompt_id);
   if (!prompt) {
@@ -249,34 +155,12 @@ creativeApp.post("/generate", authMiddleware, async (c) => {
 
   let contextMemos: string[] = [];
   let contextMemoIds = "";
-  let embedding: Float32Array | null = null;
 
-  const isManualMode = body.memo_ids !== undefined && body.memo_ids.length > 0;
-  const isTagMode =
-    !isManualMode &&
-    typeof body.tag === "string" &&
-    body.tag.trim().length > 0;
-
-  if (isManualMode) {
-    const memos = getMemos({ includePrivate: true, ids: body.memo_ids });
-    contextMemos = memos.map((m) => m.content);
-    contextMemoIds = body.memo_ids!.join(",");
-  } else if (isTagMode) {
-    const memos = getMemos({ includePrivate: true, tag: body.tag!.trim(), limit: MAX_TAG_CONTEXT });
+  // Tag mode: use tag-filtered memos as context
+  if (typeof body.tag === "string" && body.tag.trim().length > 0) {
+    const memos = getMemos({ includePrivate: true, tag: body.tag.trim(), limit: MAX_TAG_CONTEXT });
     contextMemos = memos.map((m) => m.content);
     contextMemoIds = memos.map((m) => m.id).join(",");
-  } else {
-    embedding = await generateEmbedding(body.extra_prompt.trim());
-    try {
-      const semanticIds = await getSemanticResults(body.extra_prompt.trim(), 5);
-      if (semanticIds.length > 0) {
-        const memos = getMemos({ includePrivate: true, ids: semanticIds });
-        contextMemos = memos.map((m) => m.content);
-        contextMemoIds = semanticIds.join(",");
-      }
-    } catch {
-      // Semantic search failed, proceed without context
-    }
   }
 
   // Build SSE stream
@@ -308,7 +192,6 @@ creativeApp.post("/generate", authMiddleware, async (c) => {
         const item = createCreativeItem({
           prompt_id: scopePromptId,
           extra_prompt: scopeExtraPrompt,
-          embedding: embedding ? Buffer.from(embedding.buffer) : undefined,
           content: fullContent,
           context_memo_ids: contextMemoIds,
         });

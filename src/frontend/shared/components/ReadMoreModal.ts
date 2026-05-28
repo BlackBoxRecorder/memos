@@ -54,7 +54,7 @@ export function ReadMoreModal({
         div(
           {
             style:
-              "font-size:15px;line-height:24px;color:#333;" +
+              "font-size:15px;line-height:24px;color:var(--text-primary);" +
               "white-space:pre-wrap;word-break:break-word;",
           },
           () =>
