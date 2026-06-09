@@ -218,6 +218,27 @@ body {
 }
 
 /* === Form Basics === */
+.form-input {
+    width: 100%;
+    padding: 8px 12px;
+    font-size: 14px;
+    font-family: inherit;
+    color: var(--text-primary);
+    background: var(--input-bg);
+    border: 1px solid var(--input-border);
+    border-radius: 6px;
+    outline: none;
+    transition: border-color .15s;
+}
+
+.form-input:focus {
+    border-color: var(--input-focus-border);
+}
+
+.form-input::placeholder {
+    color: var(--text-muted);
+}
+
 .form-error {
     font-size: 13px;
     color: var(--danger-color);
