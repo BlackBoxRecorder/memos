@@ -6,7 +6,6 @@ import {
   getOptimizePrompt,
   getSuggestTagsPrompt,
   getSummarizePrompt,
-  getRewritePrompt,
   getExpandPrompt,
   getKeypointsPrompt,
   getPolishPrompt,
@@ -312,8 +311,7 @@ export async function suggestTags(
 
 export async function executeAction(
   content: string,
-  action: "summarize" | "rewrite" | "expand" | "extract-keypoints" | "polish",
-  style?: "professional" | "casual" | "minimal" | "academic",
+  action: "summarize" | "expand" | "extract-keypoints" | "polish",
   providerId?: string,
   model?: string,
 ): Promise<string | null> {
@@ -325,9 +323,6 @@ export async function executeAction(
   switch (action) {
     case "summarize":
       systemPrompt = getSummarizePrompt();
-      break;
-    case "rewrite":
-      systemPrompt = getRewritePrompt(style || "professional");
       break;
     case "expand":
       systemPrompt = getExpandPrompt();

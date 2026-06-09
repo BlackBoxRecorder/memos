@@ -73,20 +73,18 @@ export const aiPanelLoading = van.state(false);
 export const aiPanelResult = van.state<string | null>(null);
 export const aiPanelError = van.state<string | null>(null);
 export const aiPanelAction = van.state("");
-export const aiPanelStyle = van.state<
-  "professional" | "casual" | "minimal" | "academic"
->("professional");
 
 // ====== Form AI Toolbox State ======
 
 export const formAiMenuOpen = van.state(false);
 export const formAiLoading = van.state(false);
-export const formAiPendingAction = van.state("");
 
 // ====== AI Menu Position State ======
 
 export const aiMenuPos = van.state<{ top: number; left: number } | null>(null);
-export const formAiMenuPos = van.state<{ top: number; left: number } | null>(null);
+export const formAiMenuPos = van.state<{ top: number; left: number } | null>(
+  null,
+);
 
 // ====== Import/Export State ======
 

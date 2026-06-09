@@ -27,12 +27,6 @@ const FALLBACKS: Record<string, string> = {
 - 语言简洁精炼
 - 只返回摘要文本，不要包含解释或前缀`,
 
-  rewrite: `你是一位个人便签应用的写作助手。请按{STYLE}风格重写以下内容：
-- 保持原意不变
-- 调整语气和表达方式以匹配指定风格
-- 在不丢失原意的前提下使表达更自然
-- 只返回改写后的文本，不要包含解释或前缀`,
-
   expand: `你是一位个人便签应用的写作助手。请基于以下简短想法展开为完整段落：
 - 增加细节和连贯性
 - 保持主题聚焦
@@ -109,11 +103,6 @@ export function getSuggestTagsPrompt(): string {
 /** 获取摘要 system prompt */
 export function getSummarizePrompt(): string {
   return getPrompt("summarize");
-}
-
-/** 获取改写 system prompt（含 {STYLE} 占位符） */
-export function getRewritePrompt(style: string): string {
-  return getPrompt("rewrite").replace("{STYLE}", style);
 }
 
 /** 获取扩写 system prompt */

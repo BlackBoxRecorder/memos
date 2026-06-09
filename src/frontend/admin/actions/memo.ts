@@ -24,7 +24,6 @@ import {
   formAiMenuOpen,
   formAiMenuPos,
   formAiLoading,
-  formAiPendingAction,
   tagAutocompleteOpen,
   tagAutocompleteHighlight,
   aiMenuPos,
@@ -133,7 +132,6 @@ export function openCreateForm(): void {
   formAiMenuOpen.val = false;
   formAiMenuPos.val = null;
   formAiLoading.val = false;
-  formAiPendingAction.val = "";
   tagAutocompleteOpen.val = false;
   tagAutocompleteHighlight.val = -1;
   document.body.style.overflow = "hidden";
@@ -150,7 +148,6 @@ export function openEditForm(memo: Memo): void {
   formAiMenuOpen.val = false;
   formAiMenuPos.val = null;
   formAiLoading.val = false;
-  formAiPendingAction.val = "";
   tagAutocompleteOpen.val = false;
   tagAutocompleteHighlight.val = -1;
   document.body.style.overflow = "hidden";
@@ -167,7 +164,6 @@ export function closeForm(): void {
   formAiMenuOpen.val = false;
   formAiMenuPos.val = null;
   formAiLoading.val = false;
-  formAiPendingAction.val = "";
   tagAutocompleteOpen.val = false;
   tagAutocompleteHighlight.val = -1;
   aiMenuPos.val = null;

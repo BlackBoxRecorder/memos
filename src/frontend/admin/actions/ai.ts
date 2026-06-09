@@ -176,7 +176,7 @@ export function closeAiPanel(): void {
 
 // ====== AI Menu Positioning ======
 
-const ESTIMATED_MENU_H = 230;
+const ESTIMATED_MENU_H = 130;
 const ESTIMATED_MENU_W = 140;
 
 export function openAiMenu(buttonEl: HTMLElement): void {

@@ -114,12 +114,10 @@ aiApp.post("/suggest-tags", authMiddleware, async (c) => {
 // POST /api/ai/action — 统一 AI 写作操作（auth required）
 const VALID_ACTIONS = [
   "summarize",
-  "rewrite",
   "expand",
   "extract-keypoints",
   "polish",
 ] as const;
-const VALID_STYLES = ["professional", "casual", "minimal", "academic"];
 
 aiApp.post("/action", authMiddleware, async (c) => {
   let body: {
@@ -155,17 +153,6 @@ aiApp.post("/action", authMiddleware, async (c) => {
 
   const action = body.action as (typeof VALID_ACTIONS)[number];
 
-  // 改写操作支持 style 参数
-  let style: "professional" | "casual" | "minimal" | "academic" | undefined;
-  if (action === "rewrite") {
-    if (
-      body.style &&
-      (VALID_STYLES as readonly string[]).includes(body.style)
-    ) {
-      style = body.style as "professional" | "casual" | "minimal" | "academic";
-    }
-  }
-
   if (!isAiAvailable().optimize) {
     return c.json({ error: "AI is not configured" }, 503);
   }
@@ -179,7 +166,6 @@ aiApp.post("/action", authMiddleware, async (c) => {
   const result = await executeAction(
     body.content.trim(),
     action,
-    style,
     body.provider,
     body.model,
   );
@@ -234,8 +220,8 @@ aiApp.post("/chat", authMiddleware, async (c) => {
   const message = body.message.trim();
   const history: ChatMessage[] = Array.isArray(body.history)
     ? body.history.filter(
-      (h) => h && typeof h.role === "string" && typeof h.content === "string",
-    )
+        (h) => h && typeof h.role === "string" && typeof h.content === "string",
+      )
     : [];
 
   // Build context via semantic search
