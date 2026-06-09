@@ -19,6 +19,12 @@
 - [README.md](file://README.md)
 </cite>
 
+## 更新摘要
+**变更内容**
+- 简化AI聊天端点，移除标签上下文过滤功能
+- 更新API架构和实现细节，仅依赖语义搜索构建上下文
+- 优化聊天端点的上下文构建流程
+
 ## 目录
 1. [简介](#简介)
 2. [项目结构](#项目结构)
@@ -72,32 +78,32 @@ C --> E
 B --> H
 ```
 
-图表来源
-- [src/api/ai.ts:1-326](file://src/api/ai.ts#L1-L326)
+**图表来源**
+- [src/api/ai.ts:1-298](file://src/api/ai.ts#L1-L298)
 - [src/ai/service.ts:1-507](file://src/ai/service.ts#L1-L507)
 - [src/ai/embeddings.ts:1-228](file://src/ai/embeddings.ts#L1-L228)
 - [src/helper/rate-limit.ts:1-153](file://src/helper/rate-limit.ts#L1-L153)
-- [src/db.ts:1-200](file://src/db.ts#L1-L200)
+- [src/db.ts:1-484](file://src/db.ts#L1-L484)
 - [ai.config.json:1-44](file://ai.config.json#L1-L44)
 - [app.config.json:1-22](file://app.config.json#L1-L22)
 
-章节来源
-- [src/api/ai.ts:1-326](file://src/api/ai.ts#L1-L326)
+**章节来源**
+- [src/api/ai.ts:1-298](file://src/api/ai.ts#L1-L298)
 - [src/ai/service.ts:1-507](file://src/ai/service.ts#L1-L507)
 - [src/ai/embeddings.ts:1-228](file://src/ai/embeddings.ts#L1-L228)
 - [src/helper/rate-limit.ts:1-153](file://src/helper/rate-limit.ts#L1-L153)
-- [src/db.ts:1-200](file://src/db.ts#L1-L200)
+- [src/db.ts:1-484](file://src/db.ts#L1-L484)
 - [ai.config.json:1-44](file://ai.config.json#L1-L44)
 - [app.config.json:1-22](file://app.config.json#L1-L22)
 
 ## 核心组件
 - 多提供商聊天与流式输出：封装OpenAI兼容格式的聊天完成与流式完成，支持超时控制与错误降级。
 - 嵌入向量与语义检索：基于DashScope生成向量，内存缓存+余弦相似度，支持可选重排序（DashScope qwen3-rerank）。
-- 统一动作执行：将“摘要、重写、扩写、提取要点、润色”映射到对应系统提示词。
+- 统一动作执行：将"摘要、重写、扩写、提取要点、润色"映射到对应系统提示词。
 - 速率限制：基于IP的小时/日双窗口限流，支持环境变量与配置文件覆盖。
 - 配置体系：ai.config.json定义提供商、默认模型；app.config.json定义超时、温度、最大token、相似度阈值、重排序参数、限流阈值。
 
-章节来源
+**章节来源**
 - [src/ai/service.ts:130-506](file://src/ai/service.ts#L130-L506)
 - [src/ai/embeddings.ts:16-228](file://src/ai/embeddings.ts#L16-L228)
 - [src/helper/rate-limit.ts:77-153](file://src/helper/rate-limit.ts#L77-L153)
@@ -105,7 +111,7 @@ B --> H
 - [app.config.json:1-22](file://app.config.json#L1-L22)
 
 ## 架构总览
-AI服务API采用“路由层-服务层-外部服务”的分层设计。路由层负责鉴权、参数校验、限流与SSE流式输出；服务层负责提供商解析、HTTP调用、提示词拼装与错误降级；嵌入层负责向量化、缓存与相似度检索。
+AI服务API采用"路由层-服务层-外部服务"的分层设计。路由层负责鉴权、参数校验、限流与SSE流式输出；服务层负责提供商解析、HTTP调用、提示词拼装与错误降级；嵌入层负责向量化、缓存与相似度检索。
 
 ```mermaid
 sequenceDiagram
@@ -130,8 +136,8 @@ SVC-->>API : 流式文本片段
 API-->>Client : SSE数据流
 ```
 
-图表来源
-- [src/api/ai.ts:198-325](file://src/api/ai.ts#L198-L325)
+**图表来源**
+- [src/api/ai.ts:201-297](file://src/api/ai.ts#L201-L297)
 - [src/ai/embeddings.ts:95-154](file://src/ai/embeddings.ts#L95-L154)
 - [src/ai/service.ts:480-506](file://src/ai/service.ts#L480-L506)
 - [src/helper/rate-limit.ts:77-110](file://src/helper/rate-limit.ts#L77-L110)
@@ -147,8 +153,8 @@ API-->>Client : SSE数据流
 - /api/ai/action：统一动作（摘要/重写/扩写/提取要点/润色，需鉴权）
 - /api/ai/chat：对话式工作台（SSE，需鉴权）
 
-章节来源
-- [src/api/ai.ts:23-325](file://src/api/ai.ts#L23-L325)
+**章节来源**
+- [src/api/ai.ts:23-298](file://src/api/ai.ts#L23-L298)
 
 ### 内容优化 /api/ai/optimize
 - 请求体字段：content（必填）、provider（可选）、model（可选）
@@ -158,7 +164,7 @@ API-->>Client : SSE数据流
   - 请求体示例：[请求体示例:34-72](file://src/api/ai.ts#L34-L72)
   - 成功响应：[成功响应:69-71](file://src/api/ai.ts#L69-L71)
 
-章节来源
+**章节来源**
 - [src/api/ai.ts:33-72](file://src/api/ai.ts#L33-L72)
 - [src/ai/service.ts:249-264](file://src/ai/service.ts#L249-L264)
 
@@ -170,7 +176,7 @@ API-->>Client : SSE数据流
   - 请求体示例：[请求体示例:74-112](file://src/api/ai.ts#L74-L112)
   - 成功响应：[成功响应:109-111](file://src/api/ai.ts#L109-L111)
 
-章节来源
+**章节来源**
 - [src/api/ai.ts:74-112](file://src/api/ai.ts#L74-L112)
 - [src/ai/service.ts:268-309](file://src/ai/service.ts#L268-L309)
 
@@ -182,18 +188,18 @@ API-->>Client : SSE数据流
   - 请求体示例：[请求体示例:127-196](file://src/api/ai.ts#L127-L196)
   - 成功响应：[成功响应:193-195](file://src/api/ai.ts#L193-L195)
 
-章节来源
+**章节来源**
 - [src/api/ai.ts:114-196](file://src/api/ai.ts#L114-L196)
 - [src/ai/service.ts:313-347](file://src/ai/service.ts#L313-L347)
 
 ### 对话式工作台 /api/ai/chat（SSE）
-- 请求体字段：message（必填）、history（可选）、provider（可选）、model（可选）、tag（可选）
-- 上下文构建：tag过滤+语义检索（去重合并），最多取MAX_TAG_CONTEXT条
+- 请求体字段：message（必填）、history（可选）、provider（可选）、model（可选）
+- **更新** 上下文构建：**移除标签过滤**，仅通过语义搜索构建上下文，最多取5条候选
 - 流式输出：逐片断发送，结束时发送done事件与上下文计数
 - 错误处理：异常转为error事件并关闭流
 - 示例请求/响应路径：
   - 请求体示例：[请求体示例:204-244](file://src/api/ai.ts#L204-L244)
-  - SSE流构建：[SSE流构建:282-325](file://src/api/ai.ts#L282-L325)
+  - SSE流构建：[SSE流构建:255-297](file://src/api/ai.ts#L255-L297)
 
 ```mermaid
 sequenceDiagram
@@ -203,10 +209,8 @@ participant EMB as "嵌入引擎"
 participant DB as "数据库"
 participant SVC as "AI服务"
 Client->>API : POST /api/ai/chat
-API->>API : 解析message/history/tag
-API->>DB : getMemos(tag限定)
-DB-->>API : memo内容集合
-API->>EMB : getSemanticResults(query, N)
+API->>API : 解析message/history
+API->>EMB : getSemanticResults(query, 5)
 EMB-->>API : 候选memo_id
 API->>DB : getMemos(候选ids)
 DB-->>API : memo内容集合
@@ -216,14 +220,14 @@ API-->>Client : data : {type : "content", content}
 API-->>Client : data : {type : "done", contextCount}
 ```
 
-图表来源
-- [src/api/ai.ts:248-305](file://src/api/ai.ts#L248-L305)
+**图表来源**
+- [src/api/ai.ts:241-278](file://src/api/ai.ts#L241-L278)
 - [src/ai/embeddings.ts:95-154](file://src/ai/embeddings.ts#L95-L154)
 - [src/db.ts:122-169](file://src/db.ts#L122-L169)
-- [src/ai/service.ts:179-245](file://src/ai/service.ts#L179-L245)
+- [src/ai/service.ts:480-506](file://src/ai/service.ts#L480-L506)
 
-章节来源
-- [src/api/ai.ts:198-325](file://src/api/ai.ts#L198-L325)
+**章节来源**
+- [src/api/ai.ts:195-298](file://src/api/ai.ts#L195-L298)
 
 ### AI提供商集成与配置
 - 配置文件：ai.config.json
@@ -240,7 +244,7 @@ API-->>Client : data : {type : "done", contextCount}
   - 配置文件：[ai.config.json:1-44](file://ai.config.json#L1-L44)
   - 默认温度/最大token/超时：[app.config.json:2-6](file://app.config.json#L2-L6)
 
-章节来源
+**章节来源**
 - [src/ai/service.ts:43-94](file://src/ai/service.ts#L43-L94)
 - [ai.config.json:1-44](file://ai.config.json#L1-L44)
 - [app.config.json:1-22](file://app.config.json#L1-L22)
@@ -282,11 +286,11 @@ ReturnIDs --> End
 ReturnOrder --> End
 ```
 
-图表来源
+**图表来源**
 - [src/ai/embeddings.ts:16-228](file://src/ai/embeddings.ts#L16-L228)
 - [src/ai/service.ts:351-445](file://src/ai/service.ts#L351-L445)
 
-章节来源
+**章节来源**
 - [src/ai/embeddings.ts:16-228](file://src/ai/embeddings.ts#L16-L228)
 - [src/ai/service.ts:351-445](file://src/ai/service.ts#L351-L445)
 
@@ -304,7 +308,7 @@ ReturnOrder --> End
   - 限流错误格式化：[formatRateLimitError:143-152](file://src/helper/rate-limit.ts#L143-L152)
   - 限流配置：[app.config.json:15-20](file://app.config.json#L15-L20)
 
-章节来源
+**章节来源**
 - [src/helper/rate-limit.ts:1-153](file://src/helper/rate-limit.ts#L1-L153)
 - [app.config.json:15-20](file://app.config.json#L15-L20)
 
@@ -323,7 +327,7 @@ ReturnOrder --> End
   - 重排序错误处理：[rerankDocuments:389-445](file://src/ai/service.ts#L389-L445)
   - 嵌入层回退：[getSemanticResults:147-150](file://src/ai/embeddings.ts#L147-L150)
 
-章节来源
+**章节来源**
 - [src/ai/service.ts:132-245](file://src/ai/service.ts#L132-L245)
 - [src/ai/service.ts:351-445](file://src/ai/service.ts#L351-L445)
 - [src/ai/embeddings.ts:95-154](file://src/ai/embeddings.ts#L95-L154)
@@ -337,7 +341,7 @@ ReturnOrder --> End
 - 润色：[polish.txt:1-7](file://data/system-prompts/polish.txt#L1-L7)
 - 摘要：[summarize.txt:1-5](file://data/system-prompts/summarize.txt#L1-L5)
 
-章节来源
+**章节来源**
 - [data/system-prompts/*.txt:1-8](file://data/system-prompts/optimize.txt#L1-L8)
 
 ## 依赖关系分析
@@ -362,6 +366,8 @@ class AIService {
 +chatCompletionStream()
 +generateEmbedding()
 +rerankDocuments()
++generateCreativeContentStream()
++chatStream()
 }
 class Embeddings {
 +initEmbeddingCache()
@@ -390,19 +396,19 @@ Embeddings --> AIService : "生成向量"
 Embeddings --> DB : "读写向量"
 ```
 
-图表来源
-- [src/api/ai.ts:1-326](file://src/api/ai.ts#L1-L326)
+**图表来源**
+- [src/api/ai.ts:1-298](file://src/api/ai.ts#L1-L298)
 - [src/ai/service.ts:1-507](file://src/ai/service.ts#L1-L507)
 - [src/ai/embeddings.ts:1-228](file://src/ai/embeddings.ts#L1-L228)
 - [src/helper/rate-limit.ts:1-153](file://src/helper/rate-limit.ts#L1-L153)
-- [src/db.ts:1-200](file://src/db.ts#L1-L200)
+- [src/db.ts:1-484](file://src/db.ts#L1-L484)
 
-章节来源
-- [src/api/ai.ts:1-326](file://src/api/ai.ts#L1-L326)
+**章节来源**
+- [src/api/ai.ts:1-298](file://src/api/ai.ts#L1-L298)
 - [src/ai/service.ts:1-507](file://src/ai/service.ts#L1-L507)
 - [src/ai/embeddings.ts:1-228](file://src/ai/embeddings.ts#L1-L228)
 - [src/helper/rate-limit.ts:1-153](file://src/helper/rate-limit.ts#L1-L153)
-- [src/db.ts:1-200](file://src/db.ts#L1-L200)
+- [src/db.ts:1-484](file://src/db.ts#L1-L484)
 
 ## 性能考量
 - 嵌入缓存：内存Map避免重复向量化，初始化阶段批量生成缺失向量
@@ -411,6 +417,7 @@ Embeddings --> DB : "读写向量"
 - 超时控制：聊天与嵌入均设置超时，防止阻塞
 - 流式输出：SSE逐片断推送，降低首包延迟
 - 限流：避免外部服务过载，提升整体稳定性
+- **更新** 简化聊天上下文：移除标签过滤，仅依赖语义搜索，减少数据库查询开销
 
 ## 故障排查指南
 - AI不可用：
@@ -425,15 +432,19 @@ Embeddings --> DB : "读写向量"
 - 嵌入为空：
   - 检查DashScope API Key与网络
   - 清理缓存后重新初始化
+- **更新** 聊天上下文为空：
+  - 检查语义搜索是否正常工作
+  - 确认嵌入向量缓存是否已初始化
+  - 验证相似度阈值设置是否合理
 
-章节来源
+**章节来源**
 - [src/api/ai.ts:24-26](file://src/api/ai.ts#L24-L26)
 - [src/helper/rate-limit.ts:143-152](file://src/helper/rate-limit.ts#L143-L152)
 - [src/ai/service.ts:162-174](file://src/ai/service.ts#L162-L174)
 - [src/ai/embeddings.ts:38-64](file://src/ai/embeddings.ts#L38-L64)
 
 ## 结论
-本AI服务API通过清晰的分层设计与完善的配置体系，实现了多提供商聊天、嵌入向量检索与重排序、统一动作执行与对话式工作台。结合限流与缓存策略，在保证稳定性的同时提升了性能与用户体验。建议在生产环境中合理设置限流阈值与相似度阈值，并定期评估重排序候选TopN以平衡质量与成本。
+本AI服务API通过清晰的分层设计与完善的配置体系，实现了多提供商聊天、嵌入向量检索与重排序、统一动作执行与对话式工作台。结合限流与缓存策略，在保证稳定性的同时提升了性能与用户体验。**更新** 简化的聊天端点移除了标签上下文过滤，仅依赖语义搜索构建上下文，进一步优化了性能和用户体验。建议在生产环境中合理设置限流阈值与相似度阈值，并定期评估重排序候选TopN以平衡质量与成本。
 
 ## 附录
 
@@ -459,12 +470,12 @@ Embeddings --> DB : "读写向量"
   - 响应：处理结果
   - 示例路径：[请求体:127-157](file://src/api/ai.ts#L127-L157)、[响应:193-195](file://src/api/ai.ts#L193-L195)
 - /api/ai/chat
-  - 请求：POST（message/history/provider/model/tag）
+  - 请求：POST（message/history/provider/model）
   - 响应：SSE流
-  - 示例路径：[请求体:204-244](file://src/api/ai.ts#L204-L244)、[SSE流:282-325](file://src/api/ai.ts#L282-L325)
+  - 示例路径：[请求体:204-244](file://src/api/ai.ts#L204-L244)、[SSE流:255-297](file://src/api/ai.ts#L255-L297)
 
-章节来源
-- [src/api/ai.ts:23-325](file://src/api/ai.ts#L23-L325)
+**章节来源**
+- [src/api/ai.ts:23-298](file://src/api/ai.ts#L23-L298)
 
 ### AI提供商配置指南
 - ai.config.json
@@ -476,7 +487,8 @@ Embeddings --> DB : "读写向量"
   - 为每个提供商配置独立的API Key与endpoint
   - 在app.config.json中设置合理的超时、温度与最大token
   - 启用重排序时，适当提高候选TopN以提升召回质量
+  - **更新** 聊天端点已简化，建议适当调整相似度阈值以平衡上下文质量和性能
 
-章节来源
+**章节来源**
 - [ai.config.json:1-44](file://ai.config.json#L1-L44)
 - [app.config.json:1-22](file://app.config.json#L1-L22)

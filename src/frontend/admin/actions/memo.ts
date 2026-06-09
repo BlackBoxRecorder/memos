@@ -20,8 +20,6 @@ import {
   importLoading,
   importResult,
   importError,
-  dragOver,
-  fileInputRef,
   importExportTab,
   formAiMenuOpen,
   formAiMenuPos,

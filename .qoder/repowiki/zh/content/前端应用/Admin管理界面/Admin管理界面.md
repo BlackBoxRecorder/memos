@@ -12,23 +12,21 @@
 - [src/frontend/admin/components/TimelineSidebar.ts](file://src/frontend/admin/components/TimelineSidebar.ts)
 - [src/frontend/admin/components/ModelSelector.ts](file://src/frontend/admin/components/ModelSelector.ts)
 - [src/frontend/admin/components/ImportExportModal.ts](file://src/frontend/admin/components/ImportExportModal.ts)
-- [src/frontend/admin/components/ChatPanel.ts](file://src/frontend/admin/components/ChatPanel.ts)
-- [src/frontend/admin/components/GenerateModal.ts](file://src/frontend/admin/components/GenerateModal.ts)
+- [src/frontend/admin/components/GenerateBar.ts](file://src/frontend/admin/components/GenerateBar.ts)
+- [src/frontend/admin/components/PromptDrawer.ts](file://src/frontend/admin/components/PromptDrawer.ts)
 - [src/frontend/admin/actions/memo.ts](file://src/frontend/admin/actions/memo.ts)
 - [src/frontend/admin/actions/auth.ts](file://src/frontend/admin/actions/auth.ts)
 - [src/frontend/admin/actions/ai.ts](file://src/frontend/admin/actions/ai.ts)
 - [src/frontend/admin/actions/creative-core.ts](file://src/frontend/admin/actions/creative-core.ts)
-- [src/frontend/admin/actions/chat.ts](file://src/frontend/admin/actions/chat.ts)
 - [src/frontend/shared/styles/common.css](file://src/frontend/shared/styles/common.css)
 </cite>
 
 ## 更新摘要
 **变更内容**
-- 新增主题切换系统，支持明暗主题自动检测与手动切换
-- 实现AI菜单动态定位功能，支持智能菜单位置计算
-- 完善认证状态识别机制，优化登录检查流程
-- 增强ChatPanel组件布局与交互体验
-- 优化CreativeTab组件数据加载性能
+- 移除ChatPanel聊天面板组件和GenerateModal生成模态框组件
+- 移除相关的聊天功能和多模态生成系统
+- 简化组件架构，专注于备忘录管理和创意内容生成
+- 保留AI工具箱、标签系统、时间线侧边栏等核心功能
 
 ## 目录
 1. [简介](#简介)
@@ -45,7 +43,7 @@
 ## 简介
 本文件面向Admin管理界面，系统性阐述VanJS框架在Admin中的应用，包括响应式状态管理、组件化开发与事件处理机制。文档覆盖登录页面、主管理页面、备忘录管理、标签系统、公开/私密状态切换、AI工具箱集成、时间线侧边栏、以及表单模态框、导入导出模态框等交互组件。同时提供状态管理最佳实践与性能优化建议。
 
-**更新** 新增主题切换系统支持明暗主题自动检测与手动切换，AI菜单实现动态定位功能，认证状态识别得到完善优化。
+**更新** 移除了ChatPanel聊天面板组件和GenerateModal生成模态框组件，简化了组件架构，专注于核心的备忘录管理和创意内容生成功能。
 
 ## 项目结构
 Admin前端采用VanJS进行声明式UI构建，核心目录如下：
@@ -77,8 +75,8 @@ FORMMODAL["FormModal"]
 TIMELINE["TimelineSidebar"]
 MODELSEL["ModelSelector"]
 IMPORTMODAL["ImportExportModal"]
-GENMODAL["GenerateModal"]
-CHATPANEL["ChatPanel"]
+GENERATEBAR["GenerateBar"]
+PROMPTDRAWER["PromptDrawer"]
 CREATIVE["creative.ts"]
 end
 subgraph "动作层"
@@ -86,7 +84,6 @@ AUTH_ACT["actions/auth.ts"]
 MEMO_ACT["actions/memo.ts"]
 AI_ACT["actions/ai.ts"]
 CREATIVE_ACT["actions/creative-core.ts"]
-CHAT_ACT["actions/chat.ts"]
 end
 HTML --> APP
 APP --> THEME
@@ -100,14 +97,13 @@ ADMIN --> FORMMODAL
 ADMIN --> TIMELINE
 ADMIN --> MODELSEL
 ADMIN --> IMPORTMODAL
-ADMIN --> GENMODAL
-ADMIN --> CHATPANEL
+ADMIN --> GENERATEBAR
+ADMIN --> PROMPTDRAWER
 ADMIN --> CREATIVE
 LOGIN --> AUTH_ACT
 ADMIN --> MEMO_ACT
 ADMIN --> AI_ACT
 CREATIVE --> CREATIVE_ACT
-CHATPANEL --> CHAT_ACT
 ```
 
 **图表来源**
@@ -131,7 +127,8 @@ CHATPANEL --> CHAT_ACT
 - 导入/导出模态框：支持拖拽/文件选择导入与一键导出
 - AI工具箱：模型选择器、内容优化、创意写作（提示词+上下文）
 - 创意内容：提示词管理、生成流式输出、对话/列表视图
-- **ChatPanel组件**：重构后的对话面板，支持标签过滤、上下文预览和提示词快速调用
+- **GenerateBar组件**：重构后的生成栏，支持提示词选择、标签过滤和流式生成
+- **PromptDrawer组件**：提示词管理抽屉，支持新建、编辑、删除提示词
 - **主题切换系统**：支持明暗主题自动检测与手动切换，持久化用户偏好
 - **AI菜单动态定位**：智能计算菜单位置，避免超出屏幕边界
 
@@ -385,7 +382,7 @@ FM->>ACT : saveForm()
 ACT->>API : POST/PUT /api/memos
 API-->>ACT : 成功
 ACT->>ACT : loadMemos()
-ACT-->>U : 关闭模态框并刷新列表
+-->>U : 关闭模态框并刷新列表
 ```
 
 **图表来源**
@@ -405,137 +402,93 @@ ACT-->>U : 关闭模态框并刷新列表
 ```mermaid
 sequenceDiagram
 participant U as "用户"
-participant GM as "GenerateModal"
+participant GB as "GenerateBar"
 participant CC as "actions/creative-core.ts"
 participant ST as "state.ts"
 participant API as "后端API"
-U->>GM : 选择提示词/输入附加指令/选择上下文模式
-U->>GM : 点击"生成"
-GM->>CC : handleGenerate()
+U->>GB : 选择提示词/输入附加指令/选择标签
+U->>GB : 点击"生成"
+GB->>CC : handleGenerate()
 CC->>API : POST /api/creative/generate
 API-->>CC : SSE流式返回
 CC->>ST : 更新streamContent/streamDone
-ST-->>GM : 实时渲染生成内容
-U->>GM : 取消/关闭
-GM->>CC : closeGenerateModal()
+ST-->>GB : 实时渲染生成内容
+U->>GB : 取消/关闭
+GB->>CC : resetGeneration()
 CC->>ST : 重置状态
 ```
 
 **图表来源**
-- [src/frontend/admin/components/GenerateModal.ts](file://src/frontend/admin/components/GenerateModal.ts)
+- [src/frontend/admin/components/GenerateBar.ts](file://src/frontend/admin/components/GenerateBar.ts)
 - [src/frontend/admin/actions/creative-core.ts](file://src/frontend/admin/actions/creative-core.ts)
 
 **章节来源**
 - [src/frontend/admin/creative.ts](file://src/frontend/admin/creative.ts)
-- [src/frontend/admin/components/GenerateModal.ts](file://src/frontend/admin/components/GenerateModal.ts)
+- [src/frontend/admin/components/GenerateBar.ts](file://src/frontend/admin/components/GenerateBar.ts)
 - [src/frontend/admin/actions/creative-core.ts](file://src/frontend/admin/actions/creative-core.ts)
 
-### ChatPanel组件布局重构与功能增强
-**更新** ChatPanel组件已完成布局重构，从简单的对话列表重构为三段式布局设计，显著提升了用户体验和交互效率。
+### GenerateBar组件重构与功能增强
+**更新** GenerateBar组件已完成重构，从复杂的生成模态框简化为简洁的生成栏，显著提升了用户体验和交互效率。
 
-ChatPanel采用全新的三段式布局架构：
+GenerateBar采用全新的三段式布局架构：
 
-#### 1. 对话区域（Conversation Area）
-- **高度自适应**：占据剩余空间的flex:1布局，高度随窗口变化而动态调整
-- **滚动容器**：内置垂直滚动，支持大量对话内容的无缝浏览
-- **消息样式区分**：用户消息和AI消息采用不同的背景色和边框样式
-- **Markdown渲染**：支持消息内容的实时Markdown渲染
-- **流式显示**：AI回复支持实时流式显示，最后一条消息显示"思考中..."占位符
+#### 1. 提示词选择区域（Prompt Selector）
+- **提示词列表**：动态显示可用提示词，支持点击选择
+- **视觉反馈**：当前选中提示词显示高亮状态
+- **禁用状态**：生成过程中禁用所有提示词按钮
 
-#### 2. 底部固定区域（Bottom Section）
-- **固定位置**：始终位于屏幕底部，不随对话内容滚动
-- **状态栏**：显示上下文检索到的相关备忘录数量
-- **标签过滤器**：动态显示可用标签，支持一键切换上下文标签
-- **输入区域**：包含文本输入框和发送按钮，支持Enter快捷键发送
-- **操作按钮**：保存对话和新对话按钮
+#### 2. 标签过滤区域（Tag Filter）
+- **标签网格**：按行排列显示所有可用标签
+- **选择逻辑**：支持单选标签，点击切换选中状态
+- **空状态**：无标签时显示友好的提示信息
 
-#### 3. 提示词快速调用区（Prompt Quick Access）
-- **提示词按钮**：最多显示前5个可用提示词，支持一键插入到对话中
-- **提示词预览**：鼠标悬停显示完整提示词内容
-- **自动发送**：插入提示词后自动触发发送请求
+#### 3. 生成控制区域（Generate Control）
+- **输入区域**：文本域支持附加指令输入
+- **生成按钮**：条件启用，支持生成状态动画
+- **加载指示**：生成过程显示进度动画
+- **错误处理**：显示生成错误信息
 
 ```mermaid
 flowchart TD
-ChatPanel["ChatPanel布局重构"] --> ConversationArea["对话区域<br/>- flex:1高度<br/>- 垂直滚动<br/>- 消息样式区分<br/>- Markdown渲染"]
-ChatPanel --> BottomSection["底部固定区域<br/>- 固定位置<br/>- 状态栏<br/>- 标签过滤器<br/>- 输入区域<br/>- 操作按钮"]
-ChatPanel --> PromptButtons["提示词快速调用<br/>- 最多5个按钮<br/>- 悬停预览<br/>- 自动发送"]
+GenerateBar["GenerateBar布局重构"] --> PromptSelector["提示词选择区域<br/>- 提示词列表<br/>- 当前选中高亮<br/>- 生成时禁用"]
+GenerateBar --> TagSelector["标签过滤区域<br/>- 标签网格布局<br/>- 单选逻辑<br/>- 空状态处理"]
+GenerateBar --> GenerateControl["生成控制区域<br/>- 文本输入<br/>- 条件启用按钮<br/>- 加载动画<br/>- 错误显示"]
 ```
 
 **图表来源**
-- [src/frontend/admin/components/ChatPanel.ts:29-248](file://src/frontend/admin/components/ChatPanel.ts#L29-L248)
+- [src/frontend/admin/components/GenerateBar.ts:119-244](file://src/frontend/admin/components/GenerateBar.ts#L119-L244)
 
 **章节来源**
-- [src/frontend/admin/components/ChatPanel.ts:16-249](file://src/frontend/admin/components/ChatPanel.ts#L16-L249)
+- [src/frontend/admin/components/GenerateBar.ts:119-244](file://src/frontend/admin/components/GenerateBar.ts#L119-L244)
 
-### CreativeTab组件数据加载优化
-**更新** CreativeTab组件现已实现智能数据加载机制，防止无限数据加载循环
+### PromptDrawer组件重构与功能增强
+**更新** PromptDrawer组件已完成重构，从复杂的模态框简化为抽屉式管理界面，提升了提示词管理的便捷性。
 
-CreativeTab组件在首次渲染时会检查并设置数据加载状态标志，确保提示词和标签数据只加载一次：
+PromptDrawer采用左右分栏布局：
 
-- **promptsLoaded状态标志**：控制提示词数据的首次加载，防止重复请求
-- **tagsLoaded状态标志**：控制标签数据的首次加载，避免重复获取
-- **懒加载策略**：只有在数据为空时才触发加载，提升初始渲染性能
-- **状态管理**：使用van.state创建布尔标志，确保数据加载的幂等性
+#### 1. 提示词列表（左侧260px）
+- **新建按钮**：固定在顶部，便于快速创建新提示词
+- **列表滚动**：右侧滚动区域，支持大量提示词浏览
+- **选择状态**：当前选中提示词显示特殊样式
+- **空状态**：无提示词时显示引导信息
+
+#### 2. 提示词编辑器（右侧弹性）
+- **表单布局**：标题输入和内容编辑区域
+- **操作按钮**：取消和保存按钮
+- **删除功能**：编辑模式下显示删除按钮
+- **保存状态**：保存过程中禁用表单控件
 
 ```mermaid
 flowchart TD
-Start(["CreativeTab首次渲染"]) --> CheckPrompts["检查promptsLoaded状态"]
-CheckPrompts --> |false| LoadPrompts["设置promptsLoaded=true<br/>调用loadPrompts()"]
-CheckPrompts --> |true| CheckTags["检查tagsLoaded状态"]
-LoadPrompts --> CheckTags
-CheckTags --> |false| LoadTags["设置tagsLoaded=true<br/>调用loadTags()"]
-CheckTags --> |true| RenderContent["渲染内容"]
-LoadTags --> RenderContent
-RenderContent --> End(["完成渲染"])
+PromptDrawer["PromptDrawer重构"] --> LeftPanel["左侧列表面板<br/>- 260px固定宽度<br/>- 新建按钮<br/>- 滚动列表<br/>- 选择状态"]
+PromptDrawer --> RightPanel["右侧编辑面板<br/>- 弹性布局<br/>- 标题输入<br/>- 内容编辑<br/>- 操作按钮"]
 ```
 
 **图表来源**
-- [src/frontend/admin/creative.ts:222-231](file://src/frontend/admin/creative.ts#L222-L231)
-- [src/frontend/admin/state.ts:116](file://src/frontend/admin/state.ts#L116)
-- [src/frontend/admin/state.ts:171](file://src/frontend/admin/state.ts#L171)
+- [src/frontend/admin/components/PromptDrawer.ts:225-276](file://src/frontend/admin/components/PromptDrawer.ts#L225-L276)
 
 **章节来源**
-- [src/frontend/admin/creative.ts:222-231](file://src/frontend/admin/creative.ts#L222-L231)
-- [src/frontend/admin/state.ts:116](file://src/frontend/admin/state.ts#L116)
-- [src/frontend/admin/state.ts:171](file://src/frontend/admin/state.ts#L171)
-
-### AI聊天对话功能
-**更新** 新增完整的AI聊天对话功能，支持流式响应和上下文管理
-
-AI聊天功能通过ChatPanel组件实现，具备以下特性：
-
-- **流式响应**：使用SSE技术实现实时流式响应，支持"思考中..."占位符
-- **上下文管理**：支持按标签过滤的上下文备忘录检索
-- **历史记录**：维护完整的对话历史，支持保存为创意内容
-- **中断机制**：支持取消正在进行的AI响应
-- **标签过滤**：动态显示可用标签，支持一键切换上下文范围
-
-```mermaid
-sequenceDiagram
-participant U as "用户"
-participant CP as "ChatPanel"
-participant CA as "actions/chat.ts"
-participant ST as "state.ts"
-participant API as "后端API"
-U->>CP : 输入消息并发送
-CP->>CA : sendChatMessage()
-CA->>ST : 更新chatMessages/聊天状态
-CA->>API : POST /api/ai/chat (SSE)
-API-->>CA : 流式返回AI响应
-CA->>ST : 实时更新chatMessages
-ST-->>CP : 渲染流式内容
-U->>CP : 保存对话/新对话
-CP->>CA : saveChatAsCreative()/newChat()
-CA->>API : 保存/重置对话
-```
-
-**图表来源**
-- [src/frontend/admin/components/ChatPanel.ts:16-249](file://src/frontend/admin/components/ChatPanel.ts#L16-L249)
-- [src/frontend/admin/actions/chat.ts:16-89](file://src/frontend/admin/actions/chat.ts#L16-L89)
-
-**章节来源**
-- [src/frontend/admin/components/ChatPanel.ts:16-249](file://src/frontend/admin/components/ChatPanel.ts#L16-L249)
-- [src/frontend/admin/actions/chat.ts:16-131](file://src/frontend/admin/actions/chat.ts#L16-L131)
+- [src/frontend/admin/components/PromptDrawer.ts:225-276](file://src/frontend/admin/components/PromptDrawer.ts#L225-L276)
 
 ### 主题切换系统
 **新增** Admin界面现已集成完整的主题切换系统，支持明暗主题自动检测与手动切换。
@@ -572,11 +525,11 @@ SaveToStorage --> ApplyTheme
 ```
 
 **图表来源**
-- [src/frontend/admin/app.ts:50-71](file://src/frontend/admin/app.ts#L50-L71)
+- [src/frontend/admin/app.ts:55-81](file://src/frontend/admin/app.ts#L55-L81)
 - [src/frontend/shared/styles/common.css:1-77](file://src/frontend/shared/styles/common.css#L1-L77)
 
 **章节来源**
-- [src/frontend/admin/app.ts:50-71](file://src/frontend/admin/app.ts#L50-L71)
+- [src/frontend/admin/app.ts:55-81](file://src/frontend/admin/app.ts#L55-L81)
 - [src/frontend/shared/styles/common.css:1-77](file://src/frontend/shared/styles/common.css#L1-L77)
 
 ### AI菜单动态定位
@@ -621,12 +574,12 @@ SetPosition --> RenderMenu["渲染菜单"]
 ```
 
 **图表来源**
-- [src/frontend/admin/actions/ai.ts:176-209](file://src/frontend/admin/actions/ai.ts#L176-L209)
+- [src/frontend/admin/actions/ai.ts:181-209](file://src/frontend/admin/actions/ai.ts#L181-L209)
 - [src/frontend/admin/components/MemoCard.ts:174-280](file://src/frontend/admin/components/MemoCard.ts#L174-L280)
 - [src/frontend/admin/components/FormModal.ts:277-375](file://src/frontend/admin/components/FormModal.ts#L277-L375)
 
 **章节来源**
-- [src/frontend/admin/actions/ai.ts:176-209](file://src/frontend/admin/actions/ai.ts#L176-L209)
+- [src/frontend/admin/actions/ai.ts:181-209](file://src/frontend/admin/actions/ai.ts#L181-L209)
 - [src/frontend/admin/components/MemoCard.ts:174-280](file://src/frontend/admin/components/MemoCard.ts#L174-L280)
 - [src/frontend/admin/components/FormModal.ts:277-375](file://src/frontend/admin/components/FormModal.ts#L277-L375)
 
@@ -665,11 +618,11 @@ LoginSuccess --> LoadData
 
 **图表来源**
 - [src/frontend/admin/actions/auth.ts:12-25](file://src/frontend/admin/actions/auth.ts#L12-L25)
-- [src/frontend/admin/app.ts:258-270](file://src/frontend/admin/app.ts#L258-L270)
+- [src/frontend/admin/app.ts:270-277](file://src/frontend/admin/app.ts#L270-L277)
 
 **章节来源**
 - [src/frontend/admin/actions/auth.ts:12-25](file://src/frontend/admin/actions/auth.ts#L12-L25)
-- [src/frontend/admin/app.ts:258-270](file://src/frontend/admin/app.ts#L258-L270)
+- [src/frontend/admin/app.ts:270-277](file://src/frontend/admin/app.ts#L270-L277)
 
 ## 依赖关系分析
 
@@ -681,10 +634,7 @@ APP --> AUTH_ACT["actions/auth.ts"]
 APP --> MEMO_ACT["actions/memo.ts"]
 APP --> AI_ACT["actions/ai.ts"]
 APP --> CREATIVE["creative.ts"]
-APP --> CHATPANEL["ChatPanel.ts"]
-APP --> THEME["主题系统"]
 CREATIVE --> CREATIVE_ACT["actions/creative-core.ts"]
-CHATPANEL --> CHAT_ACT["actions/chat.ts"]
 MEMOCARD["MemoCard.ts"] --> MEMO_ACT
 MEMOCARD --> AI_ACT
 FORMMODAL["FormModal.ts"] --> MEMO_ACT
@@ -693,7 +643,8 @@ TIMELINE["TimelineSidebar.ts"] --> STATE
 MODELSEL["ModelSelector.ts"] --> AI_STATE
 MODELSEL --> STATE
 IMPORTMODAL["ImportExportModal.ts"] --> MEMO_ACT
-GENMODAL["GenerateModal.ts"] --> CREATIVE_ACT
+GENERATEBAR["GenerateBar.ts"] --> CREATIVE_ACT
+PROMPTDRAWER["PromptDrawer.ts"] --> CREATIVE_ACT
 THEME --> COMMON_CSS["common.css"]
 THEME --> THEME_STATE["theme状态"]
 ```
@@ -712,9 +663,8 @@ THEME --> THEME_STATE["theme状态"]
 - [src/frontend/admin/components/TimelineSidebar.ts](file://src/frontend/admin/components/TimelineSidebar.ts)
 - [src/frontend/admin/components/ModelSelector.ts](file://src/frontend/admin/components/ModelSelector.ts)
 - [src/frontend/admin/components/ImportExportModal.ts](file://src/frontend/admin/components/ImportExportModal.ts)
-- [src/frontend/admin/components/GenerateModal.ts](file://src/frontend/admin/components/GenerateModal.ts)
-- [src/frontend/admin/components/ChatPanel.ts](file://src/frontend/admin/components/ChatPanel.ts)
-- [src/frontend/admin/actions/chat.ts](file://src/frontend/admin/actions/chat.ts)
+- [src/frontend/admin/components/GenerateBar.ts](file://src/frontend/admin/components/GenerateBar.ts)
+- [src/frontend/admin/components/PromptDrawer.ts](file://src/frontend/admin/components/PromptDrawer.ts)
 - [src/frontend/shared/styles/common.css](file://src/frontend/shared/styles/common.css)
 
 **章节来源**
@@ -728,23 +678,24 @@ THEME --> THEME_STATE["theme状态"]
 - 懒加载：首次进入CreativeTab时才加载提示词与标签，使用promptsLoaded和tagsLoaded标志防止重复加载
 - DOM节流：流式生成使用requestAnimationFrame合并更新
 - 本地存储：模型选择持久化减少重复请求
-- **ChatPanel优化**：对话区域使用虚拟滚动和消息缓存，避免大量DOM节点的频繁重渲染
-- **内存管理**：聊天消息采用增量更新策略，只更新变化的部分
+- **GenerateBar优化**：采用简洁的三段式布局，减少DOM层级和重绘开销
+- **PromptDrawer优化**：左右分栏布局，提升提示词管理效率
 - **主题切换优化**：主题状态持久化到localStorage，避免重复计算
 - **AI菜单定位优化**：使用预设尺寸估算，减少布局计算开销
 - **认证状态优化**：异步检查认证状态，避免阻塞UI渲染
 
-**更新** 新增主题切换系统显著提升了用户体验，通过CSS变量实现即时主题切换。AI菜单动态定位功能优化了菜单显示效果，避免超出屏幕边界。认证状态识别机制得到完善，提供了更好的错误处理和用户反馈。
+**更新** 移除了ChatPanel和GenerateModal组件，简化了组件架构，减少了不必要的状态管理和DOM节点。GenerateBar和PromptDrawer的重构显著提升了性能和用户体验。
 
 ## 故障排查指南
 - 登录失败：检查密钥是否正确，查看全局错误提示
 - 加载失败：关注全局错误banner，确认网络连通与后端服务状态
 - AI不可用：检查AI状态与模型加载，确认默认模型是否有效
 - 导入失败：确认文件格式为.txt，查看错误信息并重试
-- 生成异常：检查提示词选择、附加指令、上下文模式与网络连接
+- 生成异常：检查提示词选择、附加指令、标签选择与网络连接
 - CreativeTab数据加载异常：检查promptsLoaded和tagsLoaded状态标志是否正确设置
-- **ChatPanel问题**：检查SSE连接状态、标签过滤器是否正常工作、消息流是否中断
-- **内存泄漏**：确认聊天消息及时清理，避免长时间对话导致的内存占用
+- **GenerateBar问题**：检查提示词列表是否正确加载、标签选择逻辑是否正常
+- **PromptDrawer问题**：检查提示词列表滚动、编辑器表单状态、删除功能
+- **内存泄漏**：确认流式生成及时中断，避免长时间生成导致的内存占用
 - **主题切换问题**：检查localStorage权限、CSS变量是否正确应用
 - **AI菜单定位异常**：确认按钮元素是否正确获取、边界检测计算是否准确
 - **认证状态异常**：检查checkAuth()调用、API响应格式、状态更新逻辑
@@ -755,12 +706,11 @@ THEME --> THEME_STATE["theme状态"]
 - [src/frontend/admin/actions/memo.ts](file://src/frontend/admin/actions/memo.ts)
 - [src/frontend/admin/actions/ai.ts](file://src/frontend/admin/actions/ai.ts)
 - [src/frontend/admin/actions/creative-core.ts](file://src/frontend/admin/actions/creative-core.ts)
-- [src/frontend/admin/actions/chat.ts](file://src/frontend/admin/actions/chat.ts)
 
 ## 结论
 Admin管理界面以VanJS为核心，通过清晰的状态层、组件层与动作层实现高内聚低耦合的架构。借助响应式状态与事件驱动，实现了登录认证、备忘录管理、标签系统、公开/私密切换、AI工具箱与创意写作的完整闭环。时间线侧边栏与模态框提升了交互效率。
 
-**更新** 新增的主题切换系统显著提升了用户体验，支持明暗主题的自动检测与手动切换。AI菜单动态定位功能优化了菜单显示效果，确保在各种屏幕尺寸下的良好体验。认证状态识别机制得到完善，提供了更好的错误处理和用户反馈。ChatPanel组件的布局重构显著提升了对话体验，采用三段式布局设计使界面更加直观和高效。CreativeTab组件的数据加载优化确保了应用的稳定性和性能。
+**更新** 移除了ChatPanel和GenerateModal组件，简化了组件架构，专注于核心的备忘录管理和创意内容生成功能。GenerateBar和PromptDrawer的重构显著提升了用户体验和性能表现。主题切换系统和AI菜单动态定位功能保持了原有的高质量体验。
 
 遵循本文的状态管理与性能优化建议，可进一步提升用户体验与系统稳定性。
 
@@ -771,7 +721,8 @@ Admin管理界面以VanJS为核心，通过清晰的状态层、组件层与动�
   - 对耗时操作（AI建议、生成、聊天）提供中断能力与错误兜底
   - 合理使用缓存与懒加载，降低首屏与频繁操作的延迟
   - 在组件初始化时使用状态标志防止重复数据加载
-  - **ChatPanel优化**：利用流式渲染和增量更新策略提升大消息处理性能
+  - **GenerateBar优化**：采用简洁布局减少DOM层级，提升渲染性能
+  - **PromptDrawer优化**：左右分栏布局提升提示词管理效率
   - **主题系统优化**：使用CSS变量实现即时主题切换，避免重排重绘
   - **AI菜单优化**：使用预设尺寸估算减少布局计算开销
   - **认证状态优化**：异步检查认证状态，避免阻塞UI渲染
@@ -780,7 +731,8 @@ Admin管理界面以VanJS为核心，通过清晰的状态层、组件层与动�
   - 时间线不更新：确认数据变更后是否更新缓存与selectedMonth
   - AI结果不显示：检查aiPanelMemoId与aiPanelResult状态联动
   - CreativeTab数据加载循环：确认promptsLoaded和tagsLoaded标志正确设置
-  - **ChatPanel流式显示异常**：检查SSE连接状态和消息流完整性
+  - **GenerateBar流式显示异常**：检查SSE连接状态和消息流完整性
+  - **PromptDrawer表单状态异常**：检查保存状态和删除确认逻辑
   - **标签过滤失效**：确认availableTags状态正确更新且过滤逻辑正常
   - **主题切换失效**：检查localStorage权限和CSS变量应用
   - **AI菜单定位错误**：确认按钮元素获取和边界检测计算
