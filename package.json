@@ -4,7 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "bun run --watch src/server.ts",
+    "dev": "bun run build && bun run --watch src/server.ts",
     "build:masonry": "bun build src/frontend/masonry/index.ts --outdir=dist/masonry --target=browser --format=esm",
     "build:admin": "bun build src/frontend/admin/app.ts --outdir=dist/admin --target=browser --format=esm",
     "build": "bun run build:masonry && bun run build:admin",
