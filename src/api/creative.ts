@@ -163,13 +163,14 @@ creativeApp.post("/generate", authMiddleware, async (c) => {
     contextMemoIds = memos.map((m) => m.id).join(",");
   }
 
-  // Build SSE stream
+  // Build SSE stream with abort support for client disconnect
   const encoder = new TextEncoder();
   const scopePromptId = body.prompt_id;
   const scopeExtraPrompt = body.extra_prompt.trim();
   const scopeProvider = body.provider;
   const scopeModel = body.model;
 
+  const abortController = new AbortController();
   const stream = new ReadableStream({
     async start(controller) {
       let fullContent = "";
@@ -180,6 +181,7 @@ creativeApp.post("/generate", authMiddleware, async (c) => {
           contextMemos,
           scopeProvider,
           scopeModel,
+          abortController.signal,
         );
 
         for await (const chunk of gen) {
@@ -200,6 +202,11 @@ creativeApp.post("/generate", authMiddleware, async (c) => {
         controller.enqueue(encoder.encode(`data: ${doneMsg}\n\n`));
         controller.close();
       } catch (err) {
+        // Suppress AbortError when client disconnects intentionally
+        if (err instanceof Error && err.name === "AbortError") {
+          try { controller.close(); } catch { /* already closed */ }
+          return;
+        }
         const errorMsg = JSON.stringify({
           type: "error",
           error: (err as Error).message || "Generation failed",
@@ -207,6 +214,9 @@ creativeApp.post("/generate", authMiddleware, async (c) => {
         controller.enqueue(encoder.encode(`data: ${errorMsg}\n\n`));
         controller.close();
       }
+    },
+    cancel() {
+      abortController.abort();
     },
   });
 

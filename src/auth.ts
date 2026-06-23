@@ -106,6 +106,16 @@ export function clearLoginAttempts(ip: string): void {
   loginAttempts.delete(ip);
 }
 
+// Periodic cleanup to prevent unbounded memory growth from stale IP entries
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of loginAttempts) {
+    if (now - entry.firstAttempt > LOGIN_COOLDOWN_MS) {
+      loginAttempts.delete(ip);
+    }
+  }
+}, 60_000);
+
 // 返回 null 表示认证通过，否则返回 401 Response
 // 同时支持 session cookie 和 Bearer token 两种认证方式
 export function requireAuth(request: Request): Response | null {

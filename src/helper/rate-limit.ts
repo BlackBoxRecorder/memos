@@ -150,3 +150,18 @@ export function formatRateLimitError(
   const retrySeconds = Math.ceil(err.retryAfterMs / 1000);
   return `速率限制：每${err.limit === "hourly" ? "小时" : "天"}${label}上限 ${limitCount} 次。请在 ${retrySeconds} 秒后重试。`;
 }
+
+// Periodic cleanup to prevent unbounded memory growth from stale IP entries
+setInterval(() => {
+  const hourWindow = getHourWindowStart();
+  const dayWindow = getDayWindowStart();
+  for (const [key, entry] of rateLimitMap) {
+    // Remove entry if both hourly and daily windows are expired
+    if (
+      entry.hourly.windowStart !== hourWindow &&
+      entry.daily.windowStart !== dayWindow
+    ) {
+      rateLimitMap.delete(key);
+    }
+  }
+}, 60_000);

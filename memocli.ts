@@ -36,6 +36,13 @@ function parseArgs(args: string[]): Options {
       case "--tag": {
         const raw = args[++i];
         if (raw) {
+          // Guard against accidentally consuming the next flag as a tag value
+          if (raw.startsWith("-")) {
+            console.error(
+              `\u274C 错误: -t/--tag 后需要标签值，但收到了标志参数 "${raw}"`,
+            );
+            process.exit(1);
+          }
           opts.tags = raw
             .split(",")
             .map((t) => t.trim())

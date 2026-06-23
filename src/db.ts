@@ -93,13 +93,17 @@ interface CreativeRow {
 function parseTags(raw: string): string[] {
   try {
     const parsed = JSON.parse(raw);
+    // Handle both array format (normal) and legacy single-string format
     if (Array.isArray(parsed)) {
       return parsed.filter(
         (t: unknown): t is string => typeof t === "string" && t.length > 0,
       );
     }
+    if (typeof parsed === "string" && parsed.length > 0) {
+      return [parsed];
+    }
   } catch {
-    // legacy: if old data has a plain string tag, wrap it
+    // legacy: if old data has a plain string tag (not JSON-encoded), wrap it
     if (typeof raw === "string" && raw.length > 0) {
       return [raw];
     }

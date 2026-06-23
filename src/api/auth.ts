@@ -14,16 +14,10 @@ import {
 const SECRET_KEY = (() => {
   const key = process.env.MEMOS_SECRET_KEY;
   if (key) return key;
-  if (process.env.NODE_ENV === "production") {
-    console.error(
-      "FATAL: MEMOS_SECRET_KEY environment variable is not set in production. Exiting.",
-    );
-    process.exit(1);
-  }
-  console.warn(
-    "WARNING: Using default MEMOS_SECRET_KEY. Set MEMOS_SECRET_KEY in production!",
+  console.error(
+    "FATAL: MEMOS_SECRET_KEY environment variable is not set. Exiting.",
   );
-  return "123";
+  process.exit(1);
 })();
 
 export const authApp = new Hono();

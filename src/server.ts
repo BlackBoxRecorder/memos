@@ -128,9 +128,17 @@ initSeedData();
 await initEmbeddingCache();
 
 // 启动服务器
-Bun.serve({
-  port: PORT,
-  fetch: app.fetch,
-});
-
-console.log(`Memos server running at http://localhost:${PORT}`);
+try {
+  Bun.serve({
+    port: PORT,
+    fetch: app.fetch,
+  });
+  console.log(`Memos server running at http://localhost:${PORT}`);
+} catch (err: any) {
+  if (err?.code === "EADDRINUSE") {
+    console.error(`\u274C 端口 ${PORT} 已被占用，请先关闭占用进程或设置 PORT 环境变量使用其他端口`);
+    process.exit(1);
+  }
+  console.error(`\u274C 服务器启动失败:`, err);
+  process.exit(1);
+}
