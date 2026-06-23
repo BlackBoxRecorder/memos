@@ -218,11 +218,21 @@ aiApp.post("/chat", authMiddleware, async (c) => {
   recordRateLimit(ip, "ai");
 
   const message = body.message.trim();
-  const history: ChatMessage[] = Array.isArray(body.history)
-    ? body.history.filter(
-        (h) => h && typeof h.role === "string" && typeof h.content === "string",
-      )
-    : [];
+
+  // Enforce maximum history length to prevent DoS via oversized payloads
+  const MAX_HISTORY_LENGTH = 100;
+  const rawHistory = Array.isArray(body.history) ? body.history : [];
+  if (rawHistory.length > MAX_HISTORY_LENGTH) {
+    return c.json(
+      {
+        error: `History exceeds maximum length of ${MAX_HISTORY_LENGTH} messages`,
+      },
+      400,
+    );
+  }
+  const history: ChatMessage[] = rawHistory.filter(
+    (h) => h && typeof h.role === "string" && typeof h.content === "string",
+  );
 
   // Build context via semantic search
   let contextMemos: string[] = [];
@@ -237,8 +247,9 @@ aiApp.post("/chat", authMiddleware, async (c) => {
     // Semantic search failed, continue without context
   }
 
-  // Build SSE stream
+  // Build SSE stream with abort support for client disconnect
   const encoder = new TextEncoder();
+  const abortController = new AbortController();
   const stream = new ReadableStream({
     async start(controller) {
       try {
@@ -248,6 +259,7 @@ aiApp.post("/chat", authMiddleware, async (c) => {
           contextMemos,
           body.provider,
           body.model,
+          abortController.signal,
         );
 
         for await (const chunk of gen) {
@@ -262,6 +274,19 @@ aiApp.post("/chat", authMiddleware, async (c) => {
         );
         controller.close();
       } catch (err) {
+        // Suppress AbortError when client disconnects intentionally
+        // Also check signal.aborted to catch non-standard abort exceptions (e.g. during reader.read())
+        if (
+          err instanceof Error &&
+          (err.name === "AbortError" || abortController.signal.aborted)
+        ) {
+          try {
+            controller.close();
+          } catch {
+            /* already closed */
+          }
+          return;
+        }
         const msg = err instanceof Error ? err.message : String(err);
         controller.enqueue(
           encoder.encode(
@@ -270,6 +295,9 @@ aiApp.post("/chat", authMiddleware, async (c) => {
         );
         controller.close();
       }
+    },
+    cancel() {
+      abortController.abort();
     },
   });
 

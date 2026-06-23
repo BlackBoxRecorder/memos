@@ -10,6 +10,7 @@ import {
   creativeContentExists,
   getDb,
 } from "../db";
+import { generateAndStoreEmbedding } from "../ai/embeddings";
 import type { Memo, CreativeItem } from "../model";
 
 export const exportImportApp = new Hono();
@@ -229,9 +230,7 @@ function parseFlomoHTML(html: string): FlomoRecord[] {
     const block = match[1]!;
 
     // 提取时间
-    const timeMatch = block.match(
-      /<div class="time">\s*(.*?)\s*<\/div>/,
-    );
+    const timeMatch = block.match(/<div class="time">\s*(.*?)\s*<\/div>/);
     const time = timeMatch ? timeMatch[1]!.trim() : "";
 
     // 提取内容 HTML
@@ -316,6 +315,7 @@ exportImportApp.post("/import", authMiddleware, async (c) => {
   let deduped = 0;
   const errors: string[] = [];
   let defaultPromptId: number | null = null;
+  const importedMemoIds: number[] = [];
 
   for (let i = 0; i < blocks.length; i++) {
     const record = parseRecord(blocks[i]!);
@@ -332,7 +332,7 @@ exportImportApp.post("/import", authMiddleware, async (c) => {
           deduped++;
           continue;
         }
-        importMemo({
+        const memo = importMemo({
           content: record.content,
           tags: record.tags,
           is_public: !record.isPrivate,
@@ -341,6 +341,7 @@ exportImportApp.post("/import", authMiddleware, async (c) => {
             record.date ||
             new Date().toISOString().replace("T", " ").slice(0, 19),
         });
+        importedMemoIds.push(memo.id);
         imported++;
       } else if (record.type === "creative") {
         // Dedup: skip if content already exists in database
@@ -364,6 +365,25 @@ exportImportApp.post("/import", authMiddleware, async (c) => {
       skipped++;
       errors.push(
         `Record ${i + 1}: ${(err as Error).message || "import failed"}`,
+      );
+    }
+  }
+
+  // Generate embeddings with concurrency control to avoid overwhelming the API
+  if (importedMemoIds.length > 0) {
+    const CONCURRENCY = 5;
+    const memos = getMemos({ includePrivate: true, ids: importedMemoIds });
+    for (let i = 0; i < memos.length; i += CONCURRENCY) {
+      const chunk = memos.slice(i, i + CONCURRENCY);
+      await Promise.allSettled(
+        chunk.map((memo) =>
+          generateAndStoreEmbedding(memo.id, memo.content).catch((err) =>
+            console.error(
+              "Embedding generation failed for imported memo:",
+              err,
+            ),
+          ),
+        ),
       );
     }
   }
@@ -419,6 +439,7 @@ exportImportApp.post("/import-flomo", authMiddleware, async (c) => {
   let imported = 0;
   let skipped = 0;
   const errors: string[] = [];
+  const importedMemoIds: number[] = [];
 
   for (let i = 0; i < records.length; i++) {
     const record = records[i]!;
@@ -431,7 +452,7 @@ exportImportApp.post("/import-flomo", authMiddleware, async (c) => {
       }
 
       // 导入
-      importMemo({
+      const memo = importMemo({
         content: record.content,
         tags: record.tags,
         is_public: false,
@@ -439,11 +460,31 @@ exportImportApp.post("/import-flomo", authMiddleware, async (c) => {
           record.time ||
           new Date().toISOString().replace("T", " ").slice(0, 19),
       });
+      importedMemoIds.push(memo.id);
       imported++;
     } catch (err) {
       skipped++;
       errors.push(
         `Record ${i + 1}: ${(err as Error).message || "import failed"}`,
+      );
+    }
+  }
+
+  // Generate embeddings with concurrency control to avoid overwhelming the API
+  if (importedMemoIds.length > 0) {
+    const CONCURRENCY = 5;
+    const memos = getMemos({ includePrivate: true, ids: importedMemoIds });
+    for (let i = 0; i < memos.length; i += CONCURRENCY) {
+      const chunk = memos.slice(i, i + CONCURRENCY);
+      await Promise.allSettled(
+        chunk.map((memo) =>
+          generateAndStoreEmbedding(memo.id, memo.content).catch((err) =>
+            console.error(
+              "Embedding generation failed for imported memo:",
+              err,
+            ),
+          ),
+        ),
       );
     }
   }

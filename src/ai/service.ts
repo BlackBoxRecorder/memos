@@ -46,10 +46,20 @@ function loadConfig(): AiConfig {
     const parsed = JSON.parse(raw) as AiConfig;
     if (parsed && parsed.providers && Array.isArray(parsed.providers)) {
       _config = parsed;
+      console.log("[ai-config] Loaded from ai.config.json");
       return _config;
     }
-  } catch {
-    // Config file not found or invalid, fall through to fallback
+    console.warn(
+      "[ai-config] ai.config.json exists but providers field is missing or invalid, using fallback",
+    );
+  } catch (err: any) {
+    if (err?.code === "ENOENT") {
+      console.log("[ai-config] ai.config.json not found, using fallback (DeepSeek only)");
+    } else {
+      console.warn(
+        `[ai-config] Failed to parse ai.config.json: ${err?.message || err}, using fallback`,
+      );
+    }
   }
   // Fallback: DeepSeek-only for backward compatibility
   _config = {
@@ -179,7 +189,7 @@ async function* chatCompletionStream(
   providerId: string,
   model: string,
   messages: Array<{ role: string; content: string }>,
-  opts?: { temperature?: number; max_tokens?: number },
+  opts?: { temperature?: number; max_tokens?: number; signal?: AbortSignal },
 ): AsyncGenerator<string> {
   const resolved = resolveProvider(providerId);
   if (!resolved) {
@@ -187,6 +197,12 @@ async function* chatCompletionStream(
       `AI provider "${providerId}" not configured (missing API key or config entry)`,
     );
   }
+
+  // Combine timeout signal with optional external signal (e.g. client disconnect)
+  const timeoutSignal = AbortSignal.timeout(aiTimeout());
+  const signal = opts?.signal
+    ? AbortSignal.any([timeoutSignal, opts.signal])
+    : timeoutSignal;
 
   const res = await fetch(resolved.baseUrl, {
     method: "POST",
@@ -201,7 +217,7 @@ async function* chatCompletionStream(
       max_tokens: opts?.max_tokens ?? getAppConfig().ai.defaultMaxTokens,
       stream: true,
     }),
-    signal: AbortSignal.timeout(aiTimeout()),
+    signal,
   });
 
   if (!res.ok) {
@@ -232,6 +248,21 @@ async function* chatCompletionStream(
       const data = trimmed.slice(6);
       if (data === "[DONE]") return;
 
+      try {
+        const parsed = JSON.parse(data);
+        const content = parsed?.choices?.[0]?.delta?.content;
+        if (content) yield content;
+      } catch {
+        // skip unparseable lines
+      }
+    }
+  }
+
+  // Process any residual data left in the buffer after stream ends
+  if (buffer.trim()) {
+    const trimmed = buffer.trim();
+    if (trimmed.startsWith("data: ") && trimmed !== "data: [DONE]") {
+      const data = trimmed.slice(6);
       try {
         const parsed = JSON.parse(data);
         const content = parsed?.choices?.[0]?.delta?.content;
@@ -447,6 +478,7 @@ export async function* generateCreativeContentStream(
   contextMemos: string[],
   providerId?: string,
   model?: string,
+  signal?: AbortSignal,
 ): AsyncGenerator<string> {
   const pid = providerId || getDefaultProviderId();
   const mdl = model || getDefaultModel();
@@ -467,7 +499,7 @@ export async function* generateCreativeContentStream(
       role: "user",
       content: `\n\n附加说明：${extraPrompt}${contextText}\n\n请根据以上所有内容生成创意输出。`,
     },
-  ]);
+  ], signal ? { signal } : undefined);
 }
 
 // --- Chat Workspace (Phase 2) ---
@@ -478,6 +510,7 @@ export async function* chatStream(
   contextMemos: string[],
   providerId?: string,
   model?: string,
+  signal?: AbortSignal,
 ): AsyncGenerator<string> {
   const pid = providerId || getDefaultProviderId();
   const mdl = model || getDefaultModel();
@@ -497,5 +530,5 @@ export async function* chatStream(
     { role: "user", content: message },
   ];
 
-  yield* chatCompletionStream(pid, mdl, messages);
+  yield* chatCompletionStream(pid, mdl, messages, signal ? { signal } : undefined);
 }

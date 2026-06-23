@@ -65,7 +65,12 @@ export async function initEmbeddingCache(): Promise<void> {
 
 export function upsertEmbedding(memoId: number, embedding: Float32Array): void {
   cache.set(memoId, embedding);
-  const buf = Buffer.from(embedding.buffer);
+  // Use byteOffset/byteLength to handle Float32Array subviews correctly
+  const buf = Buffer.from(
+    embedding.buffer,
+    embedding.byteOffset,
+    embedding.byteLength,
+  );
   saveEmbedding(memoId, buf);
 }
 

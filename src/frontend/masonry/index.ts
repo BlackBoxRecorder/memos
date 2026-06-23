@@ -6,19 +6,19 @@ import { apiUrl } from "../../helper/util";
 
 // --- auth check ---
 async function checkAuth(): Promise<void> {
-    try {
-        const resp = await fetch(apiUrl("api/auth/check"), {
-            credentials: "same-origin",
-        });
-        if (resp.ok) {
-            const data: { authenticated: boolean } = await resp.json();
-            authenticated.val = data.authenticated;
-        } else {
-            authenticated.val = false;
-        }
-    } catch {
-        authenticated.val = false;
+  try {
+    const resp = await fetch(apiUrl("api/auth/check"), {
+      credentials: "same-origin",
+    });
+    if (resp.ok) {
+      const data: { authenticated: boolean } = await resp.json();
+      authenticated.val = data.authenticated;
+    } else {
+      authenticated.val = false;
     }
+  } catch {
+    authenticated.val = false;
+  }
 }
 
 // --- initialisation ---
@@ -35,16 +35,12 @@ const appEl = document.getElementById("app")!;
 const root = App();
 van.add(appEl, root);
 
-// Load data (check auth in parallel, reload if needed)
+// Load data — wait for auth check first to avoid duplicate requests
 (async () => {
-    const authPromise = checkAuth();
-    loadTags();
-    loadCount();
-    windowWidth.val = document.documentElement.clientWidth;
-    fetchAndRender(0);
-    await authPromise;
-    if (authenticated.val === true) {
-        loadCount();
-        fetchAndRender(0);
-    }
+  const authPromise = checkAuth();
+  windowWidth.val = document.documentElement.clientWidth;
+  await authPromise;
+  loadTags();
+  loadCount();
+  fetchAndRender(0);
 })();

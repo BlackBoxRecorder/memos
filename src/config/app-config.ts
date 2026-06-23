@@ -55,6 +55,26 @@ const FALLBACK: AppConfig = {
 let _config: AppConfig | null = null;
 
 function loadConfig(): AppConfig {
+  // Helper: validate numeric config value, fallback on wrong type
+  const safeNum = (val: unknown, fallback: number, name: string): number => {
+    if (typeof val === "number" && !isNaN(val)) return val;
+    if (val !== undefined && val !== null) {
+      console.warn(
+        `[app-config] Invalid type for "${name}" (expected number, got ${typeof val} = ${JSON.stringify(val)}), using fallback: ${fallback}`,
+      );
+    }
+    return fallback;
+  };
+  const safeBool = (val: unknown, fallback: boolean, name: string): boolean => {
+    if (typeof val === "boolean") return val;
+    if (val !== undefined && val !== null) {
+      console.warn(
+        `[app-config] Invalid type for "${name}" (expected boolean, got ${typeof val} = ${JSON.stringify(val)}), using fallback: ${fallback}`,
+      );
+    }
+    return fallback;
+  };
+
   try {
     const raw = readFileSync(CONFIG_PATH, "utf-8");
     const parsed = JSON.parse(raw);
@@ -62,41 +82,81 @@ function loadConfig(): AppConfig {
       console.log("[app-config] Loaded from app.config.json");
       return {
         ai: {
-          requestTimeoutMs:
-            parsed.ai?.requestTimeoutMs ?? FALLBACK.ai.requestTimeoutMs,
-          defaultMaxTokens:
-            parsed.ai?.defaultMaxTokens ?? FALLBACK.ai.defaultMaxTokens,
-          defaultTemperature:
-            parsed.ai?.defaultTemperature ?? FALLBACK.ai.defaultTemperature,
+          requestTimeoutMs: safeNum(
+            parsed.ai?.requestTimeoutMs,
+            FALLBACK.ai.requestTimeoutMs,
+            "ai.requestTimeoutMs",
+          ),
+          defaultMaxTokens: safeNum(
+            parsed.ai?.defaultMaxTokens,
+            FALLBACK.ai.defaultMaxTokens,
+            "ai.defaultMaxTokens",
+          ),
+          defaultTemperature: safeNum(
+            parsed.ai?.defaultTemperature,
+            FALLBACK.ai.defaultTemperature,
+            "ai.defaultTemperature",
+          ),
         },
         embeddings: {
-          similarityThreshold:
-            parsed.embeddings?.similarityThreshold ??
+          similarityThreshold: safeNum(
+            parsed.embeddings?.similarityThreshold,
             FALLBACK.embeddings.similarityThreshold,
+            "embeddings.similarityThreshold",
+          ),
         },
         rerank: {
-          enabled: parsed.rerank?.enabled ?? FALLBACK.rerank.enabled,
-          candidateTopN:
-            parsed.rerank?.candidateTopN ?? FALLBACK.rerank.candidateTopN,
-          finalTopN: parsed.rerank?.finalTopN ?? FALLBACK.rerank.finalTopN,
+          enabled: safeBool(
+            parsed.rerank?.enabled,
+            FALLBACK.rerank.enabled,
+            "rerank.enabled",
+          ),
+          candidateTopN: safeNum(
+            parsed.rerank?.candidateTopN,
+            FALLBACK.rerank.candidateTopN,
+            "rerank.candidateTopN",
+          ),
+          finalTopN: safeNum(
+            parsed.rerank?.finalTopN,
+            FALLBACK.rerank.finalTopN,
+            "rerank.finalTopN",
+          ),
         },
         rateLimit: {
-          memosPerHour:
-            parsed.rateLimit?.memosPerHour ?? FALLBACK.rateLimit.memosPerHour,
-          memosPerDay:
-            parsed.rateLimit?.memosPerDay ?? FALLBACK.rateLimit.memosPerDay,
-          aiPerHour:
-            parsed.rateLimit?.aiPerHour ?? FALLBACK.rateLimit.aiPerHour,
-          aiPerDay: parsed.rateLimit?.aiPerDay ?? FALLBACK.rateLimit.aiPerDay,
+          memosPerHour: safeNum(
+            parsed.rateLimit?.memosPerHour,
+            FALLBACK.rateLimit.memosPerHour,
+            "rateLimit.memosPerHour",
+          ),
+          memosPerDay: safeNum(
+            parsed.rateLimit?.memosPerDay,
+            FALLBACK.rateLimit.memosPerDay,
+            "rateLimit.memosPerDay",
+          ),
+          aiPerHour: safeNum(
+            parsed.rateLimit?.aiPerHour,
+            FALLBACK.rateLimit.aiPerHour,
+            "rateLimit.aiPerHour",
+          ),
+          aiPerDay: safeNum(
+            parsed.rateLimit?.aiPerDay,
+            FALLBACK.rateLimit.aiPerDay,
+            "rateLimit.aiPerDay",
+          ),
         },
       };
     }
-  } catch {
-    // Config file not found or invalid, fall through to fallback
+  } catch (err: any) {
+    if (err?.code === "ENOENT") {
+      console.log(
+        "[app-config] app.config.json not found, using fallback defaults",
+      );
+    } else {
+      console.warn(
+        `[app-config] Failed to read/parse app.config.json: ${err?.message || err}, using fallback defaults`,
+      );
+    }
   }
-  console.log(
-    "[app-config] app.config.json not found or invalid, using fallback defaults",
-  );
   return { ...FALLBACK };
 }
 
