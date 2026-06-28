@@ -11,10 +11,9 @@ import {
   createCreativeItem,
   deleteCreativeItem,
   getMemos,
+  getTagCounts,
 } from "../db";
-import {
-  generateCreativeContentStream,
-} from "../ai/service";
+import { generateCreativeContentStream } from "../ai/service";
 import {
   checkRateLimit,
   recordRateLimit,
@@ -26,6 +25,14 @@ export const creativeApp = new Hono();
 
 /** Maximum number of tag-filtered memos used as context to avoid token overflow */
 const MAX_TAG_CONTEXT = 20;
+
+// --- Tags (with counts) ---
+
+// GET /api/creative/tags — 获取所有标签及其 memo 条数
+creativeApp.get("/tags", (c) => {
+  const tags = getTagCounts();
+  return c.json({ tags });
+});
 
 // --- Prompts endpoints ---
 
@@ -158,7 +165,11 @@ creativeApp.post("/generate", authMiddleware, async (c) => {
 
   // Tag mode: use tag-filtered memos as context
   if (typeof body.tag === "string" && body.tag.trim().length > 0) {
-    const memos = getMemos({ includePrivate: true, tag: body.tag.trim(), limit: MAX_TAG_CONTEXT });
+    const memos = getMemos({
+      includePrivate: true,
+      tag: body.tag.trim(),
+      limit: MAX_TAG_CONTEXT,
+    });
     contextMemos = memos.map((m) => m.content);
     contextMemoIds = memos.map((m) => m.id).join(",");
   }
@@ -204,7 +215,11 @@ creativeApp.post("/generate", authMiddleware, async (c) => {
       } catch (err) {
         // Suppress AbortError when client disconnects intentionally
         if (err instanceof Error && err.name === "AbortError") {
-          try { controller.close(); } catch { /* already closed */ }
+          try {
+            controller.close();
+          } catch {
+            /* already closed */
+          }
           return;
         }
         const errorMsg = JSON.stringify({

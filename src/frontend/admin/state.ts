@@ -150,7 +150,9 @@ export const creativeTimelineCache: {
 
 // ====== Tags State ======
 
-export const availableTags = van.state<string[]>([]);
+export const availableTags = van.state<Array<{ name: string; count: number }>>(
+  [],
+);
 export const tagsLoaded = van.state(false);
 
 // ====== Tag Autocomplete State ======

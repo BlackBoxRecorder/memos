@@ -16,6 +16,7 @@ import {
   selectedTagFilter,
   generating,
   generateError,
+  streamContent,
   streamAbort,
   creativeDeleteId,
   creativeDeleting,
@@ -27,7 +28,9 @@ import {
 
 export async function loadTags(): Promise<void> {
   try {
-    const data = await api<{ tags: string[] }>("api/memos/tags");
+    const data = await api<{ tags: Array<{ name: string; count: number }> }>(
+      "api/creative/tags",
+    );
     availableTags.val = data.tags;
   } catch {
     // silently ignore
@@ -113,7 +116,9 @@ export async function savePromptForm(): Promise<void> {
       });
     }
     const wasEdit = promptFormMode.val.type === "edit";
-    const savedId = wasEdit ? (promptFormMode.val as { type: "edit"; id: number }).id : null;
+    const savedId = wasEdit
+      ? (promptFormMode.val as { type: "edit"; id: number }).id
+      : null;
     closePromptForm();
     await loadPrompts();
     // Re-select the saved prompt
@@ -208,9 +213,31 @@ export async function handleGenerate(): Promise<void> {
       throw new Error(err.error || "请求失败");
     }
 
+    // rAF throttled streaming output
+    let streamBuffer = "";
+    let flushPending = false;
+    const flushStream = () => {
+      if (streamBuffer) {
+        streamContent.val += streamBuffer;
+        streamBuffer = "";
+      }
+      flushPending = false;
+    };
+
     for await (const msg of streamSSE(resp)) {
-      if (msg.type === "done") {
+      if (msg.type === "content") {
+        streamBuffer += msg.content as string;
+        if (!flushPending) {
+          flushPending = true;
+          requestAnimationFrame(flushStream);
+        }
+      } else if (msg.type === "done") {
+        // Flush any remaining buffered content
+        if (streamBuffer || flushPending) {
+          flushStream();
+        }
         creativeItems.val = [msg.item as CreativeItem, ...creativeItems.val];
+        extraPromptInput.val = "";
       } else if (msg.type === "error") {
         throw new Error(msg.error as string);
       }
@@ -221,6 +248,7 @@ export async function handleGenerate(): Promise<void> {
   } finally {
     generating.val = false;
     streamAbort.current = null;
+    streamContent.val = "";
   }
 }
 

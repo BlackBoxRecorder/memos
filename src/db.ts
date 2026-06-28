@@ -182,6 +182,16 @@ export function getAllTags(): string[] {
   return rows.map((r) => r.value);
 }
 
+export function getTagCounts(): Array<{ name: string; count: number }> {
+  const d = getDb();
+  const rows = d
+    .query(
+      "SELECT value as name, COUNT(*) as count FROM memos, json_each(memos.tags) WHERE value != '' GROUP BY value ORDER BY value",
+    )
+    .all() as Array<{ name: string; count: number }>;
+  return rows;
+}
+
 export function countMemos(opts: { includePrivate: boolean }): number {
   const d = getDb();
   const where = opts.includePrivate ? "" : "WHERE is_public = 1";

@@ -44,9 +44,12 @@ export function FormModal() {
     if (!input) return [];
     return availableTags.val
       .filter(
-        (t) => !formTags.val.includes(t) && t.toLowerCase().includes(input),
+        (t) =>
+          !formTags.val.includes(t.name) &&
+          t.name.toLowerCase().includes(input),
       )
-      .slice(0, 8);
+      .slice(0, 8)
+      .map((t) => t.name);
   }
 
   // Helper: add tag from suggestion or input

@@ -8,6 +8,7 @@ import {
   extraPromptInput,
   generating,
   generateError,
+  streamContent,
 } from "../state";
 import { handleGenerate, selectPrompt } from "../actions/creative-core";
 
@@ -33,17 +34,18 @@ function TagSelector() {
           button(
             {
               class: () =>
-                "mode-btn" + (selectedTagFilter.val === tag ? " active" : ""),
+                "mode-btn" +
+                (selectedTagFilter.val === tag.name ? " active" : ""),
               style:
                 "font-size:12px;padding:3px 10px;border-radius:12px;" +
                 "white-space:nowrap;",
               disabled: () => generating.val,
               onclick: () => {
                 selectedTagFilter.val =
-                  selectedTagFilter.val === tag ? "" : tag;
+                  selectedTagFilter.val === tag.name ? "" : tag.name;
               },
             },
-            tag,
+            tag.name + " (" + tag.count + ")",
           ),
         ),
       );
@@ -83,6 +85,31 @@ function PromptSelector() {
         ),
       );
     },
+    // Prompt content preview
+    () => {
+      const id = selectedPromptId.val;
+      if (id === null) return "";
+      const prompt = prompts.val.find((p) => p.id === id);
+      if (!prompt) return "";
+      return div(
+        {
+          style:
+            "margin-top:8px;border:1px solid var(--border-color);" +
+            "border-radius:8px;overflow:hidden;width:100%;",
+        },
+        textarea({
+          readonly: true,
+          value: prompt.content,
+          style:
+            "width:100%;height:180px;box-sizing:border-box;" +
+            "padding:10px;font-size:13px;line-height:1.5;" +
+            "border:none;resize:none;outline:none;" +
+            "background:var(--bg-secondary);color:var(--text-primary);" +
+            "overflow-y:auto;overflow-x:hidden;" +
+            "word-wrap:break-word;white-space:pre-wrap;font-family:inherit;",
+        }),
+      );
+    },
   );
 }
 
@@ -116,6 +143,49 @@ function LoadingBar() {
           "animation:loading-37 1s infinite steps(6);"
         : "display:none;",
   });
+}
+
+// ====== Stream Output ======
+
+function StreamOutput() {
+  const textareaRef: { current: HTMLTextAreaElement | null } = {
+    current: null,
+  };
+
+  // Smart scroll: auto-follow bottom unless user has scrolled up
+  van.derive(() => {
+    const el = textareaRef.current;
+    const content = streamContent.val;
+    if (!el || !content) return;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight <= 20) {
+      requestAnimationFrame(() => {
+        el.scrollTop = el.scrollHeight;
+      });
+    }
+  });
+
+  return () =>
+    generating.val
+      ? textarea({
+          readonly: true,
+          value: () => streamContent.val,
+          style:
+            "width:100%;height:180px;box-sizing:border-box;" +
+            "padding:10px;font-size:13px;font-family:monospace;" +
+            "line-height:1.5;border:1px solid var(--border-color);" +
+            "border-radius:6px;resize:none;outline:none;" +
+            "background:var(--bg-secondary);color:var(--text-primary);" +
+            "overflow-y:auto;overflow-x:hidden;" +
+            "word-wrap:break-word;white-space:pre-wrap;" +
+            "margin-top:8px;",
+          oncreate: (el: HTMLTextAreaElement) => {
+            textareaRef.current = el;
+          },
+          onremove: () => {
+            textareaRef.current = null;
+          },
+        })
+      : "";
 }
 
 // ====== GenerateBar ======
@@ -214,6 +284,8 @@ export function GenerateBar() {
     ),
     // Loading bar animation
     LoadingBar(),
+    // Stream output display (only during generation)
+    StreamOutput(),
     // Error display
     () =>
       generateError.val
