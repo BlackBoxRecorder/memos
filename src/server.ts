@@ -81,6 +81,24 @@ app.get("/admin/index.html", async (c) =>
   serveHtml("/frontend/admin/index.html", "/admin/"),
 );
 
+// /about → 产品介绍页
+app.get("/about", async (c) =>
+  serveHtml("/frontend/about/index.html", "/about/"),
+);
+app.get("/about/", async (c) =>
+  serveHtml("/frontend/about/index.html", "/about/"),
+);
+
+// about 页面图片静态资源
+app.get("/about/images/*", async (c) => {
+  const imagePath = c.req.path.replace("/about/", "");
+  const file = Bun.file(`${STATIC_BASE}/frontend/about/${imagePath}`);
+  if (!(await file.exists())) {
+    return new Response("Not Found", { status: 404 });
+  }
+  return new Response(file);
+});
+
 // /index.js → 预构建 JS bundle
 app.get("/index.js", async (c) => {
   const file = Bun.file(`${DIST_BASE}/masonry/index.js`);
@@ -136,7 +154,9 @@ try {
   console.log(`Memos server running at http://localhost:${PORT}`);
 } catch (err: any) {
   if (err?.code === "EADDRINUSE") {
-    console.error(`\u274C 端口 ${PORT} 已被占用，请先关闭占用进程或设置 PORT 环境变量使用其他端口`);
+    console.error(
+      `\u274C 端口 ${PORT} 已被占用，请先关闭占用进程或设置 PORT 环境变量使用其他端口`,
+    );
     process.exit(1);
   }
   console.error(`\u274C 服务器启动失败:`, err);

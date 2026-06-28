@@ -30,7 +30,15 @@ import {
 } from "./state";
 import { fetchAndRender, openSimilarModal, debouncedSearch } from "./api";
 import van from "vanjs-core";
-import { svgSearchIcon, svgChevronDown, svgEyeIcon, svgCopy, svgCheck, svgSun, svgMoon } from "../../helper/svgHelper";
+import {
+  svgSearchIcon,
+  svgChevronDown,
+  svgEyeIcon,
+  svgCopy,
+  svgCheck,
+  svgSun,
+  svgMoon,
+} from "../../helper/svgHelper";
 import { escapeHtml } from "../shared/utils/text";
 import { copyToClipboard } from "../shared/utils/clipboard";
 import { ReadMoreModal } from "../shared/components/ReadMoreModal";
@@ -62,7 +70,10 @@ export function toggleTheme(): void {
 
 // 跨标签页实时同步主题
 window.addEventListener("storage", (e) => {
-  if (e.key === THEME_KEY && (e.newValue === "dark" || e.newValue === "light")) {
+  if (
+    e.key === THEME_KEY &&
+    (e.newValue === "dark" || e.newValue === "light")
+  ) {
     theme.val = e.newValue;
     document.documentElement.dataset.theme = theme.val;
   }
@@ -157,7 +168,8 @@ function FilterBar() {
       button(
         {
           class: "theme-toggle-btn",
-          title: () => (theme.val === "dark" ? "切换到亮色模式" : "切换到暗色模式"),
+          title: () =>
+            theme.val === "dark" ? "切换到亮色模式" : "切换到暗色模式",
           onclick: toggleTheme,
         },
         () => (theme.val === "dark" ? svgSun() : svgMoon()),
@@ -165,6 +177,7 @@ function FilterBar() {
       a({ href: "admin/", id: "admin-btn" }, () =>
         authenticated.val === false ? "\u767B\u5F55" : "Admin",
       ),
+      a({ href: "/about", id: "admin-btn" }, "\u5173\u4E8E"),
     ),
   );
 }
@@ -182,12 +195,12 @@ function MasonryCard(card: Card, index: number, layoutState: LayoutState) {
     () =>
       card.pinnedAt
         ? div(
-          {
-            style:
-              "font-size:12px;color:var(--pin-color);padding:0 0 4px 0;display:flex;align-items:center;gap:2px;",
-          },
-          "\uD83D\uDCCC \u5DF2\u7F6E\u9876",
-        )
+            {
+              style:
+                "font-size:12px;color:var(--pin-color);padding:0 0 4px 0;display:flex;align-items:center;gap:2px;",
+            },
+            "\uD83D\uDCCC \u5DF2\u7F6E\u9876",
+          )
         : "",
     div({ class: "card-text" }, escapeHtml(displayText)),
     () => {
@@ -223,13 +236,13 @@ function MasonryCard(card: Card, index: number, layoutState: LayoutState) {
       () =>
         isTruncated
           ? button(
-            {
-              class: "card-readmore-btn",
-              title: "Read more",
-              onclick: () => openReadMore(card.rawText),
-            },
-            svgEyeIcon(),
-          )
+              {
+                class: "card-readmore-btn",
+                title: "Read more",
+                onclick: () => openReadMore(card.rawText),
+              },
+              svgEyeIcon(),
+            )
           : "",
       button(
         {
