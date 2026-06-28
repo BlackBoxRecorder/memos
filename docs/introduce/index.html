@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Memos — 轻量级智能备忘录</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        bg: { DEFAULT: '#0d1117', card: '#161b22', elevated: '#1c2128' },
+        fg: { DEFAULT: '#f0f6fc', muted: '#8b949e', subtle: '#484f58' },
+        accent: { DEFAULT: '#58a6ff', dim: '#388bfd' },
+        border: '#30363d'
+      }
+    }
+  }
+}
+</script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background-color: #0d1117;
+    color: #f0f6fc;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+  }
+
+  /* Carousel */
+  .carousel-track {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    border-radius: 0.75rem;
+  }
+  .carousel-track::-webkit-scrollbar { display: none; }
+
+  .carousel-slide {
+    flex: 0 0 100%;
+    scroll-snap-align: start;
+  }
+  .carousel-slide img {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 0.75rem;
+    border: 1px solid #30363d;
+  }
+
+  .carousel-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #30363d;
+    border: none;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .carousel-dot.active { background: #58a6ff; }
+
+  .carousel-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(22,27,34,0.85);
+    border: 1px solid #30363d;
+    color: #8b949e;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    opacity: 0;
+    transition: opacity 0.2s;
+    z-index: 2;
+  }
+  .carousel-wrapper:hover .carousel-arrow { opacity: 1; }
+  .carousel-arrow:hover { background: #1c2128; color: #f0f6fc; }
+  .carousel-arrow.prev { left: 8px; }
+  .carousel-arrow.next { right: 8px; }
+
+  /* Fade in */
+  .fade-in {
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+  }
+  .fade-in.visible { opacity: 1; transform: translateY(0); }
+</style>
+</head>
+<body>
+
+<!-- ==================== HERO ==================== -->
+<section class="min-h-screen flex flex-col items-center justify-center text-center px-6 py-24">
+  <div class="max-w-3xl">
+    <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-[#30363d] bg-[#161b22] text-sm text-[#8b949e] mb-8">
+      <span class="w-2 h-2 rounded-full bg-[#3fb950]"></span>
+      开源 &amp; 自托管
+    </div>
+    <h1 class="text-5xl md:text-7xl font-bold tracking-tight mb-6">
+      随手记录，<span class="text-[#58a6ff]">随心整理</span>
+    </h1>
+    <p class="text-xl md:text-2xl text-[#8b949e] mb-10 leading-relaxed">
+      轻量级备忘录系统，融合 AI 智能工具箱。<br class="hidden sm:block">
+      瀑布流浏览、标签筛选、全文搜索，让每一条想法都有归处。
+    </p>
+    <div class="flex flex-col sm:flex-row gap-4 justify-center">
+      <a href="/" class="px-8 py-3 rounded-lg bg-[#58a6ff] text-white font-semibold hover:bg-[#388bfd] transition-colors">
+        开始使用
+      </a>
+      <a href="#features" class="px-8 py-3 rounded-lg border border-[#30363d] text-[#f0f6fc] font-semibold hover:bg-[#161b22] transition-colors">
+        了解功能
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== FEATURES ==================== -->
+<div id="features"></div>
+
+<!-- Section 1: 瀑布流首页 (image right) -->
+<section class="py-24 px-6 fade-in">
+  <div class="max-w-6xl mx-auto flex flex-col lg:flex-row items-center gap-12">
+    <div class="flex-1">
+      <span class="text-xs font-semibold tracking-widest uppercase text-[#58a6ff] mb-3 block">核心体验</span>
+      <h2 class="text-3xl md:text-4xl font-bold mb-6">瀑布流首页</h2>
+      <p class="text-[#8b949e] leading-relaxed mb-4">
+        采用 Masonry 瀑布流布局，浏览备忘录如同翻阅杂志。内置虚拟滚动技术，即使上千条记录也能流畅滚动。
+      </p>
+      <ul class="space-y-3 text-[#8b949e]">
+        <li class="flex items-start gap-3">
+          <span class="text-[#58a6ff] mt-1 shrink-0">▸</span>
+          <span><strong class="text-[#f0f6fc]">Tag 标签筛选</strong> — 点击标签即时过滤，快速定位目标内容</span>
+        </li>
+        <li class="flex items-start gap-3">
+          <span class="text-[#58a6ff] mt-1 shrink-0">▸</span>
+          <span><strong class="text-[#f0f6fc]">相似搜索</strong> — 基于文本嵌入的语义搜索，发现关联 memo</span>
+        </li>
+        <li class="flex items-start gap-3">
+          <span class="text-[#58a6ff] mt-1 shrink-0">▸</span>
+          <span><strong class="text-[#f0f6fc]">Markdown 渲染</strong> — 支持完整 Markdown 语法，内容呈现清晰美观</span>
+        </li>
+        <li class="flex items-start gap-3">
+          <span class="text-[#58a6ff] mt-1 shrink-0">▸</span>
+          <span><strong class="text-[#f0f6fc]">深色 / 浅色主题</strong> — 一键切换，适配不同阅读环境</span>
+        </li>
+      </ul>
+    </div>
+    <div class="flex-1 w-full max-w-lg lg:max-w-none">
+      <div class="carousel-wrapper relative" data-carousel>
+        <div class="carousel-track" data-carousel-track>
+          <div class="carousel-slide"><img src="images/memo1.png" alt="瀑布流首页"></div>
+          <div class="carousel-slide"><img src="images/memo2.png" alt="瀑布流首页"></div>
+          <div class="carousel-slide"><img src="images/memo3.png" alt="瀑布流首页"></div>
+        </div>
+        <button class="carousel-arrow prev" data-carousel-prev aria-label="上一张">‹</button>
+        <button class="carousel-arrow next" data-carousel-next aria-label="下一张">›</button>
+        <div class="flex justify-center gap-2 mt-4" data-carousel-dots></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Section 2: 管理后台 (image left) -->
+<section class="py-24 px-6 bg-[#161b22] fade-in">
+  <div class="max-w-6xl mx-auto flex flex-col lg:flex-row-reverse items-center gap-12">
+    <div class="flex-1">
+      <span class="text-xs font-semibold tracking-widest uppercase text-[#58a6ff] mb-3 block">内容管理</span>
+      <h2 class="text-3xl md:text-4xl font-bold mb-6">管理后台</h2>
+      <p class="text-[#8b949e] leading-relaxed mb-4">
+        独立的密钥认证管理后台，提供完整的备忘录生命周期管理。从创建到归档，一切尽在掌控。
+      </p>
+      <ul class="space-y-3 text-[#8b949e]">
+        <li class="flex items-start gap-3">
+          <span class="text-[#58a6ff] mt-1 shrink-0">▸</span>
+          <span><strong class="text-[#f0f6fc]">完整 CRUD</strong> — 新建、编辑、删除备忘录，支持可见性切换与置顶</span>
+        </li>
+        <li class="flex items-start gap-3">
+          <span class="text-[#58a6ff] mt-1 shrink-0">▸</span>
+          <span><strong class="text-[#f0f6fc]">左侧时间线</strong> — 按时间轴快速跳转，回顾任意时刻的记录</span>
+        </li>
+        <li class="flex items-start gap-3">
+          <span class="text-[#58a6ff] mt-1 shrink-0">▸</span>
+          <span><strong class="text-[#f0f6fc]">AI 工具箱辅助</strong> — 创建时一键调用 AI 润色、扩写、总结</span>
+        </li>
+        <li class="flex items-start gap-3">
+          <span class="text-[#58a6ff] mt-1 shrink-0">▸</span>
+          <span><strong class="text-[#f0f6fc]">Tag 自动建议</strong> — 输入标签时智能补全，保持分类一致</span>
+        </li>
+      </ul>
+    </div>
+    <div class="flex-1 w-full max-w-lg lg:max-w-none">
+      <div class="carousel-wrapper relative" data-carousel>
+        <div class="carousel-track" data-carousel-track>
+          <div class="carousel-slide"><img src="images/memo12.png" alt="管理后台"></div>
+          <div class="carousel-slide"><img src="images/memo13.png" alt="管理后台"></div>
+          <div class="carousel-slide"><img src="images/memo14.png" alt="管理后台"></div>
+        </div>
+        <button class="carousel-arrow prev" data-carousel-prev aria-label="上一张">‹</button>
+        <button class="carousel-arrow next" data-carousel-next aria-label="下一张">›</button>
+        <div class="flex justify-center gap-2 mt-4" data-carousel-dots></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Section 3: Creative 创意生成 (image right, 4 slides) -->
+<section class="py-24 px-6 fade-in">
+  <div class="max-w-6xl mx-auto flex flex-col lg:flex-row items-center gap-12">
+    <div class="flex-1">
+      <span class="text-xs font-semibold tracking-widest uppercase text-[#58a6ff] mb-3 block">AI 创作</span>
+      <h2 class="text-3xl md:text-4xl font-bold mb-6">创意生成 &amp; 提示词管理</h2>
+      <p class="text-[#8b949e] leading-relaxed mb-4">
+        内置 AI 创意工作台，支持多种生成模式。自定义提示词库，让 AI 按你的方式写作。
+      </p>
+      <ul class="space-y-3 text-[#8b949e]">
+        <li class="flex items-start gap-3">
+          <span class="text-[#58a6ff] mt-1 shrink-0">▸</span>
+          <span><strong class="text-[#f0f6fc]">创意生成</strong> — 给定主题，AI 生成创意内容或灵感拓展</span>
+        </li>
+        <li class="flex items-start gap-3">
+          <span class="text-[#58a6ff] mt-1 shrink-0">▸</span>
+          <span><strong class="text-[#f0f6fc]">内容聚合</strong> — 多段素材汇整为连贯短文</span>
+        </li>
+        <li class="flex items-start gap-3">
+          <span class="text-[#58a6ff] mt-1 shrink-0">▸</span>
+          <span><strong class="text-[#f0f6fc]">日记优化</strong> — 润色日常记录，提升表达清晰度</span>
+        </li>
+        <li class="flex items-start gap-3">
+          <span class="text-[#58a6ff] mt-1 shrink-0">▸</span>
+          <span><strong class="text-[#f0f6fc]">知识整理</strong> — 将零散笔记组织为结构化知识</span>
+        </li>
+        <li class="flex items-start gap-3">
+          <span class="text-[#58a6ff] mt-1 shrink-0">▸</span>
+          <span><strong class="text-[#f0f6fc]">自定义提示词</strong> — 管理个人提示词库，精细控制生成行为</span>
+        </li>
+      </ul>
+    </div>
+    <div class="flex-1 w-full max-w-lg lg:max-w-none">
+      <div class="carousel-wrapper relative" data-carousel>
+        <div class="carousel-track" data-carousel-track>
+          <div class="carousel-slide"><img src="images/memo7.png" alt="创意生成"></div>
+          <div class="carousel-slide"><img src="images/memo8.png" alt="创意生成"></div>
+          <div class="carousel-slide"><img src="images/memo9.png" alt="创意生成"></div>
+          <div class="carousel-slide"><img src="images/memo10.png" alt="创意生成"></div>
+        </div>
+        <button class="carousel-arrow prev" data-carousel-prev aria-label="上一张">‹</button>
+        <button class="carousel-arrow next" data-carousel-next aria-label="下一张">›</button>
+        <div class="flex justify-center gap-2 mt-4" data-carousel-dots></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Section 4: 多模型选择 (image left) -->
+<section class="py-24 px-6 bg-[#161b22] fade-in">
+  <div class="max-w-6xl mx-auto flex flex-col lg:flex-row-reverse items-center gap-12">
+    <div class="flex-1">
+      <span class="text-xs font-semibold tracking-widest uppercase text-[#58a6ff] mb-3 block">灵活配置</span>
+      <h2 class="text-3xl md:text-4xl font-bold mb-6">多模型自由选择</h2>
+      <p class="text-[#8b949e] leading-relaxed mb-4">
+        不绑定单一 AI 服务商。支持配置多个模型提供商，按需切换，灵活控制成本和效果。
+      </p>
+      <ul class="space-y-3 text-[#8b949e]">
+        <li class="flex items-start gap-3">
+          <span class="text-[#58a6ff] mt-1 shrink-0">▸</span>
+          <span><strong class="text-[#f0f6fc]">多提供商支持</strong> — 兼容主流 AI 服务 API</span>
+        </li>
+        <li class="flex items-start gap-3">
+          <span class="text-[#58a6ff] mt-1 shrink-0">▸</span>
+          <span><strong class="text-[#f0f6fc]">可视化配置</strong> — 在界面中直接选择和切换模型</span>
+        </li>
+        <li class="flex items-start gap-3">
+          <span class="text-[#58a6ff] mt-1 shrink-0">▸</span>
+          <span><strong class="text-[#f0f6fc]">即切即用</strong> — 切换模型无需重启，即时生效</span>
+        </li>
+      </ul>
+    </div>
+    <div class="flex-1 w-full max-w-lg lg:max-w-none">
+      <div class="carousel-wrapper relative" data-carousel>
+        <div class="carousel-track" data-carousel-track>
+          <div class="carousel-slide"><img src="images/memo5.png" alt="模型选择"></div>
+          <div class="carousel-slide"><img src="images/memo6.png" alt="模型选择"></div>
+          <div class="carousel-slide hidden"><img src="" alt="待补充"></div>
+        </div>
+        <button class="carousel-arrow prev" data-carousel-prev aria-label="上一张">‹</button>
+        <button class="carousel-arrow next" data-carousel-next aria-label="下一张">›</button>
+        <div class="flex justify-center gap-2 mt-4" data-carousel-dots></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Section 5: 数据导入导出 (image right) -->
+<section class="py-24 px-6 fade-in">
+  <div class="max-w-6xl mx-auto flex flex-col lg:flex-row items-center gap-12">
+    <div class="flex-1">
+      <span class="text-xs font-semibold tracking-widest uppercase text-[#58a6ff] mb-3 block">数据自由</span>
+      <h2 class="text-3xl md:text-4xl font-bold mb-6">数据导入导出</h2>
+      <p class="text-[#8b949e] leading-relaxed mb-4">
+        你的数据属于你。支持从 Flomo 等平台迁移数据，也可随时导出为 JSON 格式。
+      </p>
+      <ul class="space-y-3 text-[#8b949e]">
+        <li class="flex items-start gap-3">
+          <span class="text-[#58a6ff] mt-1 shrink-0">▸</span>
+          <span><strong class="text-[#f0f6fc]">Flomo HTML 导入</strong> — 解析 Flomo 导出的 HTML 文件，一键迁移全部记录</span>
+        </li>
+        <li class="flex items-start gap-3">
+          <span class="text-[#58a6ff] mt-1 shrink-0">▸</span>
+          <span><strong class="text-[#f0f6fc]">JSON 导出</strong> — 完整导出备忘录数据，格式开放便于二次利用</span>
+        </li>
+        <li class="flex items-start gap-3">
+          <span class="text-[#58a6ff] mt-1 shrink-0">▸</span>
+          <span><strong class="text-[#f0f6fc]">无锁定风险</strong> — 数据始终可自由迁移，不被平台绑定</span>
+        </li>
+      </ul>
+    </div>
+    <div class="flex-1 w-full max-w-lg lg:max-w-none">
+      <div class="carousel-wrapper relative" data-carousel>
+        <div class="carousel-track" data-carousel-track>
+          <div class="carousel-slide"><img src="images/memo11.png" alt="数据导入导出"></div>
+          <div class="carousel-slide hidden"><img src="" alt="待补充"></div>
+          <div class="carousel-slide hidden"><img src="" alt="待补充"></div>
+        </div>
+        <button class="carousel-arrow prev" data-carousel-prev aria-label="上一张">‹</button>
+        <button class="carousel-arrow next" data-carousel-next aria-label="下一张">›</button>
+        <div class="flex justify-center gap-2 mt-4" data-carousel-dots></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== USE CASES ==================== -->
+<section class="py-24 px-6">
+  <div class="max-w-5xl mx-auto text-center">
+    <h2 class="text-3xl md:text-4xl font-bold mb-16">使用场景</h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <div class="p-8 rounded-xl bg-[#161b22] border border-[#30363d] text-left fade-in">
+        <div class="w-12 h-12 rounded-lg bg-[#1c2128] flex items-center justify-center text-2xl mb-5">📝</div>
+        <h3 class="text-xl font-bold mb-3">个人日记</h3>
+        <p class="text-[#8b949e] leading-relaxed">随手记录生活点滴与每日感悟。AI 辅助润色，让表达更精准。</p>
+      </div>
+      <div class="p-8 rounded-xl bg-[#161b22] border border-[#30363d] text-left fade-in">
+        <div class="w-12 h-12 rounded-lg bg-[#1c2128] flex items-center justify-center text-2xl mb-5">📚</div>
+        <h3 class="text-xl font-bold mb-3">知识管理</h3>
+        <p class="text-[#8b949e] leading-relaxed">整理学习笔记和资料摘录。标签系统 + 全文搜索，构建个人知识库。</p>
+      </div>
+      <div class="p-8 rounded-xl bg-[#161b22] border border-[#30363d] text-left fade-in">
+        <div class="w-12 h-12 rounded-lg bg-[#1c2128] flex items-center justify-center text-2xl mb-5">💡</div>
+        <h3 class="text-xl font-bold mb-3">灵感捕捉</h3>
+        <p class="text-[#8b949e] leading-relaxed">快速抓住一闪而过的创意。AI 创意生成帮你将点子扩展为完整思路。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== FOOTER ==================== -->
+<footer class="py-12 px-6 border-t border-[#30363d]">
+  <div class="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
+    <div class="flex items-center gap-2 text-[#8b949e] text-sm">
+      <span class="font-semibold text-[#f0f6fc]">Memos</span>
+      <span>·</span>
+      <span>轻量级智能备忘录</span>
+    </div>
+    <div class="flex items-center gap-3 text-xs text-[#484f58]">
+      <span>Bun</span>
+      <span class="text-[#30363d]">|</span>
+      <span>SQLite</span>
+      <span class="text-[#30363d]">|</span>
+      <span>Hono</span>
+      <span class="text-[#30363d]">|</span>
+      <span>VanJS</span>
+    </div>
+  </div>
+</footer>
+
+<!-- ==================== SCRIPTS ==================== -->
+<script>
+// --- Carousel ---
+function initCarousel(wrapper) {
+  const track = wrapper.querySelector('[data-carousel-track]');
+  const dotsContainer = wrapper.querySelector('[data-carousel-dots]');
+  const prevBtn = wrapper.querySelector('[data-carousel-prev]');
+  const nextBtn = wrapper.querySelector('[data-carousel-next]');
+
+  // Count visible slides (exclude hidden ones)
+  const allSlides = track.querySelectorAll('.carousel-slide');
+  const slides = Array.from(allSlides).filter(s => !s.classList.contains('hidden'));
+  const count = slides.length;
+
+  if (count <= 1) {
+    if (prevBtn) prevBtn.style.display = 'none';
+    if (nextBtn) nextBtn.style.display = 'none';
+    return;
+  }
+
+  // Create dots
+  for (let i = 0; i < count; i++) {
+    const dot = document.createElement('button');
+    dot.className = 'carousel-dot';
+    dot.setAttribute('aria-label', `第 ${i + 1} 张`);
+    dot.addEventListener('click', () => goTo(i));
+    dotsContainer.appendChild(dot);
+  }
+  const dots = dotsContainer.querySelectorAll('.carousel-dot');
+
+  function updateDots(index) {
+    dots.forEach((d, i) => d.classList.toggle('active', i === index));
+  }
+
+  function getCurrentIndex() {
+    const scrollLeft = track.scrollLeft;
+    const slideWidth = track.clientWidth;
+    return Math.round(scrollLeft / slideWidth);
+  }
+
+  function goTo(index) {
+    const target = slides[index];
+    if (target) {
+      track.scrollLeft = target.offsetLeft - track.offsetLeft;
+      updateDots(index);
+    }
+  }
+
+  track.addEventListener('scroll', () => {
+    updateDots(getCurrentIndex());
+  }, { passive: true });
+
+  prevBtn.addEventListener('click', () => {
+    const idx = getCurrentIndex();
+    goTo(Math.max(0, idx - 1));
+  });
+
+  nextBtn.addEventListener('click', () => {
+    const idx = getCurrentIndex();
+    goTo(Math.min(count - 1, idx + 1));
+  });
+
+  // Init
+  updateDots(0);
+}
+
+document.querySelectorAll('[data-carousel]').forEach(initCarousel);
+
+// --- Fade in on scroll ---
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+    }
+  });
+}, { threshold: 0.15 });
+
+document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+</script>
+
+</body>
+</html>
