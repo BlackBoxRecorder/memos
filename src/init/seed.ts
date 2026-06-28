@@ -5,7 +5,7 @@ import {
   getAllPrompts,
   createPrompt,
   getMemos,
-  createMemo,
+  importMemo,
   countMemos,
 } from "../db";
 
@@ -60,6 +60,19 @@ function seedPromptsIfEmpty(): void {
   );
 }
 
+/** 从条目中解析日期行 --YYYY-MM-DD--，返回日期和纯内容；无日期行返回 null */
+function parseMemoDate(
+  entry: string,
+): { date: string; content: string } | null {
+  const match = entry.match(/^--(\d{4}-\d{2}-\d{2})--/m);
+  if (!match) return null;
+  const dateStr = match[1];
+  // 移除日期行，保留后续内容
+  const content = entry.replace(/^--\d{4}-\d{2}-\d{2}--[\r\n]*/m, "").trim();
+  if (!content) return null;
+  return { date: `${dateStr}T00:00:00`, content };
+}
+
 function seedMemosIfEmpty(): void {
   const count = countMemos({ includePrivate: true });
   if (count > 0) {
@@ -88,17 +101,28 @@ function seedMemosIfEmpty(): void {
   let skipped = 0;
 
   for (const entry of entries) {
-    if (existingContents.has(entry)) {
+    const parsed = parseMemoDate(entry);
+    if (!parsed) {
+      console.warn(`[seed] 跳过无日期行的条目 [${entry.slice(0, 50)}...]`);
+      continue;
+    }
+
+    if (existingContents.has(parsed.content)) {
       skipped++;
       continue;
     }
     try {
-      createMemo(entry, true);
-      existingContents.add(entry);
+      importMemo({
+        content: parsed.content,
+        tags: [],
+        is_public: true,
+        created_at: parsed.date,
+      });
+      existingContents.add(parsed.content);
       inserted++;
     } catch (err) {
       console.error(
-        `[seed] 示例 memo 导入失败 [${entry.slice(0, 50)}...]:`,
+        `[seed] 示例 memo 导入失败 [${parsed.content.slice(0, 50)}...]:`,
         err,
       );
     }
