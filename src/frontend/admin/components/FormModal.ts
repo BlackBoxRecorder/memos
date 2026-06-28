@@ -73,13 +73,14 @@ export function FormModal() {
     },
     div(
       { class: "modal modal-wide" },
-      h3(title),
+      h3({ style: "margin-bottom: 5px;" }, title),
       textarea({
         id: "form-content",
         placeholder: "在想些什么？",
         disabled: () => formSaving.val,
         value: formContent,
-        style: "height: 240px; resize: none;",
+        style:
+          "height: 240px; resize: none; overflow-x: hidden; word-wrap: break-word; white-space: pre-wrap;",
         oninput: (e: Event) => {
           formContent.val = (e.target as HTMLTextAreaElement).value;
         },
