@@ -60,6 +60,16 @@ function seedPromptsIfEmpty(): void {
   );
 }
 
+/** 从条目中解析标签行 --tag: tag1 | tag2 --，返回标签数组；无标签行返回空数组 */
+function parseTags(entry: string): string[] {
+  const match = entry.match(/^--tag:\s*(.+?)\s*--/m);
+  if (!match) return [];
+  return match[1]!
+    .split("|")
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0);
+}
+
 /** 从条目中解析日期行 --YYYY-MM-DD--，返回日期和纯内容；无日期行返回 null */
 function parseMemoDate(
   entry: string,
@@ -67,8 +77,11 @@ function parseMemoDate(
   const match = entry.match(/^--(\d{4}-\d{2}-\d{2})--/m);
   if (!match) return null;
   const dateStr = match[1];
-  // 移除日期行，保留后续内容
-  const content = entry.replace(/^--\d{4}-\d{2}-\d{2}--[\r\n]*/m, "").trim();
+  // 移除日期行和标签行，保留后续内容
+  const content = entry
+    .replace(/^--\d{4}-\d{2}-\d{2}--[\r\n]*/m, "")
+    .replace(/^--tag:.+--[\r\n]*/m, "")
+    .trim();
   if (!content) return null;
   return { date: `${dateStr}T00:00:00`, content };
 }
@@ -114,7 +127,7 @@ function seedMemosIfEmpty(): void {
     try {
       importMemo({
         content: parsed.content,
-        tags: [],
+        tags: parseTags(entry),
         is_public: true,
         created_at: parsed.date,
       });
